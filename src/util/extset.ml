@@ -9,45 +9,7 @@
 (*                                                                  *)
 (********************************************************************)
 
-module type S = sig
-  module M : Extmap.S
-  type elt = M.key
-  type t = unit M.t
-  val empty: t
-  val is_empty: t -> bool
-  val mem: elt -> t -> bool
-  val add: elt -> t -> t
-  val singleton: elt -> t
-  val remove: elt -> t -> t
-  val merge: (elt -> bool -> bool -> bool) -> t -> t -> t
-  val compare: t -> t -> int
-  val equal: t -> t -> bool
-  val subset: t -> t -> bool
-  val disjoint: t -> t -> bool
-  val iter: (elt -> unit) -> t -> unit
-  val fold: (elt -> 'a -> 'a) -> t -> 'a -> 'a
-  val for_all: (elt -> bool) -> t -> bool
-  val exists: (elt -> bool) -> t -> bool
-  val filter: (elt -> bool) -> t -> t
-  val partition: (elt -> bool) -> t -> t * t
-  val cardinal: t -> int
-  val elements: t -> elt list
-  val min_elt: t -> elt
-  val max_elt: t -> elt
-  val choose: t -> elt
-  val split: elt -> t -> t * bool * t
-  val change : (bool -> bool) -> elt -> t -> t
-  val union : t -> t -> t
-  val inter : t -> t -> t
-  val diff : t -> t -> t
-  val fold_left : ('b -> elt -> 'b) -> 'b -> t -> 'b
-  val fold2_inter : (elt -> 'a -> 'a) -> t -> t -> 'a -> 'a
-  val fold2_union : (elt -> 'a -> 'a) -> t -> t -> 'a -> 'a
-  val translate : (elt -> elt) -> t -> t
-  val add_new : exn -> elt -> t -> t
-  val is_num_elt : int -> t -> bool
-  val of_list : elt list -> t
-end
+module type S = Map_intf.Set
 
 module MakeOfMap (M: Extmap.S) = struct
   module M = M
@@ -93,6 +55,4 @@ module MakeOfMap (M: Extmap.S) = struct
   let of_list l = List.fold_left (fun acc a -> add a acc) empty l
 end
 
-module type OrderedType = Set.OrderedType
-
-module Make(Ord: OrderedType) = MakeOfMap(Extmap.Make(Ord))
+module Make(Ord: Map_intf.OrderedType) = MakeOfMap(Extmap.Make(Ord))

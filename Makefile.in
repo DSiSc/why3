@@ -106,7 +106,7 @@ LIBGENERATED = src/util/config.ml src/util/rc.ml src/parser/lexer.ml \
 	       src/driver/driver_parser.mli src/driver/driver_parser.ml \
 	       src/driver/driver_lexer.ml src/session/xml.ml
 
-LIB_UTIL = config util opt lists strings extmap extset exthtbl weakhtbl \
+LIB_UTIL = config util opt lists strings map_intf extmap extset exthtbl weakhtbl \
 	   hashcons stdlib exn_printer pp debug loc print_tree \
 	   cmdline warning sysutil rc plugin number pqueue
 

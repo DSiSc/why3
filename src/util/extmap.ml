@@ -16,80 +16,9 @@
    It is distributed under the terms of its initial license, which
    is provided in the file OCAML-LICENSE. *)
 
-module type S =
-  sig
-    type key
-    type +'a t
-    val empty: 'a t
-    val is_empty: 'a t -> bool
-    val mem:  key -> 'a t -> bool
-    val add: key -> 'a -> 'a t -> 'a t
-    val singleton: key -> 'a -> 'a t
-    val remove: key -> 'a t -> 'a t
-    val merge:
-      (key -> 'a option -> 'b option -> 'c option) -> 'a t -> 'b t -> 'c t
-    val compare: ('a -> 'a -> int) -> 'a t -> 'a t -> int
-    val equal: ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
-    val iter: (key -> 'a -> unit) -> 'a t -> unit
-    val fold: (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
-    val for_all: (key -> 'a -> bool) -> 'a t -> bool
-    val exists: (key -> 'a -> bool) -> 'a t -> bool
-    val filter: (key -> 'a -> bool) -> 'a t -> 'a t
-    val partition: (key -> 'a -> bool) -> 'a t -> 'a t * 'a t
-    val cardinal: 'a t -> int
-    val bindings: 'a t -> (key * 'a) list
-    val min_binding: 'a t -> (key * 'a)
-    val max_binding: 'a t -> (key * 'a)
-    val choose: 'a t -> (key * 'a)
-    val split: key -> 'a t -> 'a t * 'a option * 'a t
-    val find: key -> 'a t -> 'a
-    val map: ('a -> 'b) -> 'a t -> 'b t
-    val mapi: (key -> 'a -> 'b) -> 'a t -> 'b t
+module type S = Map_intf.Map
 
-    (** Added into why stdlib version *)
-    val change : ('a option -> 'a option) -> key -> 'a t -> 'a t
-    val union : (key -> 'a -> 'a -> 'a option) -> 'a t -> 'a t -> 'a t
-    val inter : (key -> 'a -> 'b -> 'c option) -> 'a t -> 'b t -> 'c t
-    val diff : (key -> 'a -> 'b -> 'a option) -> 'a t -> 'b t -> 'a t
-    val submap : (key -> 'a -> 'b -> bool) -> 'a t -> 'b t -> bool
-    val disjoint : (key -> 'a -> 'b -> bool) -> 'a t -> 'b t -> bool
-    val set_union : 'a t -> 'a t -> 'a t
-    val set_inter : 'a t -> 'b t -> 'a t
-    val set_diff : 'a t -> 'b t -> 'a t
-    val set_submap : 'a t -> 'b t -> bool
-    val set_disjoint : 'a t -> 'b t -> bool
-    val set_compare : 'a t -> 'b t -> int
-    val set_equal : 'a t -> 'b t -> bool
-    val find_def : 'a -> key -> 'a t -> 'a
-    val find_opt : key -> 'a t -> 'a option
-    val find_exn : exn -> key -> 'a t -> 'a
-    val map_filter: ('a -> 'b option) -> 'a t -> 'b t
-    val mapi_filter: (key -> 'a -> 'b option) -> 'a t -> 'b t
-    val mapi_fold:
-      (key -> 'a -> 'acc -> 'acc * 'b) -> 'a t -> 'acc -> 'acc * 'b t
-    val mapi_filter_fold:
-      (key -> 'a -> 'acc -> 'acc * 'b option) -> 'a t -> 'acc -> 'acc * 'b t
-    val fold_left : ('b -> key -> 'a -> 'b) -> 'b -> 'a t -> 'b
-    val fold2_inter: (key -> 'a -> 'b -> 'c -> 'c) -> 'a t -> 'b t -> 'c -> 'c
-    val fold2_union:
-      (key -> 'a option -> 'b option -> 'c -> 'c) -> 'a t -> 'b t -> 'c -> 'c
-    val translate : (key -> key) -> 'a t -> 'a t
-    val add_new : exn -> key -> 'a -> 'a t -> 'a t
-    val keys: 'a t -> key list
-    val values: 'a t -> 'a list
-    val of_list : (key * 'a) list -> 'a t
-    val is_num_elt : int -> 'a t -> bool
-    type 'a enumeration
-    val val_enum : 'a enumeration -> (key * 'a) option
-    val start_enum : 'a t -> 'a enumeration
-    val next_enum : 'a enumeration -> 'a enumeration
-    val start_ge_enum : key -> 'a t -> 'a enumeration
-    val next_ge_enum : key -> 'a enumeration -> 'a enumeration
-  end
-
-  module type OrderedType = Map.OrderedType
-
-  module Make(Ord: OrderedType) = struct
+  module Make(Ord: Map_intf.OrderedType) = struct
     type key = Ord.t
 
     type 'a t =
