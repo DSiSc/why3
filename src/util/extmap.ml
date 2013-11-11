@@ -16,11 +16,15 @@
    It is distributed under the terms of its initial license, which
    is provided in the file OCAML-LICENSE. *)
 
-module type S = Map_intf.Map
+module type S = sig
+  include Map_intf.Map with type 'a data = 'a
+
+  val height: 'a t -> int
+end
 
   module Make(Ord: Map_intf.OrderedType) = struct
     type key = Ord.t
-
+    type 'a data = 'a
     type 'a t =
         Empty
       | Node of 'a t * key * 'a * 'a t * int
@@ -316,6 +320,17 @@ module type S = Map_intf.Map
           else
             bal l v d (change f x r)
 
+    let rec add_change empty add x b = function
+      | Empty -> Node(Empty, x, empty b, Empty, 1)
+      | Node(l, v, d, r, h) ->
+          let c = Ord.compare x v in
+          if c = 0 then
+            Node(l, x, add b d, r, h)
+          else if c < 0 then
+            bal (add_change empty add x b l) v d r
+          else
+            bal l v d (add_change empty add x b r)
+
     let rec union f s1 s2 =
       match (s1, s2) with
         (Empty, t2) -> t2
@@ -344,6 +359,22 @@ module type S = Map_intf.Map
                     (union f r1 r2)
             end
 
+    let rec union_merge f s1 s2 =
+      match (s1, s2) with
+        (Empty, Empty) -> Empty
+      | (t1,Empty) -> t1
+      | (Node (l1, v1, d1, r1, h1), _) when h1 >= height s2 ->
+          let (l2, d2, r2) = split v1 s2 in
+          begin match d2 with
+          | None -> join (union_merge f l1 l2) v1 d1 (union_merge f r1 r2)
+          | Some d2 ->
+            concat_or_join (union_merge f l1 l2) v1 (f v1 (Some d1) d2)
+              (union_merge f r1 r2)
+          end
+      | (_, Node (l2, v2, d2, r2, _h2)) ->
+          let (l1, d1, r1) = split v2 s1 in
+          concat_or_join (union_merge f l1 l2) v2 (f v2 d1 d2)
+            (union_merge f r1 r2)
 
     let rec inter f s1 s2 =
       match (s1, s2) with
@@ -423,6 +454,32 @@ module type S = Map_intf.Map
           let c = Ord.compare x v in
           if c = 0 then d
           else find_exn exn x (if c < 0 then l else r)
+
+    let rec find_remove x = function
+        Empty ->
+          Empty, None
+      | Node(l, v, d, r, _h) ->
+          let c = Ord.compare x v in
+          if c = 0 then
+            merge_bal l r, Some d
+          else if c < 0 then
+            let l,f = find_remove x l in
+            bal l v d r,f
+          else
+            let r,f = find_remove x r in
+            bal l v d r,f
+
+    let rec find_smaller_opt cand x = function
+      | Empty -> cand
+      | Node(l, v, d, r, _) ->
+          let c = Ord.compare x v in
+          if c = 0 then Some(x,d)
+          else if c < 0 then
+            find_smaller_opt cand x l
+          else
+            find_smaller_opt (Some(x,d)) x r
+
+    let find_smaller_opt x t = find_smaller_opt None x t
 
     let rec map_filter f = function
         Empty -> Empty
@@ -512,6 +569,21 @@ module type S = Map_intf.Map
         fold (fun _ _ n -> if n < 0 then raise Exit else n-1) m n = 0
       with Exit -> false
 
+    (** the goal is to choose randomly but often the same than [choose] *)
+    let choose_rnd f m =
+      let rec aux f m ret =
+          match m with
+          | Empty -> ()
+          | Node(l, v, d, r, _) ->
+            aux f l ret;
+            if f () then (ret := (v,d); raise Exit) else aux f r ret
+      in
+      let ret = ref (Obj.magic 0) in
+      try
+        aux f m ret;
+        choose m
+      with Exit -> !ret
+
     let start_enum s = cons_enum s End
 
     let val_enum = function
@@ -533,13 +605,13 @@ module type S = Map_intf.Map
 
     let start_ge_enum k m = cons_ge_enum k m End
 
-    let rec next_ge_enum k r0 = function
-      | End -> start_ge_enum k r0
+    let rec next_ge_enum k l0 = function
+      | End -> start_ge_enum k l0
       | More(v,_,r,e) as e0 ->
         let c = Ord.compare k v in
         if c = 0 then e0
-        else if c < 0 then cons_ge_enum k r0 e0
-        else (*  c > 0  *) next_ge_enum k r  e
+        else if c < 0 then cons_ge_enum k l0 e0
+        else (* c > 0 *)    next_ge_enum k r  e
 
     let next_ge_enum k e = next_ge_enum k Empty e
 

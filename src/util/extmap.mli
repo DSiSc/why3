@@ -26,7 +26,13 @@
    and insertion take time logarithmic in the size of the map.
 *)
 
-module type S = Map_intf.Map
+module type S = sig
+  include Map_intf.Map with type 'a data = 'a
+
+  val height: 'a t -> int
+  (** height of the underlying tree, can be used for optimisations *)
+
+end
 
 module Make (Ord : Map_intf.OrderedType) : S with type key = Ord.t
 (** Functor building an implementation of the map structure
