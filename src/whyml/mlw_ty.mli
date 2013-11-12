@@ -51,18 +51,24 @@ module rec T : sig
   }
 
 end
-and Mreg : sig include Extmap.S with type key = T.region end
-and Sreg : sig include Extset.S with module M = Mreg end
+and Mreg : sig include Map_intf.PMap with type key = T.region end
+and Sreg : Map_intf.Set with type M.key = Mreg.key
+                         and type 'a M.data = 'a
+                         and type 'a M.t = 'a Mreg.t
 
 open T
 
-module Mits : Extmap.S with type key = itysymbol
-module Sits : Extset.S with module M = Mits
+module Mits : Map_intf.PMap with type key = itysymbol
+module Sits : Map_intf.Set with type M.key = Mits.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mits.t
 module Hits : Exthtbl.S with type key = itysymbol
 module Wits : Weakhtbl.S with type key = itysymbol
 
-module Mity : Extmap.S with type key = ity
-module Sity : Extset.S with module M = Mity
+module Mity : Map_intf.PMap with type key = ity
+module Sity : Map_intf.Set with type M.key = Mity.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mity.t
 module Hity : Exthtbl.S with type key = ity
 module Wity : Weakhtbl.S with type key = ity
 
@@ -193,8 +199,10 @@ exception MutableException of ident * ity
 
 val create_xsymbol : preid -> ity -> xsymbol
 
-module Mexn: Extmap.S with type key = xsymbol
-module Sexn: Extset.S with module M = Mexn
+module Mexn: Map_intf.PMap with type key = xsymbol
+module Sexn: Map_intf.Set with type M.key = Mexn.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mexn.t
 
 (** effects *)
 
@@ -265,8 +273,10 @@ type pvsymbol = private {
   pv_ghost : bool;
 }
 
-module Mpv : Extmap.S with type key = pvsymbol
-module Spv : Extset.S with module M = Mpv
+module Mpv : Map_intf.PMap with type key = pvsymbol
+module Spv : Map_intf.Set with type M.key = Mpv.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mpv.t
 module Hpv : Exthtbl.S with type key = pvsymbol
 module Wpv : Weakhtbl.S with type key = pvsymbol
 

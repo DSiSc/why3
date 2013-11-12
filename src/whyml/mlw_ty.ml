@@ -85,8 +85,10 @@ end = struct
 end
 
 and Reg : sig
-  module M : Extmap.S with type key = T.region
-  module S : Extset.S with module M = M
+  module M : Map_intf.PMap with type key = T.region
+  module S : Map_intf.Set with type M.key = T.region
+                           and type 'a M.data = 'a
+                           and type 'a M.t = 'a M.t
   module H : Exthtbl.S with type key = T.region
   module W : Weakhtbl.S with type key = T.region
 end = MakeMSHW (struct

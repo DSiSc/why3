@@ -100,8 +100,10 @@ val prover_parseable_format : prover -> string
 
 (** Printer for prover *)
 module Prover   : OrderedHashedType with type t = prover
-module Mprover  : Extmap.S with type key = prover
-module Sprover  : Extset.S with module M = Mprover
+module Mprover  : Map_intf.PMap with type key = prover
+module Sprover  : Map_intf.Set with type M.key = Mprover.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mprover.t
 module Hprover  : Exthtbl.S with type key = prover
 
 (** {3 Prover configuration} *)
@@ -144,7 +146,7 @@ type config_editor = {
   editor_options : string list;
 }
 
-module Meditor : Extmap.S with type key = string
+module Meditor : Map_intf.PMap with type key = string
 
 val set_editors : config -> config_editor Meditor.t -> config
 (** replace the set of editors *)

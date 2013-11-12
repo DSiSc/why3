@@ -57,11 +57,13 @@ type ident_path =
   }
 
 type meta_args = Theory.meta_arg list
-module Mmeta_args : Extmap.S with type key = meta_args
-module Smeta_args : Extset.S with module M = Mmeta_args
+module Mmeta_args : Map_intf.PMap with type key = meta_args
+module Smeta_args : Map_intf.Set with type M.key = Mmeta_args.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mmeta_args.t
 
 type metas_args = Smeta_args.t Mstr.t
-module Mmetas_args : Extmap.S with type key = metas_args
+module Mmetas_args : Map_intf.PMap with type key = metas_args
 
 type idpos = {
   idpos_ts : ident_path Ty.Mts.t;

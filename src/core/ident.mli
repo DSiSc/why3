@@ -9,8 +9,6 @@
 (*                                                                  *)
 (********************************************************************)
 
-open Stdlib
-
 (** Identifiers *)
 
 (** {2 Labels} *)
@@ -20,8 +18,10 @@ type label = private {
   lab_tag    : int;
 }
 
-module Mlab : Extmap.S with type key = label
-module Slab : Extset.S with module M = Mlab
+module Mlab : Map_intf.PMap with type key = label
+module Slab : Map_intf.Set with type M.key = label
+                            and type 'a M.data = 'a
+                            and type 'a M.t = 'a Mlab.t
 
 val lab_compare : label -> label -> int
 val lab_equal : label -> label -> bool
@@ -38,8 +38,10 @@ type ident = private {
   id_tag    : Weakhtbl.tag;         (* unique magical tag *)
 }
 
-module Mid : Extmap.S with type key = ident
-module Sid : Extset.S with module M = Mid
+module Mid : Map_intf.PMap with type key = ident
+module Sid : Map_intf.Set with type M.key = Mid.key
+                           and type 'a M.data = 'a
+                           and type 'a M.t = 'a Mid.t
 module Hid : Exthtbl.S with type key = ident
 module Wid : Weakhtbl.S with type key = ident
 

@@ -9,9 +9,10 @@
 (*                                                                  *)
 (********************************************************************)
 
+
 module type S = Map_intf.Set
 
-module MakeOfMap (M: Extmap.S) = struct
+module MakeOfMap (M: Map_intf.MapUnit) = struct
   module M = M
   type elt = M.key
   type t = unit M.t
@@ -56,3 +57,21 @@ module MakeOfMap (M: Extmap.S) = struct
 end
 
 module Make(Ord: Map_intf.OrderedType) = MakeOfMap(Extmap.Make(Ord))
+
+module MakeHashcons(MH:Map_intf.Map_hashcons with type 'a data = unit):
+  Map_intf.Set_hashcons with type 'a M.data = unit
+                         and type 'a poly = 'a MH.poly
+                         and type M.key = MH.key
+= struct
+  include MakeOfMap(MH)
+
+  type 'a poly = 'a MH.poly
+  let nt  = MH.nt
+  let rebuild = MH.rebuild
+
+  let compare_t = MH.compare_t
+  let equal_t = MH.equal_t
+
+  let inter_nt = MH.set_inter_nt
+end
+

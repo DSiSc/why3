@@ -23,8 +23,8 @@ module Lab = MakeMSH (struct
   let tag lab = lab.lab_tag
 end)
 
-module Slab = Lab.S
 module Mlab = Lab.M
+module Slab = Lab.S
 
 module Hslab = Hashcons.Make (struct
   type t = label

@@ -9,7 +9,6 @@
 (*                                                                  *)
 (********************************************************************)
 
-open Stdlib
 open Ident
 
 (** Types *)
@@ -18,8 +17,10 @@ type tvsymbol = private {
   tv_name : ident;
 }
 
-module Mtv : Extmap.S with type key = tvsymbol
-module Stv : Extset.S with module M = Mtv
+module Mtv : Map_intf.PMap with type key = tvsymbol
+module Stv : Map_intf.Set with type M.key = Mtv.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mtv.t
 module Htv : Exthtbl.S with type key = tvsymbol
 
 val tv_equal : tvsymbol -> tvsymbol -> bool
@@ -45,13 +46,17 @@ and ty_node = private
   | Tyvar of tvsymbol
   | Tyapp of tysymbol * ty list
 
-module Mts : Extmap.S with type key = tysymbol
-module Sts : Extset.S with module M = Mts
+module Mts : Map_intf.PMap with type key = tysymbol
+module Sts : Map_intf.Set with type M.key = Mts.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mts.t
 module Hts : Exthtbl.S with type key = tysymbol
 module Wts : Weakhtbl.S with type key = tysymbol
 
-module Mty : Extmap.S with type key = ty
-module Sty : Extset.S with module M = Mty
+module Mty : Map_intf.PMap with type key = ty
+module Sty : Map_intf.Set with type M.key = Mty.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mty.t
 module Hty : Exthtbl.S with type key = ty
 module Wty : Weakhtbl.S with type key = ty
 

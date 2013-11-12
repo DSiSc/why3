@@ -22,8 +22,10 @@ type vsymbol = private {
   vs_ty   : ty;
 }
 
-module Mvs : Extmap.S with type key = vsymbol
-module Svs : Extset.S with module M = Mvs
+module Mvs : Map_intf.PMap with type key = vsymbol
+module Svs : Map_intf.Set with type M.key = Mvs.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mvs.t
 module Hvs : Exthtbl.S with type key = vsymbol
 module Wvs : Weakhtbl.S with type key = vsymbol
 
@@ -43,8 +45,10 @@ type lsymbol = private {
   ls_constr : int;
 }
 
-module Mls : Extmap.S with type key = lsymbol
-module Sls : Extset.S with module M = Mls
+module Mls : Map_intf.PMap with type key = lsymbol
+module Sls : Map_intf.Set with type M.key = Mls.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mls.t
 module Hls : Exthtbl.S with type key = lsymbol
 module Wls : Weakhtbl.S with type key = lsymbol
 
@@ -142,8 +146,10 @@ and term_quant
 
 and trigger = term list list
 
-module Mterm : Extmap.S with type key = term
-module Sterm : Extset.S with module M = Mterm
+module Mterm : Map_intf.PMap with type key = term
+module Sterm : Map_intf.Set with type M.key = Mterm.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mterm.t
 module Hterm : Exthtbl.S with type key = term
 
 val t_compare : term -> term -> int

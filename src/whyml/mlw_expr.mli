@@ -100,8 +100,10 @@ type psymbol = private {
      in ps_vars to itself *)
 }
 
-module Mps : Extmap.S with type key = psymbol
-module Sps : Extset.S with module M = Mps
+module Mps : Map_intf.PMap with type key = psymbol
+module Sps : Map_intf.Set with type M.key = Mps.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mps.t
 module Hps : Exthtbl.S with type key = psymbol
 module Wps : Weakhtbl.S with type key = psymbol
 

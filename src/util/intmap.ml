@@ -1495,9 +1495,8 @@ end
 
 module Make(Data: Map_intf.HashType) :
   Map_intf.Map_hashcons with type 'a data = Data.t
-              and type 'a poly := 'a NT.t
-              and type key = K.t = struct
-
+                         and type 'a poly := 'a NT.t
+                         and type key = K.t = struct
 
 
   (** Tag *)
@@ -1655,6 +1654,7 @@ let rec interi_nt lf_phi s t =
 
 let inter_nt phi = interi_nt (fun i x y -> mk_Lf i (phi i x y))
 let interf_nt phi = interi_nt (fun i x y -> lf i (phi i x y))
+let set_inter_nt m1 m2 = interi_nt (fun i x _ -> mk_Lf i x) m1 m2
 
 end
 

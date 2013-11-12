@@ -353,6 +353,8 @@ module type Map =
         greater or equal to the given key *)
   end
 
+module type PMap = Map with type 'a data = 'a
+
 module type Map_hashcons = sig
   include Map
 
@@ -372,6 +374,7 @@ module type Map_hashcons = sig
     (key -> 'a data -> 'b -> 'a data) -> 'a data t -> 'b poly -> 'a data t
   val interf_nt : (key -> 'a data -> 'b -> 'a data option) ->
     'a data t -> 'b poly -> 'a data t
+  val set_inter_nt : 'a data t -> 'b poly -> 'a data t
 end
 
 
@@ -390,10 +393,16 @@ module type Gen_Map_hashcons = sig
 end
 
 
+type 'a punit = unit
+module type MapUnit = sig
+  type 'a data
+  include Map with type 'a data := 'a punit
+end
+
 (** Output signature of the functor {!Extset.Make}. *)
 module type Set =
   sig
-    module M : Map
+    module M : MapUnit
     (** The module of association tables over [elt]. *)
 
     type elt = M.key
@@ -538,3 +547,21 @@ module type Set =
     val of_list: elt list -> t
     (** construct a set from a list of elements *)
   end
+
+module type Set_hashcons = sig
+  include Set
+
+  type 'a poly
+
+  val nt: t -> unit poly
+  (** constant time *)
+  val rebuild: unit poly -> t
+  (** linear *)
+
+  (** comparison induced by hashconsing *)
+  val compare_t: t -> t -> int
+  val equal_t: t -> t -> bool
+
+  (** with NT.t *)
+  val inter_nt : t -> 'b poly -> t
+end

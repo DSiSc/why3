@@ -59,8 +59,10 @@ type prsymbol = private {
   pr_name : ident;
 }
 
-module Mpr : Extmap.S with type key = prsymbol
-module Spr : Extset.S with module M = Mpr
+module Mpr : Map_intf.PMap with type key = prsymbol
+module Spr : Map_intf.Set with type M.key = Mpr.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mpr.t
 module Hpr : Exthtbl.S with type key = prsymbol
 module Wpr : Weakhtbl.S with type key = prsymbol
 
@@ -103,8 +105,10 @@ and decl_node = private
   | Dind   of ind_list          (* (co)inductive predicates *)
   | Dprop  of prop_decl         (* axiom / lemma / goal *)
 
-module Mdecl : Extmap.S with type key = decl
-module Sdecl : Extset.S with module M = Mdecl
+module Mdecl : Map_intf.PMap with type key = decl
+module Sdecl : Map_intf.Set with type M.key = Mdecl.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mdecl.t
 module Wdecl : Weakhtbl.S with type key = decl
 module Hdecl : Exthtbl.S with type key = decl
 

@@ -60,8 +60,10 @@ type meta = private {
 
 val print_meta_desc : Pp.formatter -> meta -> unit
 
-module Mmeta : Extmap.S with type key = meta
-module Smeta : Extset.S with module M = Mmeta
+module Mmeta : Map_intf.PMap with type key = meta
+module Smeta : Map_intf.Set with type M.key = Mmeta.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mmeta.t
 module Hmeta : Exthtbl.S with type key = meta
 
 val meta_equal : meta -> meta -> bool
@@ -107,8 +109,10 @@ and symbol_map = private {
   sm_pr : prsymbol Mpr.t;
 }
 
-module Mtdecl : Extmap.S with type key = tdecl
-module Stdecl : Extset.S with module M = Mtdecl
+module Mtdecl : Map_intf.PMap with type key = tdecl
+module Stdecl : Map_intf.Set with type M.key = Mtdecl.key
+         and type 'a M.data = 'a
+         and type 'a M.t = 'a Mtdecl.t
 module Htdecl : Exthtbl.S with type key = tdecl
 
 val td_equal : tdecl -> tdecl -> bool

@@ -79,7 +79,13 @@ end
 
 module MakeMSH (X : TaggedType) =
 struct
-  module T = OrderedHashed(X)
+  module T = struct
+    module X' = OrderedHashed(X)
+    include X'
+    let tag = X.tag
+  end
+  (* module GM = Intmap.Make(T) *)
+  (* module M  = GM.NT *)
   module M = Extmap.Make(T)
   module S = Extset.MakeOfMap(M)
   module H = Exthtbl.Make(T)
