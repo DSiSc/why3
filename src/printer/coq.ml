@@ -986,6 +986,7 @@ let print_task printer_args realize ?old fmt task =
                Theory.Decl { Decl.d_node = Decl.Dprop (Decl.Pgoal, _, _) }}} ->
         realized_theories
     | Some { Task.task_decl = { Theory.td_node = Theory.Clone (th,_) }} ->
+      (** reserve the name used in the local theory in a consistent order *)
         Sid.iter (fun id -> ignore (id_unique iprinter id)) th.Theory.th_local;
         Mid.remove th.Theory.th_name realized_theories
     | Some { Task.task_decl = { Theory.td_node = Theory.Meta _ };
@@ -1003,6 +1004,7 @@ let print_task printer_args realize ?old fmt task =
     let printers =
       Mid.map (fun th ->
         let pr = fresh_printer () in
+        (** reserve all symbols in a consistent order *)
         Sid.iter (fun id -> ignore (id_unique pr id)) th.Theory.th_local;
         pr
       ) realized_theories' in

@@ -20,7 +20,29 @@ open Decl
 open Printer
 open Theory
 
-let iprinter,aprinter,tprinter,pprinter =
+exception NotInRealizedTheories of theory
+
+type ident_printers = {
+  iprinter: ident_printer;
+  cprinter: ident_printer;
+  aprinter: ident_printer;
+  tprinter: ident_printer;
+  pprinter: ident_printer;
+}
+
+(* info *)
+
+type info = {
+  (** used in an thread unsafe way but there is not thread in why3 *)
+  mutable info_syn : syntax_map;
+  (** printer for imported theories during realization.
+      empty when not doing realization *)
+  symbol_printers : (string * ident_printers) Mid.t;
+  (** printer for local symbols *)
+  local_printers  : ident_printers;
+}
+
+let fresh_printers () =
   let bl = ["theory"; "type"; "function"; "predicate"; "inductive";
             "axiom"; "lemma"; "goal"; "use"; "clone"; "prop"; "meta";
             "namespace"; "import"; "export"; "end";
@@ -28,54 +50,76 @@ let iprinter,aprinter,tprinter,pprinter =
             "let"; "in"; "match"; "with"; "as"; "epsilon" ] in
   let isanitize = sanitizer char_to_alpha char_to_alnumus in
   let lsanitize = sanitizer char_to_lalpha char_to_alnumus in
-  create_ident_printer bl ~sanitizer:isanitize,
-  create_ident_printer bl ~sanitizer:lsanitize,
-  create_ident_printer bl ~sanitizer:lsanitize,
-  create_ident_printer bl ~sanitizer:isanitize
+  {
+    iprinter = create_ident_printer bl ~sanitizer:isanitize;
+    cprinter = create_ident_printer bl ~sanitizer:isanitize;
+    aprinter = create_ident_printer bl ~sanitizer:lsanitize;
+    tprinter = create_ident_printer bl ~sanitizer:lsanitize;
+    pprinter = create_ident_printer bl ~sanitizer:isanitize;
+  }
+
+let info = ref { info_syn = Mid.empty; symbol_printers = Mid.empty;
+                 local_printers = fresh_printers ()}
 
 let forget_tvs () =
-  forget_all aprinter
+  forget_all !info.local_printers.aprinter
 
-let _forget_all () =
-  forget_all iprinter;
-  forget_all aprinter;
-  forget_all tprinter;
-  forget_all pprinter
+let print_gen
+    ?sanitizer ?(format=("%s":(string -> 'a, 'b, 'c, 'd, 'd, 'a) format6))
+    ~getid ~getprinter  fmt x =
+  let id = getid x in
+  try
+    let path,ipr = Mid.find id (!info).symbol_printers in
+    fprintf fmt "%s.%(%s%)"
+      path format (id_unique ?sanitizer (getprinter ipr) id)
+  with Not_found ->
+    let ipr = (!info).local_printers in
+    fprintf fmt format (id_unique ?sanitizer (getprinter ipr) id)
 
 (* type variables always start with a quote *)
-let print_tv fmt tv =
-  fprintf fmt "'%s" (id_unique aprinter tv.tv_name)
+let print_tv fmt x = print_gen
+  ~getid:(fun tv -> tv.tv_name)
+  ~getprinter:(fun p -> p.aprinter)
+  ~format:"'%s"
+  fmt x
 
 (* logic variables always start with a lower case letter *)
-let print_vs fmt vs =
-  let sanitizer = String.uncapitalize in
-  fprintf fmt "%s" (id_unique iprinter ~sanitizer vs.vs_name)
+let print_vs fmt x = print_gen
+  ~getid:(fun vs -> vs.vs_name)
+  ~getprinter:(fun p -> p.iprinter)
+  ~sanitizer:String.uncapitalize
+  fmt x
 
-let forget_var vs = forget_id iprinter vs.vs_name
+let forget_var vs = forget_id (!info).local_printers.iprinter vs.vs_name
 
 (* theory names always start with an upper case letter *)
-let print_th fmt th =
-  let sanitizer = String.capitalize in
-  fprintf fmt "%s" (id_unique iprinter ~sanitizer th.th_name)
+let print_th fmt x = print_gen
+  ~getid:(fun th -> th.th_name)
+  ~getprinter:(fun p -> p.cprinter)
+  ~sanitizer:String.capitalize
+  fmt x
 
-let print_ts fmt ts =
-  fprintf fmt "%s" (id_unique tprinter ts.ts_name)
+let print_ts fmt x = print_gen
+  ~getid:(fun ts -> ts.ts_name)
+  ~getprinter:(fun p -> p.tprinter)
+  fmt x
 
-let print_ls fmt ls =
-  fprintf fmt "%s" (id_unique iprinter ls.ls_name)
+let print_ls fmt x = print_gen
+  ~getid:(fun ls -> ls.ls_name)
+  ~getprinter:(fun p -> p.iprinter)
+  fmt x
 
-let print_cs fmt ls =
-  let sanitizer = String.capitalize in
-  fprintf fmt "%s" (id_unique iprinter ~sanitizer ls.ls_name)
+(* constructor names always start with an upper case letter *)
+let print_cs fmt x = print_gen
+  ~getid:(fun ls -> ls.ls_name)
+  ~getprinter:(fun p -> p.cprinter)
+  ~sanitizer:String.capitalize
+  fmt x
 
-let print_pr fmt pr =
-  fprintf fmt "%s" (id_unique pprinter pr.pr_name)
-
-(* info *)
-
-type info = { info_syn : syntax_map }
-
-let info = ref { info_syn = Mid.empty }
+let print_pr fmt x = print_gen
+  ~getid:(fun pr -> pr.pr_name)
+  ~getprinter:(fun p -> p.pprinter)
+  fmt x
 
 let query_syntax id = query_syntax !info.info_syn id
 let query_remove id = Mid.mem id !info.info_syn
@@ -164,10 +208,12 @@ and print_lterm pri fmt t =
 and print_app pri fs fmt tl =
   match query_syntax fs.ls_name with
     | Some s -> syntax_arguments s print_term fmt tl
-    | None -> begin match tl with
-        | [] -> print_ls fmt fs
+    | None ->
+      let print_symb = if fs.ls_constr > 0 then print_cs else print_ls in
+      begin match tl with
+        | [] -> print_symb fmt fs
         | tl -> fprintf fmt (protect_on (pri > 5) "%a@ %a")
-            print_ls fs (print_list space (print_lterm 6)) tl
+            print_symb fs (print_list space (print_lterm 6)) tl
         end
 
 and print_tnode pri fmt t = match t.t_node with
@@ -379,7 +425,7 @@ let print_tdecl fmt td = match td.td_node with
 
 let print_tdecls =
   let print_tdecl sm fmt td =
-    info := {info_syn = sm}; print_tdecl fmt td; sm, [] in
+    (!info).info_syn <- sm; print_tdecl fmt td; sm, [] in
   let print_tdecl = Printer.sprint_tdecl print_tdecl in
   let print_tdecl task acc = print_tdecl task.Task.task_decl acc in
   Discriminate.on_syntax_map (fun sm -> Trans.fold print_tdecl (sm,[]))
@@ -398,3 +444,111 @@ let print_task args ?old:_ fmt task =
 
 let () = register_printer "why3" print_task
   ~desc:"Printer@ for@ the@ logical@ format@ of@ Why3.@ Used@ for@ debugging."
+
+(** TODO: th_local doesn't indicate the kind of an id (vs, ts, ls, ...)
+    so we can't reserve the symbols in the corresponding printer.
+    So we reserve in all of them.
+*)
+let reserve_ident pr id =
+  ignore (id_unique pr.iprinter id);
+  ignore (id_unique ~sanitizer:String.capitalize pr.cprinter id);
+  ignore (id_unique pr.aprinter id);
+  ignore (id_unique pr.tprinter id);
+  ignore (id_unique pr.pprinter id)
+
+let print_task printer_args fmt task =
+  (* eprintf "Task:%a@.@." Pretty.print_task task; *)
+  print_prelude fmt printer_args.prelude;
+  (* find theories that are both used and realized from metas *)
+  let realized_theories =
+    Task.on_meta meta_realized_theory (fun mid args ->
+      match args with
+      | [Theory.MAstr src; Theory.MAstr dst] ->
+        (* TODO: do not split string; in fact, do not even use a
+           string argument *)
+        let f,id =
+          let l = Strings.rev_split src '.' in
+          List.rev (List.tl l), List.hd l in
+        let th = Env.find_theory printer_args.env f id in
+        let id =
+          let l = Strings.rev_split dst '.' in
+          List.hd l in
+        Mid.add th.Theory.th_name (th, dst, id) mid
+      | _ -> assert false
+    ) Mid.empty task in
+  (* 2 cases: goal is clone T with [] or goal is a real goal *)
+  let rec upd_realized_theories = function
+    (** not realized *)
+    | Some { Task.task_decl = { Theory.td_node =
+               Theory.Decl { Decl.d_node = Decl.Dprop (Decl.Pgoal, _, _) }}} ->
+      fprintf fmt "theory Task@\n";
+      realized_theories
+    (** realized *)
+    | Some { Task.task_decl = { Theory.td_node = Theory.Clone (th,_) }} ->
+      (** reserve the name used in the local theory in a consistent order *)
+        Sid.iter (reserve_ident (!info).local_printers) th.Theory.th_local;
+      begin
+        try
+          let (_,_, id) = Mid.find th.Theory.th_name realized_theories in
+          fprintf fmt "theory %s@\n" id;
+        with Not_found ->
+          raise (NotInRealizedTheories(th))
+      end;
+      Mid.remove th.Theory.th_name realized_theories
+    | Some { Task.task_decl = { Theory.td_node = Theory.Meta _ };
+             Task.task_prev = task } ->
+        upd_realized_theories task
+    | _ -> assert false in
+  let realized_theories = upd_realized_theories task in
+  (** use prelude *)
+  print_th_prelude task fmt printer_args.th_prelude;
+  let realized_theories' =
+    Mid.map (fun (th,s1,s2) -> fprintf fmt "use %s as %s@\n" s1 s2; th)
+      realized_theories in
+  let realized_symbols = Task.used_symbols realized_theories' in
+  let local_decls = Task.local_decls task realized_symbols in
+  (* eprintf "local_decls:%i@." (List.length local_decls); *)
+  (* associate a special printer to each symbol in a realized theory *)
+  let symbol_printers =
+    let printers =
+      Mid.map (fun th ->
+        let pr = fresh_printers () in
+        (** reserve all symbols in a consistent order *)
+        Sid.iter (reserve_ident pr) th.Theory.th_local;
+        pr
+      ) realized_theories' in
+    Mid.map (fun th ->
+      let _,_,s2 = Mid.find th.Theory.th_name realized_theories in
+      (s2, Mid.find th.Theory.th_name printers)
+    ) realized_symbols in
+  info := { !info with
+    info_syn = get_syntax_map task;
+    symbol_printers = symbol_printers;
+  };
+  let print_decls fmt dl =
+    fprintf fmt "@\n@[<hov>%a@]" (print_list nothing print_decl) dl in
+  print_decls fmt local_decls;
+  fprintf fmt "end@."
+
+let print_realize args ?old:_ fmt task =
+  let info_bak = !info in (** printer without realization *)
+  try
+    info := { info_syn = Mid.empty; symbol_printers = Mid.empty;
+              local_printers = fresh_printers ()};
+    print_task args fmt task;
+    info := info_bak
+  with exn -> (** finally *)
+    info := info_bak;
+    raise exn
+
+
+let () = register_printer "why3-realize" print_realize
+  ~desc:"Printer@ for@ the@ logical@ format@ of@ Why3.
+         @ Used for printing theories."
+
+let () = Exn_printer.register (fun fmt -> function
+  | NotInRealizedTheories th -> fprintf fmt
+    "The@ theory %s@ is@ asked@ to@ be@ realized@ but@ it@ is@ specified \
+     in no \"realized_theory\" meta." th.th_name.id_string
+  | exn -> raise exn
+)
