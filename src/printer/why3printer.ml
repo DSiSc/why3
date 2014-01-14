@@ -65,22 +65,23 @@ let forget_tvs () =
   forget_all !info.local_printers.aprinter
 
 let print_gen
-    ?sanitizer ?(format=("%s":(string -> 'a, 'b, 'c, 'd, 'd, 'a) format6))
+    ?sanitizer ?(prefix="")
     ~getid ~getprinter  fmt x =
   let id = getid x in
   try
     let path,ipr = Mid.find id (!info).symbol_printers in
-    fprintf fmt "%s.%(%s%)"
-      path format (id_unique ?sanitizer (getprinter ipr) id)
+    fprintf fmt "%s.%s%s"
+      path prefix (id_unique ?sanitizer (getprinter ipr) id)
   with Not_found ->
     let ipr = (!info).local_printers in
-    fprintf fmt format (id_unique ?sanitizer (getprinter ipr) id)
+      Format.pp_print_string fmt prefix;
+      Format.pp_print_string fmt (id_unique ?sanitizer (getprinter ipr) id)
 
 (* type variables always start with a quote *)
 let print_tv fmt x = print_gen
   ~getid:(fun tv -> tv.tv_name)
   ~getprinter:(fun p -> p.aprinter)
-  ~format:"'%s"
+  ~prefix:"'"
   fmt x
 
 (* logic variables always start with a lower case letter *)
