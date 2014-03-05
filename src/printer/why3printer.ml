@@ -398,3 +398,8 @@ let print_task args ?old:_ fmt task =
 
 let () = register_printer "why3" print_task
   ~desc:"Printer@ for@ the@ logical@ format@ of@ Why3.@ Used@ for@ debugging."
+
+let print_task _args ?old:_ _fmt _task = ()
+
+let () = register_printer "null" print_task
+  ~desc:"Printer@ that@ print@ nothing@ for@ testing@ only."
