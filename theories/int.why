@@ -13,9 +13,9 @@ theory Int
   constant zero : int = 0
   constant one  : int = 1
 
-  predicate (< ) int int
-  predicate (> ) (x y : int) = y < x
-  predicate (<=) (x y : int) = x < y \/ x = y
+  predicate (<=) int int
+  predicate (<) (x y : int) = x <= y /\ x <> y
+  predicate (>) (x y : int) = y <= x /\ x <> y
 
   clone export algebra.OrderedUnitaryCommutativeRing with type t = int,
     constant zero = zero, constant one = one, predicate (<=) = (<=)
