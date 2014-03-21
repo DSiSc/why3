@@ -85,4 +85,5 @@ val find_definition : known_map -> psymbol -> fun_defn option
 exception NonupdatableType of ity
 
 val inst_constructors :
-  Decl.known_map -> known_map -> ity -> (lsymbol * field list) list
+  Decl.known_map -> known_map -> ity ->
+    (lsymbol * (lsymbol option * field) list) list

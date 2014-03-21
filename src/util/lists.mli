@@ -73,3 +73,6 @@ val chop : int -> 'a list -> 'a list
 
 val chop_last : 'a list -> 'a list * 'a
 (** removes (and returns) the last element of a list *)
+
+val map3 : ('a -> 'b -> 'c -> 'd) -> 'a list -> 'b list -> 'c list -> 'd list
+(** combines three lists *)

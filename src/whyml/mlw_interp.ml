@@ -488,7 +488,7 @@ let rec to_program_value_rec env regions s ity ls vl =
           begin
             let (s,regions,vl) =
               List.fold_left2
-                (fun (s,regions,vl) fd v ->
+                (fun (s,regions,vl) (_,fd) v ->
                   match fd.fd_mut,regions with
                   | None,_ -> (* non mutable field, but
                                  some subfield may be mutable *)

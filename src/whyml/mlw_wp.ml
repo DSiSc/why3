@@ -25,8 +25,10 @@ let debug = Debug.register_info_flag "whyml_wp"
 let no_track = Debug.register_flag "wp_no_track"
   ~desc:"Do@ not@ remove@ redundant@ type@ invariant@ conditions@ from@ VCs."
 
+(*
 let no_eval = Debug.register_flag "wp_no_eval"
   ~desc:"Do@ not@ simplify@ pattern@ matching@ on@ record@ datatypes@ in@ VCs."
+*)
 
 let lemma_label = Ident.create_label "why3:lemma"
 
@@ -305,6 +307,7 @@ let analyze_var fn_down fn_join lkm km vs ity =
   let var_of_fd fd =
     create_vsymbol (id_fresh "y") (ty_of_ity fd.fd_ity) in
   let branch (cs,fdl) =
+    let fdl = List.map snd fdl in
     let vl = List.map var_of_fd fdl in
     let pat = pat_app cs (List.map pat_var vl) vs.vs_ty in
     let t = fn_join cs (List.map2 fn_down vl fdl) vs.vs_ty in
@@ -351,7 +354,7 @@ let var_of_region reg f =
     | _ -> acc in
   t_v_fold test None f
 
-let quantify env regs f =
+let _quantify env regs f =
   (* mreg : modified region -> vs *)
   let get_var reg () =
     let ty = ty_of_ity reg.reg_ity in
@@ -363,6 +366,98 @@ let quantify env regs f =
   (* quantify over the modified resions *)
   let f = update_term env mreg f in
   wp_forall (List.rev (Mreg.values mreg)) f
+
+(** Reconstruct pure values after writes, experimental *)
+
+let quantify env regs f =
+  (* vars : affected vsymbol -> new vsymbol * ity *)
+  let is_affected ity =
+    reg_any (fun reg -> Sreg.mem reg regs) ity.ity_vars in
+  let get_affected vs _ =
+    let ity = ity_of_vs vs in
+    if is_affected ity
+    then Some (mk_var vs.vs_name model2_lab vs.vs_ty, ity)
+    else None in
+  let vars = Mvs.mapi_filter get_affected (t_vars f) in
+  (* replace affected vsymbols with new vsymbols *)
+  let f = subst_at_now true (Mvs.map fst vars) f in
+  (* mreg : modified shared region -> fresh vsymbol *)
+  let get_shared reg () =
+    (* a region may occur twice in a single variable *)
+    let rec ity_twice seen ity =
+      let rl = match ity.ity_node with
+        | Ityapp (_,_,rl) -> rl | _ -> [] in
+      ity_fold ity_twice (List.fold_left reg_twice seen rl) ity
+    and reg_twice seen r = if reg_equal reg r
+      then not seen || raise Exit
+      else ity_twice seen r.reg_ity in
+    let got_twice _ (_, ity) seen = ity_twice seen ity in
+    if try Mvs.fold got_twice vars false && false with Exit -> true
+    then Some (mk_var reg.reg_name model1_lab (ty_of_ity reg.reg_ity))
+    else None in
+  let mreg = Mreg.mapi_filter get_shared regs in
+  (* relate new vsymbols to the original values *)
+  let has_shared ity =
+    reg_any (fun reg -> Mreg.mem reg mreg) ity.ity_vars in
+  let rec update ot nt ity = function
+    | Some reg -> (* we are a modified region *)
+        (* are we a modified shared region? *)
+        let hd = match Mreg.find_opt reg mreg with
+          | Some vs -> t_equ nt (t_var vs)
+          | None    -> t_true in
+        (* FIXME? If we have non-modified subregions, they are either
+           reset, in which case any access to them will go through [nt],
+           or not, in which case they keep the old value, and therefore
+           should not be havoced. However, any implementation of such
+           a modification will/should have a postcondition describing
+           the new value of [reg] and ensuring that the values of kept
+           subregions are preserved, so we don't need to bother here. *)
+        let tl = (* do we have modified shared subregions? *)
+          if has_shared ity then update nt nt ity None else t_true in
+        t_and_simp hd tl
+    | None when is_affected ity -> (* we have modified subregions *)
+        begin match
+          Mlw_decl.inst_constructors env.pure_known env.prog_known ity
+        with
+        | [] -> assert false (* mutable types are always algebraic *)
+        | [cs, fdl] when List.for_all (fun (pj,_) -> pj <> None) fdl ->
+            let pj_app pj t = t_app_infer (Opt.get pj) [t] in
+            let nfl = List.map (fun (pj,_) -> pj_app pj nt) fdl in
+            let hd = t_equ nt (t_app cs nfl nt.t_ty) in
+            let down (pj,fd) nf =
+              update (pj_app pj ot) nf fd.fd_ity fd.fd_mut in
+            let tl = t_and_simp_l (List.map2 down fdl nfl) in
+            t_and_simp hd tl
+        | csl ->
+            let var_of_fd (pj,fd) =
+              let nm = match pj with
+                | Some pj -> pj.ls_name.id_string | None -> "y" in
+              create_vsymbol (id_fresh nm) (ty_of_ity fd.fd_ity) in
+            let branch (cs,fdl) =
+              let ovl = List.map var_of_fd fdl in
+              let nvl = List.map var_of_fd fdl in
+              let nfl = List.map t_var nvl in
+              let pat = pat_app cs (List.map pat_var ovl) (t_type ot) in
+              let hd = t_equ nt (t_app cs nfl nt.t_ty) in
+              let down (_,fd) ov nf =
+                update (t_var ov) nf fd.fd_ity fd.fd_mut in
+              let tl = t_and_simp_l (Lists.map3 down fdl ovl nfl) in
+              let f = t_exists_close_simp nvl [] (t_and_simp hd tl) in
+              t_close_branch pat f in
+            t_case_simp ot (List.map branch csl)
+        end
+    | None ->
+        t_equ_simp nt ot
+  in
+  let update_var v (v', ity) f =
+    let p = update (t_var v) (t_var v') ity None in
+    wp_forall_post v' p f in
+  let f = Mvs.fold update_var vars f in
+  (* quantify over the modified shared resions *)
+  wp_forall (Mreg.values mreg) f
+
+let quantify env regs f =
+  if Sreg.is_empty regs then f else quantify env regs f
 
 (** Invariants *)
 
@@ -387,22 +482,38 @@ let ps_inv = Term.create_psymbol (id_fresh "inv")
   [ty_var (create_tvsymbol (id_fresh "a"))]
 
 let full_invariant lkm km vs ity =
-  let rec update vs { fd_ity = ity } =
+  let rec update t ity =
     if not (ity_has_inv ity) then t_true else
     (* what is our current invariant? *)
     let f = match ity.ity_node with
       | Ityapp (its,_,_) when its.its_inv ->
           if Debug.test_flag no_track
-          then get_invariant km (t_var vs)
-          else ps_app ps_inv [t_var vs]
+          then get_invariant km t
+          else ps_app ps_inv [t]
       | _ -> t_true in
     (* what are our sub-invariants? *)
-    let join _ fl _ = wp_ands ~sym:true fl in
-    let g = analyze_var update join lkm km vs ity in
+    let g = match Mlw_decl.inst_constructors lkm km ity with
+      | [] -> assert false (* types with invs are always algebraic *)
+      | [_, fdl] when List.for_all (fun (pj,_) -> pj <> None) fdl ->
+          let down (pj,fd) =
+            update (t_app_infer (Opt.get pj) [t]) fd.fd_ity in
+          t_and_asym_simp_l (List.map down fdl)
+      | csl ->
+          let var_of_fd (pj,fd) =
+            let nm = match pj with
+              | Some pj -> pj.ls_name.id_string | None -> "y" in
+            create_vsymbol (id_fresh nm) (ty_of_ity fd.fd_ity) in
+          let branch (cs,fdl) =
+            let vl = List.map var_of_fd fdl in
+            let pat = pat_app cs (List.map pat_var vl) (t_type t) in
+            let down (_,fd) vs = update (t_var vs) fd.fd_ity in
+            let f = t_and_simp_l (List.map2 down fdl vl) in
+            t_close_branch pat f in
+          t_case_simp t (List.map branch csl) in
     (* put everything together *)
-    wp_and ~sym:true f g
+    t_and_asym_simp f g
   in
-  update vs { fd_ity = ity; fd_ghost = false; fd_mut = None }
+  update (t_var vs) ity
 
 (** Value tracking *)
 
@@ -851,18 +962,18 @@ and wp_abstract env c_eff c_q c_xq q xq =
 
 and wp_fun_regs ps l = (* regions to refresh at the top of function WP *)
   let add_arg = let seen = ref Sreg.empty in fun sbs pv ->
-    (* we only need to "havoc" the regions that occur twice in [l.l_args].
+    (* we only need to havoc the regions that occur twice in [l.l_args].
        If a region in an argument is shared with the context, then is it
        already frozen in [ps.ps_subst]. If a region in an argument is not
        shared at all, the last [wp_forall] over [args] will be enough. *)
-    let rec down sbs ity =
+    let rec ity_twice sbs ity =
       let rl = match ity.ity_node with
         | Ityapp (_,_,rl) -> rl | _ -> [] in
-      ity_fold down (List.fold_left add_reg sbs rl) ity
-    and add_reg sbs r =
+      ity_fold ity_twice (List.fold_left reg_twice sbs rl) ity
+    and reg_twice sbs r =
       if Sreg.mem r !seen then reg_match sbs r r else
-      (seen := Sreg.add r !seen; down sbs r.reg_ity) in
-    down sbs pv.pv_ity in
+      (seen := Sreg.add r !seen; ity_twice sbs r.reg_ity) in
+    ity_twice sbs pv.pv_ity in
   let sbs = List.fold_left add_arg ps.ps_subst l.l_args in
   Mreg.map (fun _ -> ()) sbs.ity_subst_reg
 
@@ -953,12 +1064,14 @@ let add_wp_decl km name f uc =
   let lkm = Theory.get_known uc in
   (* remove redundant invariants *)
   let f = if Debug.test_flag no_track then f else track_values lkm km f in
+(*
   (* simplify f *)
   let f = if Debug.test_flag no_eval then f else
     (* do preliminary checks on f to spare eval_match any surprises *)
     let _lkm = Decl.known_add_decl lkm (create_prop_decl Pgoal pr f) in
     Eval_match.eval_match ~inline:Eval_match.inline_nonrec_linear lkm f in
   (* printf "wp: f=%a@." print_term f; *)
+*)
   let d = create_prop_decl Pgoal pr f in
   Theory.add_decl uc d
 

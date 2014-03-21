@@ -134,3 +134,8 @@ let rec chop_last = function
   | [r] -> [], r
   | x :: s -> let s, r = chop_last s in x :: s, r
 
+let rec map3 f l1 l2 l3 = match l1, l2, l3 with
+  | (a1::l1), (a2::l2), (a3::l3) ->
+      f a1 a2 a3 :: map3 f l1 l2 l3
+  | [], [], [] -> []
+  | _ -> invalid_arg "Lists.map3"

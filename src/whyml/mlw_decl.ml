@@ -289,11 +289,11 @@ let inst_constructors lkn kn ity = match ity.ity_node with
       if csl = [] || is_rec then raise (NonupdatableType ity);
       let base = ity_pur ts (List.map ity_var ts.ts_args) in
       let sbs = ity_match ity_subst_empty base ity in
-      let subst ty = {
+      let subst pj ty = pj, {
         fd_ity   = ity_full_inst sbs (ity_of_ty ty);
         fd_ghost = false;
         fd_mut   = None; } in
-      List.map (fun (cs,_) -> cs, List.map subst cs.ls_args) csl
+      List.map (fun (cs,pl) -> cs, List.map2 subst pl cs.ls_args) csl
   | Ityapp (its,_,_) ->
       let csl = find_constructors kn its in
       let d = Mid.find its.its_ts.ts_name lkn in
@@ -302,11 +302,11 @@ let inst_constructors lkn kn ity = match ity.ity_node with
       let args = List.map ity_var its.its_ts.ts_args in
       let base = ity_app its args its.its_regs in
       let sbs = ity_match ity_subst_empty base ity in
-      let subst fd = {
+      let subst pj fd = Opt.map (fun pl -> pl.pl_ls) pj, {
         fd_ity   = ity_full_inst sbs fd.fd_ity;
         fd_ghost = fd.fd_ghost;
         fd_mut   = Opt.map (reg_full_inst sbs) fd.fd_mut; } in
-      List.map (fun (cs,_) -> cs.pl_ls, List.map subst cs.pl_args) csl
+      List.map (fun (cs,pl) -> cs.pl_ls, List.map2 subst pl cs.pl_args) csl
   | Ityvar _ ->
       invalid_arg "Mlw_decl.inst_constructors"
 
