@@ -67,18 +67,21 @@ let compile_match = Trans.decl (fun d -> [decl_map rewriteT d]) None
 type state = {
   mt_map : lsymbol Mts.t;       (* from type symbols to selector functions *)
   pj_map : lsymbol list Mls.t;  (* from constructors to projections *)
+  is_map : lsymbol Mls.t;       (* from constructors to test functions *)
   tp_map : decl Mid.t;          (* skipped tuple symbols *)
   inf_ts : Sts.t;               (* infinite types *)
   ma_map : bool list Mts.t;     (* material type arguments *)
   keep_t : bool;                (* keep algebraic type definitions *)
   keep_e : bool;                (* keep monomorphic enumeration types *)
   keep_r : bool;                (* keep non-recursive records *)
-  no_ind : bool;                (* do not generate indexing funcitons *)
+  no_ind : bool;                (* do not generate indexing functions *)
+  tests : bool;                 (* use encoding based on test predicates *)
 }
 
 let empty_state = {
   mt_map = Mts.empty;
   pj_map = Mls.empty;
+  is_map = Mls.empty;
   tp_map = Mid.empty;
   inf_ts = Sts.add ts_real (Sts.singleton ts_int);
   ma_map = Mts.empty;
@@ -86,101 +89,164 @@ let empty_state = {
   keep_e = false;
   keep_r = false;
   no_ind = false;
+  tests = false;
 }
 
 let uncompiled = "eliminate_algebraic: compile_match required"
 
-let rec rewriteT kn state t = match t.t_node with
-  | Tcase (t1,bl) ->
-      let t1 = rewriteT kn state t1 in
+let rewriteT rewriteF =
+  let rec rewriteT kn state t = match t.t_node with
+    | Tcase (t1,bl) ->
+        let t1 = rewriteT kn state t1 in
+        let mk_br (w,m) br =
+          let (p,e) = t_open_branch br in
+          let e = rewriteT kn state e in
+          match p with
+          | { pat_node = Papp (cs,pl) } ->
+              let add_var e p pj = match p.pat_node with
+                | Pvar v -> t_let_close_simp v (fs_app pj [t1] v.vs_ty) e
+                | _ -> Printer.unsupportedTerm t uncompiled
+              in
+              let pjl = Mls.find cs state.pj_map in
+              let e = List.fold_left2 add_var e pl pjl in
+              w, Mls.add cs e m
+          | { pat_node = Pwild } ->
+              Some e, m
+          | _ -> Printer.unsupportedTerm t uncompiled
+        in
+        let w,m = List.fold_left mk_br (None,Mls.empty) bl in
+        let find (cs,_) = try Mls.find cs m with Not_found -> Opt.get w in
+        let ts = match t1.t_ty with
+          | Some { ty_node = Tyapp (ts,_) } -> ts
+          | _ -> Printer.unsupportedTerm t uncompiled
+        in
+        begin match List.map find (find_constructors kn ts) with
+          | [t] -> t
+          | tl  -> t_app (Mts.find ts state.mt_map) (t1::tl) t.t_ty
+        end
+    | _ ->
+        TermTF.t_map (rewriteT kn state) (rewriteF kn state) t
+  in
+  rewriteT
+
+let rec rewriteF_notests kn state f =
+  let rewriteT = rewriteT rewriteF_notests in
+  let rec rewriteF kn state av sign f = match f.t_node with
+    | Tcase (t1,bl) ->
+        let t1 = rewriteT kn state t1 in
+        let av' = Mvs.set_diff av (t_vars t1) in
+        let mk_br (w,m) br =
+          let (p,e) = t_open_branch br in
+          let e = rewriteF kn state av' sign e in
+          match p with
+          | { pat_node = Papp (cs,pl) } ->
+              let get_var p = match p.pat_node with
+                | Pvar v -> v
+                | _ -> Printer.unsupportedTerm f uncompiled
+              in
+              w, Mls.add cs (List.map get_var pl, e) m
+          | { pat_node = Pwild } ->
+              Some e, m
+          | _ -> Printer.unsupportedTerm f uncompiled
+        in
+        let w,m = List.fold_left mk_br (None,Mls.empty) bl in
+        let find (cs,_) =
+          let vl,e = try Mls.find cs m with Not_found ->
+            let var = create_vsymbol (id_fresh "w") in
+            let get_var pj = var (t_type (t_app_infer pj [t1])) in
+            List.map get_var (Mls.find cs state.pj_map), Opt.get w
+          in
+          let hd = t_app cs (List.map t_var vl) t1.t_ty in
+          match t1.t_node with
+          | Tvar v when Svs.mem v av ->
+              let hd = t_let_close_simp v hd e in if sign
+              then t_forall_close_simp vl [] hd
+              else t_exists_close_simp vl [] hd
+          | _ ->
+              let hd = t_equ t1 hd in if sign
+              then t_forall_close_simp vl [] (t_implies_simp hd e)
+              else t_exists_close_simp vl [] (t_and_simp     hd e)
+        in
+        let ts = match t1.t_ty with
+          | Some { ty_node = Tyapp (ts,_) } -> ts
+          | _ -> Printer.unsupportedTerm f uncompiled
+        in
+        let op = if sign then t_and_simp else t_or_simp in
+        Lists.map_join_left find op (find_constructors kn ts)
+    | Tquant (q, bf) when (q = Tforall && sign) || (q = Texists && not sign) ->
+        let vl, tr, f1, close = t_open_quant_cb bf in
+        let tr = TermTF.tr_map (rewriteT kn state)
+                        (rewriteF kn state Svs.empty sign) tr in
+        let av = List.fold_left (fun s v -> Svs.add v s) av vl in
+        let f1 = rewriteF kn state av sign f1 in
+        t_quant_simp q (close vl tr f1)
+    | Tbinop (o, _, _) when (o = Tand && sign) || (o = Tor && not sign) ->
+        TermTF.t_map_sign (Util.const (rewriteT kn state))
+          (rewriteF kn state av) sign f
+    | Tlet (t1, _) ->
+        let av = Mvs.set_diff av (t_vars t1) in
+        TermTF.t_map_sign (Util.const (rewriteT kn state))
+          (rewriteF kn state av) sign f
+    | _ ->
+        TermTF.t_map_sign (Util.const (rewriteT kn state))
+          (rewriteF kn state Svs.empty) sign f
+  in
+  rewriteF kn state Svs.empty true f
+
+(* rewriteF, tests version. Change pattern-matching
+   into a conjunction of implications. *)
+let rec rewriteF_tests kn state f =
+  let rewriteT = rewriteT rewriteF_tests in
+  let rewriteF = rewriteF_tests in
+  match f.t_node with
+  | Tcase (t1,bl) -> let t1 = rewriteT kn state t1 in
+      let var = create_vsymbol (id_fresh "w") in
+      (* create a let to avoid copying t1. *)
+      let v1 = var (t_type t1) in
+      let vt1 = t_var v1 in
       let mk_br (w,m) br =
         let (p,e) = t_open_branch br in
-        let e = rewriteT kn state e in
+        let e = rewriteF kn state e in
         match p with
         | { pat_node = Papp (cs,pl) } ->
             let add_var e p pj = match p.pat_node with
-              | Pvar v -> t_let_close_simp v (fs_app pj [t1] v.vs_ty) e
-              | _ -> Printer.unsupportedTerm t uncompiled
+              | Pvar v -> t_let_close_simp v (fs_app pj [vt1] v.vs_ty) e
+              | _ -> Printer.unsupportedTerm t1 uncompiled
             in
             let pjl = Mls.find cs state.pj_map in
             let e = List.fold_left2 add_var e pl pjl in
             w, Mls.add cs e m
         | { pat_node = Pwild } ->
             Some e, m
-        | _ -> Printer.unsupportedTerm t uncompiled
-      in
-      let w,m = List.fold_left mk_br (None,Mls.empty) bl in
-      let find (cs,_) = try Mls.find cs m with Not_found -> Opt.get w in
-      let ts = match t1.t_ty with
-        | Some { ty_node = Tyapp (ts,_) } -> ts
-        | _ -> Printer.unsupportedTerm t uncompiled
-      in
-      begin match List.map find (find_constructors kn ts) with
-        | [t] -> t
-        | tl  -> t_app (Mts.find ts state.mt_map) (t1::tl) t.t_ty
-      end
-  | _ ->
-      TermTF.t_map (rewriteT kn state) (rewriteF kn state Svs.empty true) t
-
-and rewriteF kn state av sign f = match f.t_node with
-  | Tcase (t1,bl) ->
-      let t1 = rewriteT kn state t1 in
-      let av' = Mvs.set_diff av (t_vars t1) in
-      let mk_br (w,m) br =
-        let (p,e) = t_open_branch br in
-        let e = rewriteF kn state av' sign e in
-        match p with
-        | { pat_node = Papp (cs,pl) } ->
-            let get_var p = match p.pat_node with
-              | Pvar v -> v
-              | _ -> Printer.unsupportedTerm f uncompiled
-            in
-            w, Mls.add cs (List.map get_var pl, e) m
-        | { pat_node = Pwild } ->
-            Some e, m
         | _ -> Printer.unsupportedTerm f uncompiled
       in
       let w,m = List.fold_left mk_br (None,Mls.empty) bl in
+      let ts = match t1.t_ty with
+        | Some { ty_node = Tyapp (ts,_) } -> ts
+        | _ -> Printer.unsupportedTerm f uncompiled
+      in
+      let csl = find_constructors kn ts in
+      (* no need for test when there is a single constructor. *)
+      let left = match csl with
+        | [_] -> fun _ rg -> rg
+        | _ -> fun cs rg ->
+          t_implies_simp (ps_app (Mls.find cs state.is_map) [vt1]) rg
+      in
       let find (cs,_) =
-        let vl,e = try Mls.find cs m with Not_found ->
-          let var = create_vsymbol (id_fresh "w") in
-          let get_var pj = var (t_type (t_app_infer pj [t1])) in
-          List.map get_var (Mls.find cs state.pj_map), Opt.get w
-        in
-        let hd = t_app cs (List.map t_var vl) t1.t_ty in
-        match t1.t_node with
-        | Tvar v when Svs.mem v av ->
-            let hd = t_let_close_simp v hd e in if sign
-            then t_forall_close_simp vl [] hd
-            else t_exists_close_simp vl [] hd
-        | _ ->
-            let hd = t_equ t1 hd in if sign
-            then t_forall_close_simp vl [] (t_implies_simp hd e)
-            else t_exists_close_simp vl [] (t_and_simp     hd e)
+        let rg = try Mls.find cs m with Not_found -> Opt.get w in
+        left cs rg
       in
-      let ts = match t1.t_ty with
-        | Some { ty_node = Tyapp (ts,_) } -> ts
-        | _ -> Printer.unsupportedTerm f uncompiled
-      in
-      let op = if sign then t_and_simp else t_or_simp in
-      Lists.map_join_left find op (find_constructors kn ts)
-  | Tquant (q, bf) when (q = Tforall && sign) || (q = Texists && not sign) ->
-      let vl, tr, f1, close = t_open_quant_cb bf in
-      let tr = TermTF.tr_map (rewriteT kn state)
-                      (rewriteF kn state Svs.empty sign) tr in
-      let av = List.fold_left (fun s v -> Svs.add v s) av vl in
-      let f1 = rewriteF kn state av sign f1 in
-      t_quant_simp q (close vl tr f1)
-  | Tbinop (o, _, _) when (o = Tand && sign) || (o = Tor && not sign) ->
-      TermTF.t_map_sign (Util.const (rewriteT kn state))
-        (rewriteF kn state av) sign f
-  | Tlet (t1, _) ->
-      let av = Mvs.set_diff av (t_vars t1) in
-      TermTF.t_map_sign (Util.const (rewriteT kn state))
-        (rewriteF kn state av) sign f
-  | _ ->
-      TermTF.t_map_sign (Util.const (rewriteT kn state))
-        (rewriteF kn state Svs.empty) sign f
+      let cj = Lists.map_join_left find t_and_simp csl in
+      t_let_close_simp v1 t1 cj
+  | _ -> TermTF.t_map (rewriteT kn state) (rewriteF_tests kn state) f
+
+let rewriteF kn state = if state.tests
+  then rewriteF_tests kn state
+  else rewriteF_notests kn state
+
+let rewriteT kn state = if state.tests
+  then rewriteT rewriteF_tests kn state
+  else rewriteT rewriteF_notests kn state
 
 let add_selector (state,task) ts ty csl =
   (* declare the selector function *)
@@ -197,12 +263,20 @@ let add_selector (state,task) ts ty csl =
   let mt_add tsk (cs,_) t =
     let id = mt_ls.ls_name.id_string ^ "_" ^ cs.ls_name.id_string in
     let pr = create_prsymbol (id_derive id cs.ls_name) in
-    let vl = List.rev_map (create_vsymbol (id_fresh "u")) cs.ls_args in
-    let hd = fs_app cs (List.rev_map t_var vl) (Opt.get cs.ls_value) in
-    let hd = fs_app mt_ls (hd::mt_tl) mt_ty in
-    let vl = List.rev_append mt_vl (List.rev vl) in
-    let ax = t_forall_close vl [] (t_equ hd t) in
-    add_prop_decl tsk Paxiom pr ax
+    if state.tests
+    then let u = create_vsymbol (id_fresh "u") ty in
+      let tu = t_var u in
+      let hd = fs_app mt_ls (tu::mt_tl) mt_ty in
+      let lf = ps_app (Mls.find cs state.is_map) [tu] in
+      let vl = u::List.rev mt_vl in
+      let ax = t_forall_close vl [[hd]] (t_implies lf (t_equ hd t)) in
+      add_prop_decl tsk Paxiom pr ax
+    else let vl = List.rev_map (create_vsymbol (id_fresh "u")) cs.ls_args in
+      let hd = fs_app cs (List.rev_map t_var vl) (Opt.get cs.ls_value) in
+      let hd = fs_app mt_ls (hd::mt_tl) mt_ty in
+      let vl = List.rev_append mt_vl (List.rev vl) in
+      let ax = t_forall_close vl [] (t_equ hd t) in
+      add_prop_decl tsk Paxiom pr ax
   in
   let task = List.fold_left2 mt_add task csl mt_tl in
   { state with mt_map = mtmap }, task
@@ -219,30 +293,75 @@ let add_indexer (state,task) ts ty csl =
   (* define the indexer function *)
   let index = ref (-1) in
   let mt_add tsk (cs,_) =
-    incr index;
-    let id = mt_ls.ls_name.id_string ^ "_" ^ cs.ls_name.id_string in
-    let pr = create_prsymbol (id_derive id cs.ls_name) in
-    let vl = List.rev_map (create_vsymbol (id_fresh "u")) cs.ls_args in
-    let hd = fs_app cs (List.rev_map t_var vl) (Opt.get cs.ls_value) in
-    let ax = t_equ (fs_app mt_ls [hd] ty_int) (t_nat_const !index) in
-    let ax = t_forall_close (List.rev vl) [[hd]] ax in
-    add_prop_decl tsk Paxiom pr ax
+      incr index;
+      let id = mt_ls.ls_name.id_string ^ "_" ^ cs.ls_name.id_string in
+      let pr = create_prsymbol (id_derive id cs.ls_name) in
+      let ax = if state.tests
+        then let v = create_vsymbol (id_fresh "u") ty in
+          let vt = [t_var v] in
+          let rg = t_equ (fs_app mt_ls vt ty_int) (t_nat_const !index) in
+          let lf = ps_app (Mls.find cs state.is_map) vt in
+          t_forall_close [v] [[lf]] (t_implies lf rg)
+        else let vl = List.rev_map (create_vsymbol (id_fresh "u")) cs.ls_args in
+          let hd = fs_app cs (List.rev_map t_var vl) (Opt.get cs.ls_value) in
+          let ax = t_equ (fs_app mt_ls [hd] ty_int) (t_nat_const !index) in
+          t_forall_close (List.rev vl) [[hd]] ax in
+      add_prop_decl tsk Paxiom pr ax
   in
   let task = List.fold_left mt_add task csl in
   state, task
+
+(* Test predicate: test whether a term corresponds to a given
+   constructor. It is defined as
+   is_A(u) = (u = A(A_proj_1(u),...,A_proj_n(u))),
+   which gives directly the desired reconstruction axiom (if
+   an element corresponds to constructor A, then it could be build
+   using constructor A).
+   Also add another (certainly derivable,but useful) axiom:
+   every value constructed using A corresponds to constructor A.
+   (e.g, A_proj_i are skolems). *)
+let add_tester (state,task) ty csl =
+  let mt_add (st,tsk) (cs,_) =
+    let id = id_derive ("is_" ^ cs.ls_name.id_string) cs.ls_name in
+    let ls = create_psymbol id [ty] in
+    let st = { st with is_map = Mls.add cs ls st.is_map } in
+    let v = create_vsymbol (id_fresh "u") ty in
+    let vt = t_var v in
+    let pj = Mls.find cs st.pj_map in
+    let pv pj = fs_app pj [vt] (Opt.get pj.ls_value) in
+    let hd = t_equ vt (fs_app cs (List.map pv pj) (Opt.get cs.ls_value)) in
+    let df = make_ls_defn ls [v] hd in
+    let tsk = add_logic_decl tsk [df] in
+    let id = id_derive (ls.ls_name.id_string ^ "_constructor") cs.ls_name in
+    let pr = create_prsymbol id in
+    let vl = List.rev_map (create_vsymbol (id_fresh "u")) cs.ls_args in
+    let hd = [fs_app cs (List.rev_map t_var vl) (Opt.get cs.ls_value)] in
+    let ax = ps_app ls hd in
+    let ax = t_forall_close (List.rev vl) [hd] ax in
+    st,add_prop_decl tsk Paxiom pr ax
+  in
+  List.fold_left mt_add (state,task) csl
 
 let add_discriminator (state,task) ts ty csl =
   let d_add (c1,_) task (c2,_) =
     let id = c1.ls_name.id_string ^ "_" ^ c2.ls_name.id_string in
     let pr = create_prsymbol (id_derive id ts.ts_name) in
-    let ul = List.rev_map (create_vsymbol (id_fresh "u")) c1.ls_args in
-    let vl = List.rev_map (create_vsymbol (id_fresh "v")) c2.ls_args in
-    let t1 = fs_app c1 (List.rev_map t_var ul) ty in
-    let t2 = fs_app c2 (List.rev_map t_var vl) ty in
-    let ax = t_neq t1 t2 in
-    let ax = t_forall_close (List.rev vl) [[t2]] ax in
-    let ax = t_forall_close (List.rev ul) [[t1]] ax in
-    add_prop_decl task Paxiom pr ax
+    if state.tests
+    then let u = create_vsymbol (id_fresh "u") ty in
+      let ul = [t_var u] in
+      let f1 = ps_app (Mls.find c1 state.is_map) ul in
+      let f2 = ps_app (Mls.find c2 state.is_map) ul in
+      let ax = t_and (t_not f1) (t_not f2) in
+      let ax = t_forall_close [u] [[f1];[f2]] ax in
+      add_prop_decl task Paxiom pr ax
+    else let ul = List.rev_map (create_vsymbol (id_fresh "u")) c1.ls_args in
+      let vl = List.rev_map (create_vsymbol (id_fresh "v")) c2.ls_args in
+      let t1 = fs_app c1 (List.rev_map t_var ul) ty in
+      let t2 = fs_app c2 (List.rev_map t_var vl) ty in
+      let ax = t_neq t1 t2 in
+      let ax = t_forall_close (List.rev vl) [[t2]] ax in
+      let ax = t_forall_close (List.rev ul) [[t1]] ax in
+      add_prop_decl task Paxiom pr ax
   in
   let rec dl_add task = function
     | c :: cl -> dl_add (List.fold_left (d_add c) task cl) cl
@@ -255,6 +374,11 @@ let add_indexer acc ts ty = function
   | _ when (fst acc).keep_t -> acc
   | csl when not ((fst acc).no_ind) -> add_indexer acc ts ty csl
   | csl when List.length csl <= 16 -> add_discriminator acc ts ty csl
+  | _ -> acc
+
+let add_tester acc _ ty = function
+  | [_] -> acc
+  | csl when (fst acc).tests -> add_tester acc ty csl
   | _ -> acc
 
 let meta_proj =
@@ -303,10 +427,15 @@ let add_inversion (state,task) ts ty csl =
   let ax_pr = create_prsymbol (id_derive ax_id ts.ts_name) in
   let ax_vs = create_vsymbol (id_fresh "u") ty in
   let ax_hd = t_var ax_vs in
+  (* We do not have test function with a single constructor,
+     but we still want the inversion axiom. *)
+  let b = state.tests && match csl with [_] -> false | _ -> true in
   let mk_cs (cs,_) =
-    let pjl = Mls.find cs state.pj_map in
-    let app pj = t_app_infer pj [ax_hd] in
-    t_equ ax_hd (fs_app cs (List.map app pjl) ty) in
+    if b
+    then ps_app (Mls.find cs state.is_map) [ax_hd]
+    else let pjl = Mls.find cs state.pj_map in
+      let app pj = t_app_infer pj [ax_hd] in
+      t_equ ax_hd (fs_app cs (List.map app pjl) ty) in
   let ax_f = Lists.map_join_left mk_cs t_or csl in
   let ax_f = t_forall_close [ax_vs] [] ax_f in
   state, add_prop_decl task Paxiom ax_pr ax_f
@@ -318,9 +447,10 @@ let add_type (state,task) (ts,csl) =
     if state.keep_t then task else List.fold_left cs_add task csl in
   (* add selector, projections, and inversion axiom *)
   let ty = ty_app ts (List.map ty_var ts.ts_args) in
+  let state,task = add_projections (state,task) ts ty csl in
+  let state,task = add_tester (state,task) ts ty csl in
   let state,task = add_selector (state,task) ts ty csl in
   let state,task = add_indexer (state,task) ts ty csl in
-  let state,task = add_projections (state,task) ts ty csl in
   let state,task = add_inversion (state,task) ts ty csl in
   state, task
 
@@ -362,14 +492,14 @@ let comp t (state,task) = match t.task_decl.td_node with
       in
       (* add needed functions and axioms *)
       let state, task = List.fold_left add_type (state,task) dl in
-      (* add the tags for infitite types and material arguments *)
+      (* add the tags for infinite types and material arguments *)
       let mts = List.fold_right (fun (t,l) -> Mts.add t l) dl Mts.empty in
       let state, task = List.fold_left (add_tags mts) (state,task) dl in
       (* return the updated state and task *)
       state, task
   | Decl d ->
       let fnT = rewriteT t.task_known state in
-      let fnF = rewriteF t.task_known state Svs.empty true in
+      let fnF = rewriteF t.task_known state in
       state, add_decl task (DeclTF.decl_map fnT fnF d)
   | Meta (m, [MAts ts]) when meta_equal m meta_infinite ->
       let state = { state with inf_ts = Sts.add ts state.inf_ts } in
@@ -431,7 +561,8 @@ let meta_elim = register_meta "eliminate_algebraic" [MTstring]
     \"keep_types\" : @[keep algebraic type definitions@]@\n\
     \"keep_enums\" : @[keep monomorphic enumeration types@]@\n\
     \"keep_recs\"  : @[keep non-recursive records@]@\n\
-    \"no_index\"   : @[do not generate indexing funcitons@]@]"
+    \"no_index\"   : @[do not generate indexing functions@]@\n\
+    \"use_tests\"  : @[use encoding based on test functions@]@]"
 
 let eliminate_algebraic = Trans.compose compile_match
   (Trans.on_meta meta_elim (fun ml ->
@@ -441,6 +572,7 @@ let eliminate_algebraic = Trans.compose compile_match
       | [MAstr "keep_enums"] -> { st with keep_e = true }
       | [MAstr "keep_recs"]  -> { st with keep_r = true }
       | [MAstr "no_index"]   -> { st with no_ind = true }
+      | [MAstr "use_tests"]  -> { st with tests = true }
       | _ -> raise (Invalid_argument "meta eliminate_algebraic")
     in
     let st = List.fold_left check st ml in
