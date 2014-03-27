@@ -35,6 +35,7 @@ theory BuiltIn
   syntax type real  "real"
 
   syntax predicate (=)  "(%1 = %2)"
+  meta "eliminate_algebraic" "use_tests"
 end
 
 theory int.Int
