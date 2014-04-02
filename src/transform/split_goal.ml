@@ -37,7 +37,7 @@ let split_case forig spl pos acc tl bl =
 
 let compiled = Ident.create_label "split_goal: compiled match"
 
-let split_case_2 kn forig spl pos acc t bl =
+let split_case_2 forig spl pos acc t bl =
   let vs = create_vsymbol (id_fresh "q") (t_type t) in
   let tv = t_var vs in
   let conn f = t_label_copy forig (t_let_close_simp vs t f) in
@@ -47,19 +47,13 @@ let split_case_2 kn forig spl pos acc t bl =
     let p, f = t_open_branch b in
     match p.pat_node with
     | Pwild ->
-        let csl = match p.pat_ty.Ty.ty_node with
-          | Ty.Tyapp (ts,_) -> Decl.find_constructors kn ts
-          | _ -> assert false in
-        let csall = Sls.of_list (List.rev_map fst csl) in
-        let csnew = Sls.diff csall cseen in
-        assert (not (Sls.is_empty csnew));
         let add_cs cs g =
           let vl = List.map (create_vsymbol (id_fresh "w")) cs.ls_args in
-          let f = t_equ tv (fs_app cs (List.map t_var vl) p.pat_ty) in
-          t_or_simp g (t_exists_close_simp vl [] f) in
-        let g = Sls.fold add_cs csnew t_false in
+          let f = t_neq tv (fs_app cs (List.map t_var vl) p.pat_ty) in
+          t_and_simp g (t_forall_close_simp vl [] f) in
+        let g = Sls.fold add_cs cseen t_true in
         let conn f = conn (jn g f) in
-        csall, apply_rev_append conn acc (spl [] f)
+        cseen, apply_rev_append conn acc (spl [] f)
     | Papp (cs, pl) ->
         let vl = List.map (function
           | {pat_node = Pvar v} -> v | _ -> assert false) pl in
@@ -71,11 +65,11 @@ let split_case_2 kn forig spl pos acc t bl =
   in
   List.rev_append bll acc
 
-let split_case_2 kn forig spl pos acc t bl =
+let split_case_2 forig spl pos acc t bl =
   if Slab.mem compiled forig.t_label then
     let lab = Slab.remove compiled forig.t_label in
     let forig = t_label ?loc:forig.t_loc lab forig in
-    split_case_2 kn forig spl pos acc t bl
+    split_case_2 forig spl pos acc t bl
   else
     let mk_let = t_let_close_simp in
     let mk_case t bl = t_label_add compiled (t_case_close t bl) in
@@ -96,7 +90,7 @@ type split = {
   right_only : bool;
   stop_label : bool;
   respect_as : bool;
-  comp_match : known_map option;
+  comp_match : bool;
 }
 
 let rec split_pos ro acc f = match f.t_node with
@@ -133,8 +127,8 @@ let rec split_pos ro acc f = match f.t_node with
       let vs,f1,close = t_open_bound_cb fb in
       let fn f1 = t_label_copy f (t_let t (close vs f1)) in
       apply_append fn acc (split_pos ro [] f1)
-  | Tcase (tl,bl) when ro.comp_match <> None ->
-      split_case_2 (Opt.get ro.comp_match) f (split_pos ro) true acc tl bl
+  | Tcase (tl,bl) when ro.comp_match ->
+      split_case_2 f (split_pos ro) true acc tl bl
   | Tcase (tl,bl) ->
       split_case f (split_pos ro) true acc tl bl
   | Tquant (Tforall,fq) ->
@@ -176,8 +170,8 @@ and split_neg ro acc f = match f.t_node with
       let vs,f1,close = t_open_bound_cb fb in
       let fn f1 = t_label_copy f (t_let t (close vs f1)) in
       apply_append fn acc (split_neg ro [] f1)
-  | Tcase (tl,bl) when ro.comp_match <> None ->
-      split_case_2 (Opt.get ro.comp_match) f (split_neg ro) false acc tl bl
+  | Tcase (tl,bl) when ro.comp_match ->
+      split_case_2 f (split_neg ro) false acc tl bl
   | Tcase (tl,bl) ->
       split_case f (split_neg ro) false acc tl bl
   | Tquant (Texists,fq) ->
@@ -213,7 +207,7 @@ let full_split = {
   right_only = false;
   stop_label = false;
   respect_as = true;
-  comp_match = None;
+  comp_match = true;
 }
 
 let right_split = { full_split with right_only = true }
