@@ -37,7 +37,7 @@ let split_case forig spl pos acc tl bl =
 
 let compiled = Ident.create_label "split_goal: compiled match"
 
-let split_case_2 forig spl pos acc t bl =
+let split_case_2 kn forig spl pos acc t bl =
   let vs = create_vsymbol (id_fresh "q") (t_type t) in
   let tv = t_var vs in
   let conn f = t_label_copy forig (t_let_close_simp vs t f) in
@@ -47,13 +47,19 @@ let split_case_2 forig spl pos acc t bl =
     let p, f = t_open_branch b in
     match p.pat_node with
     | Pwild ->
+        let csl = match p.pat_ty.Ty.ty_node with
+          | Ty.Tyapp (ts,_) -> Decl.find_constructors kn ts
+          | _ -> assert false in
+        let csall = Sls.of_list (List.rev_map fst csl) in
+        let csnew = Sls.diff csall cseen in
+        assert (not (Sls.is_empty csnew));
         let add_cs cs g =
           let vl = List.map (create_vsymbol (id_fresh "w")) cs.ls_args in
-          let f = t_neq tv (fs_app cs (List.map t_var vl) p.pat_ty) in
-          t_and_simp g (t_forall_close_simp vl [] f) in
-        let g = Sls.fold add_cs cseen t_true in
+          let f = t_equ tv (fs_app cs (List.map t_var vl) p.pat_ty) in
+          t_or_simp g (t_exists_close_simp vl [] f) in
+        let g = Sls.fold add_cs csnew t_false in
         let conn f = conn (jn g f) in
-        cseen, apply_rev_append conn acc (spl [] f)
+        csall, apply_rev_append conn acc (spl [] f)
     | Papp (cs, pl) ->
         let vl = List.map (function
           | {pat_node = Pvar v} -> v | _ -> assert false) pl in
@@ -65,11 +71,11 @@ let split_case_2 forig spl pos acc t bl =
   in
   List.rev_append bll acc
 
-let split_case_2 forig spl pos acc t bl =
+let split_case_2 kn forig spl pos acc t bl =
   if Slab.mem compiled forig.t_label then
     let lab = Slab.remove compiled forig.t_label in
     let forig = t_label ?loc:forig.t_loc lab forig in
-    split_case_2 forig spl pos acc t bl
+    split_case_2 kn forig spl pos acc t bl
   else
     let mk_let = t_let_close_simp in
     let mk_case t bl = t_label_add compiled (t_case_close t bl) in
@@ -90,7 +96,7 @@ type split = {
   right_only : bool;
   stop_label : bool;
   respect_as : bool;
-  comp_match : bool;
+  comp_match : known_map option;
 }
 
 let rec split_pos ro acc f = match f.t_node with
@@ -127,8 +133,8 @@ let rec split_pos ro acc f = match f.t_node with
       let vs,f1,close = t_open_bound_cb fb in
       let fn f1 = t_label_copy f (t_let t (close vs f1)) in
       apply_append fn acc (split_pos ro [] f1)
-  | Tcase (tl,bl) when ro.comp_match ->
-      split_case_2 f (split_pos ro) true acc tl bl
+  | Tcase (tl,bl) when ro.comp_match <> None ->
+      split_case_2 (Opt.get ro.comp_match) f (split_pos ro) true acc tl bl
   | Tcase (tl,bl) ->
       split_case f (split_pos ro) true acc tl bl
   | Tquant (Tforall,fq) ->
@@ -170,8 +176,8 @@ and split_neg ro acc f = match f.t_node with
       let vs,f1,close = t_open_bound_cb fb in
       let fn f1 = t_label_copy f (t_let t (close vs f1)) in
       apply_append fn acc (split_neg ro [] f1)
-  | Tcase (tl,bl) when ro.comp_match ->
-      split_case_2 f (split_neg ro) false acc tl bl
+  | Tcase (tl,bl) when ro.comp_match <> None ->
+      split_case_2 (Opt.get ro.comp_match) f (split_neg ro) false acc tl bl
   | Tcase (tl,bl) ->
       split_case f (split_neg ro) false acc tl bl
   | Tquant (Texists,fq) ->
@@ -203,108 +209,120 @@ let split_premise ro d = match d.d_node with
   | Dprop (Paxiom,pr,f) ->  split_axiom ro pr f
   | _ -> [d]
 
-let full_split = {
+let full_split kn = {
   right_only = false;
   stop_label = false;
   respect_as = true;
-  comp_match = true;
+  comp_match = kn;
 }
 
-let right_split = { full_split with right_only = true }
-let wp_split    = { right_split with stop_label = true }
-let intro_split = { wp_split with respect_as = false }
+let right_split kn = { (full_split kn) with right_only = true }
+let wp_split kn    = { (right_split kn) with stop_label = true }
+let intro_split kn = { (wp_split kn) with respect_as = false }
 
-let split_pos_full  = split_pos full_split []
-let split_neg_full  = split_neg full_split []
+let split_pos_full ?known_map f = split_pos (full_split known_map) [] f
+let split_neg_full ?known_map f = split_neg (full_split known_map) [] f
 
-let split_pos_right = split_pos right_split []
-let split_neg_right = split_neg right_split []
+let split_pos_right ?known_map f = split_pos (right_split known_map) [] f
+let split_neg_right ?known_map f = split_neg (right_split known_map) [] f
 
-let split_pos_wp    = split_pos wp_split []
-let split_neg_wp    = split_neg wp_split []
+let split_pos_wp ?known_map f = split_pos (wp_split known_map) [] f
+let split_neg_wp ?known_map f = split_neg (wp_split known_map) [] f
 
-let split_pos_intro = split_pos intro_split []
-let split_neg_intro = split_neg intro_split []
+let split_pos_intro ?known_map f = split_pos (intro_split known_map) [] f
+let split_neg_intro ?known_map f = split_neg (intro_split known_map) [] f
 
-let split_goal_full  = Trans.goal_l (split_goal full_split)
-let split_goal_right = Trans.goal_l (split_goal right_split)
-let split_goal_wp    = Trans.goal_l (split_goal wp_split)
+let prep_goal split kn = Trans.goal_l (split_goal (split kn))
 
-let split_all_full  = Trans.decl_l (split_all full_split) None
-let split_all_right = Trans.decl_l (split_all right_split) None
-let split_all_wp    = Trans.decl_l (split_all wp_split) None
+let split_goal_full  = prep_goal full_split
+let split_goal_right = prep_goal right_split
+let split_goal_wp    = prep_goal wp_split
 
-let split_premise_full  = Trans.decl (split_premise full_split) None
-let split_premise_right = Trans.decl (split_premise right_split) None
-let split_premise_wp    = Trans.decl (split_premise wp_split) None
+let prep_all split kn = Trans.decl_l (split_all (split kn)) None
 
-let () = Trans.register_transform_l "split_goal_full" split_goal_full
+let split_all_full  = prep_all full_split
+let split_all_right = prep_all right_split
+let split_all_wp    = prep_all wp_split
+
+let prep_premise split kn = Trans.decl (split_premise (split kn)) None
+
+let split_premise_full  = prep_premise full_split
+let split_premise_right = prep_premise right_split
+let split_premise_wp    = prep_premise wp_split
+
+let prep split = Trans.store (fun t ->
+  Trans.apply (split (Some (Task.task_known t))) t)
+
+let () = Trans.register_transform_l "split_goal_full" (prep split_goal_full)
   ~desc:"Put@ the@ goal@ in@ a@ conjunctive@ form,@ \
   returns@ the@ corresponding@ set@ of@ subgoals.@ The@ number@ of@ subgoals@ \
   generated@ may@ be@ exponential@ in@ the@ size@ of@ the@ initial@ goal."
-let () = Trans.register_transform_l "split_all_full" split_all_full
+let () = Trans.register_transform_l "split_all_full" (prep split_all_full)
   ~desc:"Same@ as@ split_goal_full,@ but@ also@ split@ premises."
-let () = Trans.register_transform "split_premise_full" split_premise_full
+let () = Trans.register_transform "split_premise_full" (prep split_premise_full)
   ~desc:"Same@ as@ split_all_full,@ but@ split@ only@ premises."
 
-let () = Trans.register_transform_l "split_goal_right" split_goal_right
+let () = Trans.register_transform_l "split_goal_right" (prep split_goal_right)
   ~desc:"@[<hov 2>Same@ as@ split_goal_full,@ but@ don't@ split:@,\
       - @[conjunctions under disjunctions@]@\n\
       - @[conjunctions on the left of implications.@]@]"
-let () = Trans.register_transform_l "split_all_right" split_all_right
+let () = Trans.register_transform_l "split_all_right" (prep split_all_right)
   ~desc:"Same@ as@ split_goal_right,@ but@ also@ split@ premises."
-let () = Trans.register_transform "split_premise_right" split_premise_right
+let () = Trans.register_transform "split_premise_right" (prep split_premise_right)
   ~desc:"Same@ as@ split_all_right,@ but@ split@ only@ premises."
 
-let () = Trans.register_transform_l "split_goal_wp" split_goal_wp
+let () = Trans.register_transform_l "split_goal_wp" (prep split_goal_wp)
   ~desc:"Same@ as@ split_goal_right,@ but@ stops@ at@ \
     the@ `stop_split'@ label@ and@ removes@ the@ label."
-let () = Trans.register_transform_l "split_all_wp" split_all_wp
+let () = Trans.register_transform_l "split_all_wp" (prep split_all_wp)
   ~desc:"Same@ as@ split_goal_wp,@ but@ also@ split@ premises."
-let () = Trans.register_transform "split_premise_wp" split_premise_wp
+let () = Trans.register_transform "split_premise_wp" (prep split_premise_wp)
   ~desc:"Same@ as@ split_all_wp,@ but@ split@ only@ premises."
 
-let () = Trans.register_transform_l "split_goal" split_goal_wp
+let () = Trans.register_transform_l "split_goal" (prep split_goal_wp)
   ~desc:"The@ deprecated@ name@ of@ split_goal_wp,@ \
     kept@ for@ compatibility@ purposes."
 
 let ls_of_var v =
   create_fsymbol (id_fresh ("spl_" ^ v.vs_name.id_string)) [] v.vs_ty
 
-let rec split_intro pr dl acc f =
-  let rsp = split_intro pr dl in
-  match f.t_node with
-  | Ttrue when not (keep f) -> acc
-  | Tbinop (Tand,f1,f2) when asym f1 ->
-      rsp (rsp acc (t_implies f1 f2)) f1
-  | Tbinop (Tand,f1,f2) ->
-      rsp (rsp acc f2) f1
-  | Tbinop (Timplies,f1,f2) ->
-      let pp = create_prsymbol (id_fresh (pr.pr_name.id_string ^ "_spl")) in
-      let dl = create_prop_decl Paxiom pp f1 :: dl in
-      split_intro pr dl acc f2
-  | Tbinop (Tiff,f1,f2) ->
-      rsp (rsp acc (t_implies f2 f1)) (t_implies f1 f2)
-  | Tif (fif,fthen,felse) ->
-      rsp (rsp acc (t_implies (t_not fif) felse)) (t_implies fif fthen)
-  | Tlet (t,fb) -> let vs,f = t_open_bound fb in
-      let ls = ls_of_var vs in
-      let f  = t_subst_single vs (fs_app ls [] vs.vs_ty) f in
-      let dl = create_logic_decl [make_ls_defn ls [] t] :: dl in
-      split_intro pr dl acc f
-  | Tquant (Tforall,fq) -> let vsl,_,f = t_open_quant fq in
-      let lls = List.map ls_of_var vsl in
-      let add s vs ls = Mvs.add vs (fs_app ls [] vs.vs_ty) s in
-      let f = t_subst (List.fold_left2 add Mvs.empty vsl lls) f in
-      let add dl ls = create_param_decl ls :: dl in
-      let dl = List.fold_left add dl lls in
-      split_intro pr dl acc f
-  | _ ->
-      let goal f = List.rev (create_prop_decl Pgoal pr f :: dl) in
-      List.rev_append (List.rev_map goal (split_pos_wp f)) acc
+let split_intro kn =
+  let rec split_intro pr dl acc f =
+    let rsp = split_intro pr dl in
+    match f.t_node with
+    | Ttrue when not (keep f) -> acc
+    | Tbinop (Tand,f1,f2) when asym f1 ->
+        rsp (rsp acc (t_implies f1 f2)) f1
+    | Tbinop (Tand,f1,f2) ->
+        rsp (rsp acc f2) f1
+    | Tbinop (Timplies,f1,f2) ->
+        let pp = create_prsymbol (id_fresh (pr.pr_name.id_string ^ "_spl")) in
+        let dl = create_prop_decl Paxiom pp f1 :: dl in
+        split_intro pr dl acc f2
+    | Tbinop (Tiff,f1,f2) ->
+        rsp (rsp acc (t_implies f2 f1)) (t_implies f1 f2)
+    | Tif (fif,fthen,felse) ->
+        rsp (rsp acc (t_implies (t_not fif) felse)) (t_implies fif fthen)
+    | Tlet (t,fb) -> let vs,f = t_open_bound fb in
+        let ls = ls_of_var vs in
+        let f  = t_subst_single vs (fs_app ls [] vs.vs_ty) f in
+        let dl = create_logic_decl [make_ls_defn ls [] t] :: dl in
+        split_intro pr dl acc f
+    | Tquant (Tforall,fq) -> let vsl,_,f = t_open_quant fq in
+        let lls = List.map ls_of_var vsl in
+        let add s vs ls = Mvs.add vs (fs_app ls [] vs.vs_ty) s in
+        let f = t_subst (List.fold_left2 add Mvs.empty vsl lls) f in
+        let add dl ls = create_param_decl ls :: dl in
+        let dl = List.fold_left add dl lls in
+        split_intro pr dl acc f
+    | _ ->
+        let goal f = List.rev (create_prop_decl Pgoal pr f :: dl) in
+        List.rev_append (List.rev_map goal (split_pos_wp ?known_map:kn f)) acc
+  in
+  split_intro
 
-let split_intro = Trans.goal_l (fun pr f -> split_intro pr [] [] f)
+let split_intro kn = Trans.goal_l (fun pr f -> split_intro kn pr [] [] f)
 
-let () = Trans.register_transform_l "split_intro" split_intro
+let () = Trans.register_transform_l "split_intro" (prep split_intro)
   ~desc:"Same@ as@ split_goal_wp,@ but@ moves@ \
     the@ implication@ antecedents@ to@ premises."
