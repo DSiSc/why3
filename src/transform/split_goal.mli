@@ -45,17 +45,17 @@ val split_neg_intro : ?known_map:Decl.known_map -> Term.term -> Term.term list
 (** [split_neg_intro] works as [split_neg_wp] but does not
  respect the `asym_split' label *)
 
-val split_goal_full : Decl.known_map option -> Task.task Trans.tlist
-val split_all_full : Decl.known_map option -> Task.task Trans.tlist
-val split_premise_full : Decl.known_map option -> Task.task Trans.trans
+val split_goal_full : Task.task Trans.tlist
+val split_all_full : Task.task Trans.tlist
+val split_premise_full : Task.task Trans.trans
 
-val split_goal_right : Decl.known_map option -> Task.task Trans.tlist
-val split_all_right : Decl.known_map option -> Task.task Trans.tlist
-val split_premise_right : Decl.known_map option -> Task.task Trans.trans
+val split_goal_right : Task.task Trans.tlist
+val split_all_right : Task.task Trans.tlist
+val split_premise_right : Task.task Trans.trans
 
-val split_goal_wp : Decl.known_map option -> Task.task Trans.tlist
-val split_all_wp : Decl.known_map option -> Task.task Trans.tlist
-val split_premise_wp : Decl.known_map option -> Task.task Trans.trans
+val split_goal_wp : Task.task Trans.tlist
+val split_all_wp : Task.task Trans.tlist
+val split_premise_wp : Task.task Trans.trans
 
-val split_intro : Decl.known_map option -> Task.task Trans.tlist
+val split_intro : Task.task Trans.tlist
 (** [split_intro] is [split_goal_wp] with skolemization and formula separation *)

@@ -232,54 +232,55 @@ let split_neg_wp ?known_map f = split_neg (wp_split known_map) [] f
 let split_pos_intro ?known_map f = split_pos (intro_split known_map) [] f
 let split_neg_intro ?known_map f = split_neg (intro_split known_map) [] f
 
-let prep_goal split kn = Trans.goal_l (split_goal (split kn))
+let prep split = Trans.store (fun t ->
+  Trans.apply (split (Some (Task.task_known t))) t)
+
+let prep_goal split = prep (fun kn -> Trans.goal_l (split_goal (split kn)))
 
 let split_goal_full  = prep_goal full_split
 let split_goal_right = prep_goal right_split
 let split_goal_wp    = prep_goal wp_split
 
-let prep_all split kn = Trans.decl_l (split_all (split kn)) None
+let prep_all split = prep (fun kn -> Trans.decl_l (split_all (split kn)) None)
 
 let split_all_full  = prep_all full_split
 let split_all_right = prep_all right_split
 let split_all_wp    = prep_all wp_split
 
-let prep_premise split kn = Trans.decl (split_premise (split kn)) None
+let prep_premise split =
+  prep (fun kn -> Trans.decl (split_premise (split kn)) None)
 
 let split_premise_full  = prep_premise full_split
 let split_premise_right = prep_premise right_split
 let split_premise_wp    = prep_premise wp_split
 
-let prep split = Trans.store (fun t ->
-  Trans.apply (split (Some (Task.task_known t))) t)
-
-let () = Trans.register_transform_l "split_goal_full" (prep split_goal_full)
+let () = Trans.register_transform_l "split_goal_full" split_goal_full
   ~desc:"Put@ the@ goal@ in@ a@ conjunctive@ form,@ \
   returns@ the@ corresponding@ set@ of@ subgoals.@ The@ number@ of@ subgoals@ \
   generated@ may@ be@ exponential@ in@ the@ size@ of@ the@ initial@ goal."
-let () = Trans.register_transform_l "split_all_full" (prep split_all_full)
+let () = Trans.register_transform_l "split_all_full" split_all_full
   ~desc:"Same@ as@ split_goal_full,@ but@ also@ split@ premises."
-let () = Trans.register_transform "split_premise_full" (prep split_premise_full)
+let () = Trans.register_transform "split_premise_full" split_premise_full
   ~desc:"Same@ as@ split_all_full,@ but@ split@ only@ premises."
 
-let () = Trans.register_transform_l "split_goal_right" (prep split_goal_right)
+let () = Trans.register_transform_l "split_goal_right" split_goal_right
   ~desc:"@[<hov 2>Same@ as@ split_goal_full,@ but@ don't@ split:@,\
       - @[conjunctions under disjunctions@]@\n\
       - @[conjunctions on the left of implications.@]@]"
-let () = Trans.register_transform_l "split_all_right" (prep split_all_right)
+let () = Trans.register_transform_l "split_all_right" split_all_right
   ~desc:"Same@ as@ split_goal_right,@ but@ also@ split@ premises."
-let () = Trans.register_transform "split_premise_right" (prep split_premise_right)
+let () = Trans.register_transform "split_premise_right" split_premise_right
   ~desc:"Same@ as@ split_all_right,@ but@ split@ only@ premises."
 
-let () = Trans.register_transform_l "split_goal_wp" (prep split_goal_wp)
+let () = Trans.register_transform_l "split_goal_wp" split_goal_wp
   ~desc:"Same@ as@ split_goal_right,@ but@ stops@ at@ \
     the@ `stop_split'@ label@ and@ removes@ the@ label."
-let () = Trans.register_transform_l "split_all_wp" (prep split_all_wp)
+let () = Trans.register_transform_l "split_all_wp" split_all_wp
   ~desc:"Same@ as@ split_goal_wp,@ but@ also@ split@ premises."
-let () = Trans.register_transform "split_premise_wp" (prep split_premise_wp)
+let () = Trans.register_transform "split_premise_wp" split_premise_wp
   ~desc:"Same@ as@ split_all_wp,@ but@ split@ only@ premises."
 
-let () = Trans.register_transform_l "split_goal" (prep split_goal_wp)
+let () = Trans.register_transform_l "split_goal" split_goal_wp
   ~desc:"The@ deprecated@ name@ of@ split_goal_wp,@ \
     kept@ for@ compatibility@ purposes."
 
@@ -321,8 +322,9 @@ let split_intro kn =
   in
   split_intro
 
-let split_intro kn = Trans.goal_l (fun pr f -> split_intro kn pr [] [] f)
+let split_intro =
+  prep (fun kn -> Trans.goal_l (fun pr f -> split_intro kn pr [] [] f))
 
-let () = Trans.register_transform_l "split_intro" (prep split_intro)
+let () = Trans.register_transform_l "split_intro" split_intro
   ~desc:"Same@ as@ split_goal_wp,@ but@ moves@ \
     the@ implication@ antecedents@ to@ premises."
