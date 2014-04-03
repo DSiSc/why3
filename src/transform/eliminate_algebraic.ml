@@ -125,11 +125,11 @@ let rewriteT rewriteF =
           | tl  -> t_app (Mts.find ts state.mt_map) (t1::tl) t.t_ty
         end
     | _ ->
-        TermTF.t_map (rewriteT kn state) (rewriteF kn state) t
+        TermTF.t_map (rewriteT kn state) (rewriteF kn state true) t
   in
   rewriteT
 
-let rec rewriteF_notests kn state f =
+let rec rewriteF_notests kn state sign f =
   let rewriteT = rewriteT rewriteF_notests in
   let rec rewriteF kn state av sign f = match f.t_node with
     | Tcase (t1,bl) ->
@@ -191,54 +191,62 @@ let rec rewriteF_notests kn state f =
         TermTF.t_map_sign (Util.const (rewriteT kn state))
           (rewriteF kn state Svs.empty) sign f
   in
-  rewriteF kn state Svs.empty true f
+  rewriteF kn state Svs.empty sign f
 
 (* rewriteF, tests version. Change pattern-matching
-   into a conjunction of implications. *)
-let rec rewriteF_tests kn state f =
+   into a conjunction of implications (constructor -> ...)
+   for positive occurences,
+   and into a disjunction of conjunctions (constructor /\ ...)
+   for negative ones. *)
+let rec rewriteF_tests kn state sign f =
   let rewriteT = rewriteT rewriteF_tests in
-  let rewriteF = rewriteF_tests in
-  match f.t_node with
-  | Tcase (t1,bl) -> let t1 = rewriteT kn state t1 in
-      let var = create_vsymbol (id_fresh "w") in
-      (* create a let to avoid copying t1. *)
-      let v1 = var (t_type t1) in
-      let vt1 = t_var v1 in
-      let mk_br (w,m) br =
-        let (p,e) = t_open_branch br in
-        let e = rewriteF kn state e in
-        match p with
-        | { pat_node = Papp (cs,pl) } ->
-            let add_var e p pj = match p.pat_node with
-              | Pvar v -> t_let_close_simp v (fs_app pj [vt1] v.vs_ty) e
-              | _ -> Printer.unsupportedTerm t1 uncompiled
-            in
-            let pjl = Mls.find cs state.pj_map in
-            let e = List.fold_left2 add_var e pl pjl in
-            w, Mls.add cs e m
-        | { pat_node = Pwild } ->
-            Some e, m
-        | _ -> Printer.unsupportedTerm f uncompiled
-      in
-      let w,m = List.fold_left mk_br (None,Mls.empty) bl in
-      let ts = match t1.t_ty with
-        | Some { ty_node = Tyapp (ts,_) } -> ts
-        | _ -> Printer.unsupportedTerm f uncompiled
-      in
-      let csl = find_constructors kn ts in
-      (* no need for test when there is a single constructor. *)
-      let left = match csl with
-        | [_] -> fun _ rg -> rg
-        | _ -> fun cs rg ->
-          t_implies_simp (ps_app (Mls.find cs state.is_map) [vt1]) rg
-      in
-      let find (cs,_) =
-        let rg = try Mls.find cs m with Not_found -> Opt.get w in
-        left cs rg
-      in
-      let cj = Lists.map_join_left find t_and_simp csl in
-      t_let_close_simp v1 t1 cj
-  | _ -> TermTF.t_map (rewriteT kn state) (rewriteF_tests kn state) f
+  let rec rewriteF kn state sign f =
+    match f.t_node with
+    | Tcase (t1,bl) -> let t1 = rewriteT kn state t1 in
+        let var = create_vsymbol (id_fresh "w") in
+        (* create a let to avoid copying t1. *)
+        let v1 = var (t_type t1) in
+        let vt1 = t_var v1 in
+        let mk_br (w,m) br =
+          let (p,e) = t_open_branch br in
+          let e = rewriteF kn state sign e in
+          match p with
+          | { pat_node = Papp (cs,pl) } ->
+              let add_var e p pj = match p.pat_node with
+                | Pvar v -> t_let_close_simp v (fs_app pj [vt1] v.vs_ty) e
+                | _ -> Printer.unsupportedTerm t1 uncompiled
+              in
+              let pjl = Mls.find cs state.pj_map in
+              let e = List.fold_left2 add_var e pl pjl in
+              w, Mls.add cs e m
+          | { pat_node = Pwild } ->
+              Some e, m
+          | _ -> Printer.unsupportedTerm f uncompiled
+        in
+        let w,m = List.fold_left mk_br (None,Mls.empty) bl in
+        let ts = match t1.t_ty with
+          | Some { ty_node = Tyapp (ts,_) } -> ts
+          | _ -> Printer.unsupportedTerm f uncompiled
+        in
+        let csl = find_constructors kn ts in
+        let conn = if sign then t_implies_simp else t_and_simp in
+        (* no need for test when there is a single constructor. *)
+        let left = match csl with
+          | [_] -> fun _ rg -> rg
+          | _ -> fun cs rg ->
+            conn (ps_app (Mls.find cs state.is_map) [vt1]) rg
+        in
+        let find (cs,_) =
+          let rg = try Mls.find cs m with Not_found -> Opt.get w in
+          left cs rg
+        in
+        let jn = if sign then t_and_simp else t_or_simp in
+        let cj = Lists.map_join_left find jn csl in
+        t_let_close_simp v1 t1 cj
+    | _ -> TermTF.t_map_sign (Util.const (rewriteT kn state))
+      (rewriteF kn state) sign f
+  in
+  rewriteF kn state sign f
 
 let rewriteF kn state = if state.tests
   then rewriteF_tests kn state
@@ -497,9 +505,13 @@ let comp t (state,task) = match t.task_decl.td_node with
       let state, task = List.fold_left (add_tags mts) (state,task) dl in
       (* return the updated state and task *)
       state, task
+  | Decl ({ d_node = Dprop (Pgoal,_,_) } as d) ->
+    let fnT = rewriteT t.task_known state in
+    let fnF = rewriteF t.task_known state false in
+    state, add_decl task (DeclTF.decl_map fnT fnF d)
   | Decl d ->
       let fnT = rewriteT t.task_known state in
-      let fnF = rewriteF t.task_known state in
+      let fnF = rewriteF t.task_known state true in
       state, add_decl task (DeclTF.decl_map fnT fnF d)
   | Meta (m, [MAts ts]) when meta_equal m meta_infinite ->
       let state = { state with inf_ts = Sts.add ts state.inf_ts } in
