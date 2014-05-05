@@ -131,6 +131,9 @@ let option_list = Arg.align [
       " Read the input file from stdin";
   "-T", Arg.String add_opt_theory,
       "<theory> Select <theory> in the input file or in the library";
+  "--backend-c", Arg.Unit Mlw_backends.switch_to_c,
+      " enables the C backend. WhyML will preduce a C program instead \
+       of an OCaml one";
   "--theory", Arg.String add_opt_theory,
       " same as -T";
   "-G", Arg.String add_opt_goal,
@@ -602,7 +605,7 @@ let do_exec env fname cin exec =
 
 let extract_to ?fname th extract =
   let dir = Opt.get !opt_output in
-  let file = Filename.concat dir (Mlw_ocaml.extract_filename ?fname th) in
+  let file = Filename.concat dir (Mlw_backends.extract_filename ?fname th) in
   let old =
     if Sys.file_exists file then begin
       let backup = file ^ ".bak" in
@@ -627,8 +630,8 @@ let use_iter f th =
 let rec do_extract_theory edrv ?fname th =
   let extract file ?old fmt = ignore (old);
     let tname = th.th_name.Ident.id_string in
-    Debug.dprintf Mlw_ocaml.debug "extract theory %s to file %s@." tname file;
-    Mlw_ocaml.extract_theory edrv ?old ?fname fmt th
+    Debug.dprintf Mlw_backends.debug "extract theory %s to file %s@." tname file;
+    Mlw_backends.extract_theory edrv ?old ?fname fmt th
   in
   extract_to ?fname th extract;
   let extract_use th' =
@@ -639,8 +642,8 @@ let rec do_extract_theory edrv ?fname th =
 let rec do_extract_module edrv ?fname m =
   let extract file ?old fmt = ignore (old);
     let tname = m.Mlw_module.mod_theory.th_name.Ident.id_string in
-    Debug.dprintf Mlw_ocaml.debug "extract module %s to file %s@." tname file;
-    Mlw_ocaml.extract_module edrv ?old ?fname fmt m
+    Debug.dprintf Mlw_backends.debug "extract module %s to file %s@." tname file;
+    Mlw_backends.extract_module edrv ?old ?fname fmt m
   in
   extract_to ?fname m.Mlw_module.mod_theory extract;
   let extract_use th' =

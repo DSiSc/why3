@@ -21,10 +21,6 @@ open Decl
 open Theory
 open Printer
 
-let debug =
-  Debug.register_info_flag "extraction"
-    ~desc:"Print@ details@ of@ program@ extraction."
-
 let clean_fname fname =
   let fname = Filename.basename fname in
   (try Filename.chop_extension fname with _ -> fname)

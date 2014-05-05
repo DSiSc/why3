@@ -9,7 +9,9 @@
 (*                                                                  *)
 (********************************************************************)
 
-(* OCaml program extraction *)
+(* Generic interface for program extraction *)
+
+val debug: Debug.flag
 
 val extract_filename: ?fname:string -> Theory.theory -> string
 
@@ -20,3 +22,7 @@ val extract_theory:
 val extract_module:
   Mlw_driver.driver -> ?old:Pervasives.in_channel -> ?fname:string ->
   Format.formatter -> Mlw_module.modul -> unit
+
+(** Switches *)
+
+val switch_to_c : unit -> unit

@@ -9,14 +9,27 @@
 (*                                                                  *)
 (********************************************************************)
 
-(* OCaml program extraction *)
+type t =
+  | OCaml
+  | C
 
-val extract_filename: ?fname:string -> Theory.theory -> string
+let backend = ref OCaml
 
-val extract_theory:
-  Mlw_driver.driver -> ?old:Pervasives.in_channel -> ?fname:string ->
-  Format.formatter -> Theory.theory -> unit
+let switch_to_c () =
+  backend := C
 
-val extract_module:
-  Mlw_driver.driver -> ?old:Pervasives.in_channel -> ?fname:string ->
-  Format.formatter -> Mlw_module.modul -> unit
+let debug =
+  Debug.register_info_flag "extraction"
+    ~desc:"Print@ details@ of@ program@ extraction."
+
+let extract_filename ?fname theory = match !backend with
+  | OCaml -> Mlw_ocaml.extract_filename ?fname theory
+  | C -> assert false
+
+let extract_theory driver ?old ?fname formatter theory = match !backend with
+  | OCaml -> Mlw_ocaml.extract_theory driver ?old ?fname formatter theory
+  | C -> assert false
+
+let extract_module driver ?old ?fname formatter modul = match !backend with
+  | OCaml -> Mlw_ocaml.extract_module driver ?old ?fname formatter modul
+  | C -> assert false
