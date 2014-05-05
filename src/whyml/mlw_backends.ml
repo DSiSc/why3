@@ -24,12 +24,12 @@ let debug =
 
 let extract_filename ?fname theory = match !backend with
   | OCaml -> Mlw_ocaml.extract_filename ?fname theory
-  | C -> assert false
+  | C -> Mlw_ocaml.extract_filename ?fname theory
 
 let extract_theory driver ?old ?fname formatter theory = match !backend with
   | OCaml -> Mlw_ocaml.extract_theory driver ?old ?fname formatter theory
-  | C -> assert false
+  | C -> Mlw_ocaml.extract_theory driver ?old ?fname formatter theory
 
 let extract_module driver ?old ?fname formatter modul = match !backend with
   | OCaml -> Mlw_ocaml.extract_module driver ?old ?fname formatter modul
-  | C -> assert false
+  | C -> Mlw_ocaml.extract_module driver ?old ?fname formatter modul
