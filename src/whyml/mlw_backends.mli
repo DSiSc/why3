@@ -25,4 +25,11 @@ val extract_module:
 
 (** Switches *)
 
-val switch_to_c : unit -> unit
+module Switch : sig
+  type t =
+    | OCaml
+    | C
+
+  val set : t -> unit
+  val get : unit -> t
+end

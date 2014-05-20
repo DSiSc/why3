@@ -9,14 +9,18 @@
 (*                                                                  *)
 (********************************************************************)
 
-type t =
-  | OCaml
-  | C
+module Switch = struct
+  type t =
+    | OCaml
+    | C
 
-let backend = ref OCaml
+  let backend = ref OCaml
 
-let switch_to_c () =
-  backend := C
+  let set = (:=) backend
+  let get () = !backend
+end
+
+open Switch
 
 let debug =
   Debug.register_info_flag "extraction"

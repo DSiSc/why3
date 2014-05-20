@@ -131,7 +131,7 @@ let option_list = Arg.align [
       " Read the input file from stdin";
   "-T", Arg.String add_opt_theory,
       "<theory> Select <theory> in the input file or in the library";
-  "--backend-c", Arg.Unit Mlw_backends.switch_to_c,
+  "--backend-c", Arg.Unit (fun () -> Mlw_backends.Switch.(set C)),
       " enables the C backend. WhyML will preduce a C program instead \
        of an OCaml one";
   "--theory", Arg.String add_opt_theory,
@@ -624,10 +624,25 @@ let extract_to =
       extract_to ?fname th extract
     end
 
+let extract_to_c ~fname th =
+  let dir = Opt.get !opt_output in
+  let file = Filename.concat dir (Mlw_backends.extract_filename ?fname th) in
+  let old =
+    if Sys.file_exists file then begin
+      let backup = file ^ ".bak" in
+      Sys.rename file backup;
+      Some (open_in backup)
+    end else None in
+  let cout = open_out file in
+  let fcout = formatter_of_out_channel cout in
+  fun ?fname:_ _ extract ->
+    extract file ?old fcout;
+    close_out cout
+
 let use_iter f th =
   List.iter (fun d -> match d.td_node with Use t -> f t | _ -> ()) th.th_decls
 
-let rec do_extract_theory edrv ?fname th =
+let rec do_extract_theory ~extract_to edrv ?fname th =
   let extract file ?old fmt = ignore (old);
     let tname = th.th_name.Ident.id_string in
     Debug.dprintf Mlw_backends.debug "extract theory %s to file %s@." tname file;
@@ -636,10 +651,10 @@ let rec do_extract_theory edrv ?fname th =
   extract_to ?fname th extract;
   let extract_use th' =
     let fname = if th'.th_path = [] then fname else None in
-    do_extract_theory edrv ?fname th' in
+    do_extract_theory ~extract_to edrv ?fname th' in
   use_iter extract_use th
 
-let rec do_extract_module edrv ?fname m =
+let rec do_extract_module ~extract_to edrv ?fname m =
   let extract file ?old fmt = ignore (old);
     let tname = m.Mlw_module.mod_theory.th_name.Ident.id_string in
     Debug.dprintf Mlw_backends.debug "extract module %s to file %s@." tname file;
@@ -651,9 +666,25 @@ let rec do_extract_module edrv ?fname m =
     match
       try Some (Mlw_module.restore_module th') with Not_found -> None
     with
-      | Some m' -> do_extract_module edrv ?fname m'
-      | None    -> do_extract_theory edrv ?fname th' in
+      | Some m' -> do_extract_module ~extract_to edrv ?fname m'
+      | None    -> do_extract_theory ~extract_to edrv ?fname th' in
   use_iter extract_use m.Mlw_module.mod_theory
+
+let do_extract_theory edrv ?fname th =
+  let extract_to =
+    match Mlw_backends.Switch.get () with
+    | Mlw_backends.Switch.C -> extract_to_c ~fname th
+    | Mlw_backends.Switch.OCaml -> extract_to
+  in
+  do_extract_theory ~extract_to edrv ?fname th
+
+let do_extract_module edrv ?fname m =
+  let extract_to =
+    match Mlw_backends.Switch.get () with
+    | Mlw_backends.Switch.C -> extract_to_c ~fname m.Mlw_module.mod_theory
+    | Mlw_backends.Switch.OCaml -> extract_to
+  in
+  do_extract_module ~extract_to edrv ?fname m
 
 let do_global_extract edrv (tname,p,t,_,_) =
   let lib = edrv.Mlw_driver.drv_lib in
