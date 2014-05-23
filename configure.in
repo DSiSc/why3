@@ -135,6 +135,12 @@ AC_ARG_ENABLE(profiling,
     AS_HELP_STRING([--enable-profiling], [enable profiling]),,
     enable_profiling=no)
 
+# bin-annot
+
+AC_ARG_ENABLE(bin-annot,
+    [  --enable-bin-annot      enable -bin-annot],,
+    enable_bin_annot=no)
+
 # either relocation or local, not both
 if test "$enable_relocation" = yes ; then
 if test "$enable_local" = yes ; then
@@ -697,6 +703,7 @@ AC_SUBST(OCAMLGRAPHLIB)
 dnl AC_SUBST(OCAMLWEB)
 
 AC_SUBST(enable_profiling)
+AC_SUBST(enable_bin_annot)
 
 AC_SUBST(CAMLP5O)
 
@@ -780,6 +787,7 @@ echo "    Version             : $OCAMLVERSION"
 echo "    Library path        : $OCAMLLIB"
 echo "    Native compilation  : $enable_native_code"
 echo "    Profiling           : $enable_profiling"
+echo "    -bin-annot          : $enable_bin_annot"
 echo "Zarith                  : $enable_zarith$reason_zarith"
 echo "IDE                     : $enable_ide$reason_ide"
 echo "Bench tool              : $enable_bench$reason_bench"

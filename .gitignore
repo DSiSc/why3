@@ -8,6 +8,8 @@ why3.conf
 *.cmx
 *.cmo
 *.cmi
+*.cmt
+*.cmti
 *.cmxs
 *.cma
 *.cmxa
