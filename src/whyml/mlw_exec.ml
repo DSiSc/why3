@@ -84,10 +84,9 @@ let get_non_exec_logic_idents x =
 
 let is_exec_decl syn d =
   let idents = match d.d_node with
-    | Dtype _ ->
-        [] (* Can we use types as terms in some cases ? *)
+    | Dtype _
     | Ddata _ ->
-        [] (* Can we use types as terms in some cases ? *)
+        []
     | Dparam ls ->
         [ls.ls_name]
     | Dlogic ll ->
@@ -161,13 +160,12 @@ let rec is_exec_expr e =
     | Eabstr (e,_) ->
         is_exec_expr e
     | Eassert _ ->
-        true (* TODO: Why is it not used ? *)
-    | Eabsurd -> (* TODO: Do we really have this ? *)
+        true
+    | Eabsurd ->
         true
 
 let check_exec_pdecl pd =
   let is_exec = match pd.pd_node with
-    | PDtype {its_ts = {ts_def = None; _}; _} -> false (* TODO: Do we want that ? *)
     | PDtype _
     | PDdata _ ->
         false
@@ -188,7 +186,7 @@ let check_exec_pdecl pd =
         in
         List.for_all aux fdl
     | PDexn _ ->
-        true (* TODO: Is it ok ? *)
+        true
   in
   if not is_exec then
     failwith "Cannot use undefined identifiers in programs"
