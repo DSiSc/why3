@@ -9,8 +9,6 @@
 #                                                                  #
 ####################################################################
 
-include Version
-
 VERBOSEMAKE ?= @enable_verbose_make@
 
 ifeq ($(VERBOSEMAKE),yes)
@@ -75,6 +73,11 @@ ifeq (@enable_profiling@,yes)
 OFLAGS += -g -p
 endif
 
+ifeq (@enable_bin_annot@,yes)
+OFLAGS += -bin-annot
+BFLAGS += -bin-annot
+endif
+
 # external libraries common to all binaries
 
 EXTOBJS =
@@ -82,6 +85,9 @@ EXTLIBS = str unix nums dynlink
 
 EXTCMA	= $(addsuffix .cma,$(EXTLIBS)) $(addsuffix .cmo,$(EXTOBJS))
 EXTCMXA = $(addsuffix .cmxa,$(EXTLIBS)) $(addsuffix .cmx,$(EXTOBJS))
+
+INSTALLED_LIB_EXTS = a cma cmx cmi cmxa cmxs
+COMPILED_LIB_EXTS = $(INSTALLED_LIB_EXTS) o cmo cmt cmti annot dep
 
 TARGET_EMACS = share/emacs/why3.elc
 
@@ -141,7 +147,8 @@ LIB_PRINTER = alt_ergo why3printer smtv1 smtv2 coq pvs isabelle \
 LIB_SESSION = xml termcode session session_tools session_scheduler
 
 LIB_WHYML = mlw_ty mlw_expr mlw_decl mlw_pretty mlw_wp mlw_module \
-	    mlw_dexpr mlw_typing mlw_driver mlw_ocaml mlw_c mlw_backends \
+	    mlw_dexpr mlw_typing mlw_driver mlw_exec \
+	    mlw_ocaml mlw_c mlw_backends \
 	    mlw_main mlw_interp
 
 LIBMODULES =  $(addprefix src/util/, $(LIB_UTIL)) \
@@ -213,17 +220,14 @@ endif
 depend: $(LIBDEP)
 
 LIBSDIRS = src $(addprefix src/, $(LIBDIRS))
-LIBCLEAN = $(addsuffix /*.cm[iox], $(LIBSDIRS)) \
-	   $(addsuffix /*.annot, $(LIBSDIRS)) \
+LIBCLEAN = $(foreach dir, $(LIBSDIRS), $(addprefix $(dir)/*., $(COMPILED_LIB_EXTS))) \
 	   $(addsuffix /*.output, $(LIBSDIRS)) \
 	   $(addsuffix /*.automaton, $(LIBSDIRS)) \
-	   $(addsuffix /*.dep, $(LIBSDIRS)) \
-	   $(addsuffix /*.o, $(LIBSDIRS)) \
 	   $(addsuffix /*~, $(LIBSDIRS))
 
 clean::
 	rm -f $(LIBCLEAN) $(LIBGENERATED)
-	rm -f lib/why3/why3.cm* lib/why3/why3.[ao]
+	rm -f $(addprefix lib/why3/why3., $(COMPILED_LIB_EXTS))
 
 ###############
 # installation
@@ -269,7 +273,7 @@ endif
 
 install_no_local_lib::
 	mkdir -p $(OCAMLINSTALLLIB)/why3
-	cp -f lib/why3/why3.cm* lib/why3/why3.[ao] \
+	cp -f $(addprefix lib/why3/why3., $(INSTALLED_LIB_EXTS)) \
 		lib/why3/META $(OCAMLINSTALLLIB)/why3
 
 ifeq (@enable_local@,yes)
@@ -395,12 +399,9 @@ lib/plugins/tptp.cmo: $(TPTPCMO)
 	    $(OCAMLC) $(BFLAGS) -pack -o $@ $^
 
 PLUGSDIRS = plugins $(addprefix plugins/, $(PLUGDIRS))
-PLUGCLEAN = $(addsuffix /*.cm[iox], $(PLUGSDIRS)) \
-	    $(addsuffix /*.annot, $(PLUGSDIRS)) \
+PLUGCLEAN = $(foreach dir, $(PLUGSDIRS), $(addprefix $(dir)/*., $(COMPILED_LIB_EXTS))) \
 	    $(addsuffix /*.output, $(PLUGSDIRS)) \
 	    $(addsuffix /*.automaton, $(PLUGSDIRS)) \
-	    $(addsuffix /*.dep, $(PLUGSDIRS)) \
-	    $(addsuffix /*.o, $(PLUGSDIRS)) \
 	    $(addsuffix /*~, $(PLUGSDIRS))
 
 # depend and clean targets
@@ -455,7 +456,7 @@ endif
 depend: src/main.dep
 
 clean::
-	rm -f src/main.cm[iox] src/main.annot src/main.o src/main.dep
+	rm -f $(addprefix src/main., $(COMPILED_LIB_EXTS))
 	rm -f bin/why3.byte bin/why3.opt bin/why3
 	rm -f bin/why3ml.byte bin/why3ml.opt bin/why3ml
 
@@ -569,8 +570,8 @@ endif
 depend: $(CONFIGDEP)
 
 clean::
-	rm -f src/why3config/*.cm[iox] src/why3config/*.o
-	rm -f src/why3config/*.annot src/why3config/*.dep src/why3config/*~
+	rm -f $(addprefix src/why3config/*., $(COMPILED_LIB_EXTS))
+	rm -f src/why3config/*~
 	rm -f src/why3config/*.output src/why3config/*.automaton
 	rm -f bin/why3config.byte bin/why3config.opt bin/why3config
 
@@ -635,8 +636,8 @@ depend: $(IDEDEP)
 
 clean::
 	rm -f src/ide/xml.ml
-	rm -f src/ide/*.cm[iox] src/ide/*.o
-	rm -f src/ide/*.annot src/ide/*.dep src/ide/*~
+	rm -f $(addprefix src/ide/*., $(COMPILED_LIB_EXTS))
+	rm -f src/ide/*~
 	rm -f bin/why3ide.byte bin/why3ide.opt bin/why3ide
 
 clean_old_install::
@@ -690,8 +691,8 @@ endif
 depend: $(REPLAYERDEP)
 
 clean::
-	rm -f src/why3replayer/*.cm[iox] src/why3replayer/*.o
-	rm -f src/why3replayer/*.annot src/why3replayer/*.dep src/why3replayer/*~
+	rm -f $(addprefix src/why3replayer/*., $(COMPILED_LIB_EXTS))
+	rm -f src/why3replayer/*~
 	rm -f bin/why3replayer.byte bin/why3replayer.opt bin/why3replayer
 
 clean_old_install::
@@ -746,8 +747,8 @@ endif
 depend: $(SESSIONDEP)
 
 clean::
-	rm -f src/why3session/*.cm[iox] src/why3session/*.o
-	rm -f src/why3session/*.annot src/why3session/*.dep src/why3session/*~
+	rm -f $(addprefix src/why3session/*., $(COMPILED_LIB_EXTS))
+	rm -f src/why3session/*~
 	rm -f bin/why3session.byte bin/why3session.opt bin/why3session
 
 clean_old_install::
@@ -804,8 +805,8 @@ endif
 depend: $(BENCHDEP)
 
 clean::
-	rm -f src/why3bench/*.cm[iox] src/why3bench/*.o
-	rm -f src/why3bench/*.annot src/why3bench/*.dep src/why3bench/*~
+	rm -f $(addprefix src/why3bench/*., $(COMPILED_LIB_EXTS))
+	rm -f src/why3bench/*~
 	rm -f bin/why3bench.byte bin/why3bench.opt bin/why3bench
 
 clean_old_install::
@@ -881,10 +882,9 @@ endif
 depend: $(COQPDEP)
 
 clean::
-	rm -f src/coq-tactic/*.cm[iox] src/coq-tactic/*.o
-	rm -f lib/coq-tactic/*.cma lib/coq-tactic/*.cmxs
+	rm -f $(addprefix src/coq-tactic/*., $(COMPILED_LIB_EXTS))
 	rm -f lib/coq-tactic/*.vo lib/coq-tactic/*.glob
-	rm -f src/coq-tactic/*.annot src/coq-tactic/*.dep src/coq-tactic/*~
+	rm -f src/coq-tactic/*~
 	rm -f src/coq-tactic/.why3-vo-*
 	rm -f $(COQPGENERATED)
 
@@ -1271,8 +1271,7 @@ $(OCAMLLIBS_DEP): lib/ocaml/why3__BigInt_compat.ml
 depend: $(OCAMLLIBS_DEP)
 
 clean::
-	rm -f lib/ocaml/*.cm[iox] lib/ocaml/*.o
-	rm -f lib/ocaml/*.annot lib/ocaml/*.dep
+	rm -f $(addprefix lib/ocaml/*., $(COMPILED_LIB_EXTS))
 
 opt: $(OCAMLLIBS_CMX)
 
@@ -1302,8 +1301,11 @@ lib/why3/why3extract.cmx: $(OCAMLLIBS_CMX)
 
 install_no_local_lib::
 	mkdir -p $(OCAMLINSTALLLIB)/why3
-	cp -f lib/why3/why3extract.cm* lib/why3/why3extract.[ao] \
+	cp -f $(addprefix lib/why3/why3extract., $(INSTALLED_LIB_EXTS)) \
 		$(OCAMLINSTALLLIB)/why3
+
+clean::
+	rm -f $(addprefix lib/why3/why3extract., $(COMPILED_LIB_EXTS))
 
 
 
@@ -1324,7 +1326,7 @@ jessie.opt: src/jessie/Makefile lib/why3/why3.cmxa
 
 install_no_local::
 	mkdir -p $(FRAMAC_LIBDIR)/plugins/
-	cp -f src/jessie/Jessie3.cm* $(FRAMAC_LIBDIR)/plugins/
+	cp -f $(addprefix src/jessie/Jessie3., $(INSTALLED_LIB_EXTS)) $(FRAMAC_LIBDIR)/plugins/
 
 clean::
 	$(MAKE) -C src/jessie clean
@@ -1389,8 +1391,8 @@ depend: $(WHY3WCDEP)
 
 clean::
 	rm -f $(WHY3WCGENERATED)
-	rm -f src/tools/*.cm[iox] src/tools/*.o
-	rm -f src/tools/*.annot src/tools/*.dep src/tools/*~
+	rm -f $(addprefix src/tools/*., $(COMPILED_LIB_EXTS))
+	rm -f src/tools/*~
 	rm -f bin/why3wc.byte bin/why3wc.opt bin/why3wc
 
 clean_old_install::
@@ -1446,7 +1448,8 @@ depend: $(WHY3DOCDEP)
 
 clean::
 	rm -f $(WHY3DOCGENERATED)
-	rm -f src/why3doc/*.cm[iox] src/why3doc/*.o
+	rm -f $(addprefix src/why3doc/*., $(COMPILED_LIB_EXTS))
+
 	rm -f src/why3doc/*.annot src/why3doc/*.dep src/why3doc/*~
 	rm -f bin/why3doc.byte bin/why3doc.opt bin/why3doc
 
@@ -1870,7 +1873,7 @@ wc:
 # distrib
 #########
 
-NAME = why3-$(VERSION)
+NAME = why3-@VERSION@
 DISTRIB_DIR = distrib/$(NAME)
 DISTRIB_TAR = $(DISTRIB_DIR).tar.gz
 
@@ -2048,7 +2051,7 @@ clean::
 doc/version.tex: doc/version.tex.in config.status
 	./config.status chmod --file $@
 
-config.status: configure Version
+config.status: configure
 	./config.status --recheck
 
 opt byte: lib/why3/META
@@ -2056,7 +2059,7 @@ opt byte: lib/why3/META
 lib/why3/META: lib/why3/META.in config.status
 	./config.status chmod --file $@
 
-configure: configure.in
+configure: configure.in Version
 	autoconf
 
 ###################

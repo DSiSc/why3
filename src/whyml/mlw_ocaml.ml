@@ -152,11 +152,6 @@ let print_path_id fmt = function
 let print_theory_name fmt th = print_path_id fmt (th.th_path, th.th_name)
 let print_module_name fmt m  = print_theory_name fmt m.Mlw_module.mod_theory
 
-let non_executable fmt s =
-  fprintf fmt "failwith \"non-executable\" (* %s *)" s
-
-let non_executable_fmt s = "failwith \"non-executable\" (* " ^^ s ^^ " *)"
-
 (** Types *)
 
 let protect_on x s = if x then "(" ^^ s ^^ ")" else s
@@ -164,6 +159,14 @@ let protect_on x s = if x then "(" ^^ s ^^ ")" else s
 let star fmt () = fprintf fmt " *@ "
 
 let has_syntax info id = Mid.mem id info.info_syn
+
+let has_syntax_or_nothing info id fmt name =
+  if has_syntax info id then
+    fprintf fmt "(* %s %a is overridden by driver *)"
+      name
+      (print_lident info) id
+  else
+    assert false
 
 let rec print_ty ?(paren=false) info fmt ty = match ty.ty_node with
   | Tyvar v ->
@@ -274,54 +277,10 @@ let print_projections info fmt (ts, _ as d) =
 
 (** Inductive *)
 
-let name_args l =
-  let r = ref 0 in
-  let mk ty = incr r; create_vsymbol (id_fresh "x") ty in
-  List.map mk l
-
-let print_ind_decl info sign fst fmt (ps,_ as d) =
-  let print_ind fmt d =
-    if fst then Pretty.print_ind_decl fmt sign d
-    else Pretty.print_next_ind_decl fmt d in
-  let vars = name_args ps.ls_args in
-  fprintf fmt "@[<hov 2>%s %a %a : bool =@ @[<hov>%a@\n(* @[%a@] *)@]@]"
-    (if fst then "let rec" else "and") (print_ls info) ps
-    (print_list space (print_vs_arg info)) vars
-    non_executable "inductive"
-    print_ind d;
-  forget_vars vars
-
-let print_ind_decl info sign first fmt (ls, _ as d) =
-  if has_syntax info ls.ls_name then
-    fprintf fmt "(* inductive %a is overridden by driver *)"
-      (print_lident info) ls.ls_name
-  else begin print_ind_decl info sign first fmt d; forget_tvs () end
+let print_ind_decl info fmt (ls, _) =
+  has_syntax_or_nothing info ls.ls_name fmt "inductive"
 
 (** Functions/Predicates *)
-
-let rec is_exec_term t = match t.t_node with
-  | Tvar _
-  | Tconst _
-  | Ttrue
-  | Tfalse ->
-      true
-  | Tapp (_, tl) ->
-      List.for_all is_exec_term tl
-  | Tif (t1, t2, t3) ->
-      is_exec_term t1 && is_exec_term t2 && is_exec_term t3
-  | Tlet (t1, b2) ->
-      is_exec_term t1 && let _, t2 = t_open_bound b2 in is_exec_term t2
-  | Tcase (t1, bl) ->
-      is_exec_term t1 && List.for_all is_exec_branch bl
-  | Teps _ | Tquant _ ->
-      false (* TODO: improve? *)
-  | Tbinop (_, t1, t2) ->
-      is_exec_term t1 && is_exec_term t2
-  | Tnot t1 ->
-      is_exec_term t1
-
-and is_exec_branch b =
-  let _, t = t_open_branch b in is_exec_term t
 
 let min_int31 = BigInt.of_int (- 0x40000000)
 let max_int31 = BigInt.of_int    0x3FFFFFFF
@@ -339,14 +298,8 @@ let print_const ~paren fmt = function
       else
         let s = BigInt.to_string n in
         fprintf fmt (protect_on paren "Why3__BigInt.of_string \"%s\"") s
-  | ConstReal (RConstDec (i,f,None)) ->
-      fprintf fmt (non_executable_fmt "%s.%s") i f
-  | ConstReal (RConstDec (i,f,Some e)) ->
-      fprintf fmt (non_executable_fmt "%s.%se%s") i f e
-  | ConstReal (RConstHex (i,f,Some e)) ->
-      fprintf fmt (non_executable_fmt "0x%s.%sp%s") i f e
-  | ConstReal (RConstHex (i,f,None)) ->
-      fprintf fmt (non_executable_fmt "0x%s.%s") i f
+  | ConstReal _ ->
+      assert false
 
 (* can the type of a value be derived from the type of the arguments? *)
 let unambig_fs fs =
@@ -503,25 +456,8 @@ let print_ls_type info fmt = function
   | None -> fprintf fmt "bool"
   | Some ty -> print_ty info fmt ty
 
-let print_defn info fmt e =
-  if is_exec_term e then print_term info fmt e
-  else fprintf fmt "@[<hov>%a@ @[(* %a *)@]@]"
-    non_executable "not executable" Pretty.print_term e
-
 let print_param_decl info fmt ls =
-  if has_syntax info ls.ls_name then
-    fprintf fmt "(* parameter %a is overridden by driver *)"
-      (print_lident info) ls.ls_name
-  else begin
-    let vars = name_args ls.ls_args in
-    fprintf fmt "@[<hov 2>let %a %a : %a =@ %a@]"
-      (print_ls info) ls
-      (print_list space (print_vs_arg info)) vars
-      (print_ls_type info) ls.ls_value
-      non_executable "uninterpreted symbol";
-    forget_vars vars;
-    forget_tvs ()
-  end
+  has_syntax_or_nothing info ls.ls_name fmt "parameter"
 
 let print_logic_decl info isrec fst fmt (ls,ld) =
   if has_syntax info ls.ls_name then
@@ -533,7 +469,7 @@ let print_logic_decl info isrec fst fmt (ls,ld) =
       (if fst then if isrec then "let rec" else "let" else "and")
       (print_ls info) ls
       (print_list space (print_vs_arg info)) vl
-      (print_ls_type info) ls.ls_value (print_defn info) e;
+      (print_ls_type info) ls.ls_value (print_term info) e;
     forget_vars vl;
     forget_tvs ()
   end
@@ -567,8 +503,8 @@ let logic_decl info fmt d = match d.d_node with
   | Dlogic ll ->
       print_list_next newline (print_logic_decl info true) fmt ll;
       fprintf fmt "@\n@\n"
-  | Dind (s, il) ->
-      print_list_next newline (print_ind_decl info s) fmt il;
+  | Dind (_, il) ->
+      print_list newline (print_ind_decl info) fmt il;
       fprintf fmt "@\n@\n"
   | Dprop (_pk, _pr, _) ->
       ()
@@ -576,9 +512,11 @@ let logic_decl info fmt d = match d.d_node with
 
 let logic_decl info fmt td = match td.td_node with
   | Decl d ->
-      let union = Sid.union d.d_syms d.d_news in
-      let inter = Mid.set_inter union info.mo_known_map in
-      if Sid.is_empty inter then logic_decl info fmt d
+      if Mlw_exec.is_exec_decl info.info_syn d then begin
+        let union = Sid.union d.d_syms d.d_news in
+        let inter = Mid.set_inter union info.mo_known_map in
+        if Sid.is_empty inter then logic_decl info fmt d
+      end
   | Use _ | Clone _ | Meta _ ->
       ()
 
@@ -671,15 +609,6 @@ let print_pvty info fmt pv =
   if pv.pv_ghost then fprintf fmt "((* ghost *))" else
   fprintf fmt "@[(%a:@ %a)@]"
     (print_lident info) pv.pv_vs.vs_name (print_ity info) pv.pv_ity
-
-let rec print_aty info fmt aty =
-  let print_arg fmt pv = print_ity info fmt pv.pv_ity in
-  fprintf fmt "(%a -> %a)" (print_list Pp.arrow print_arg) aty.aty_args
-    (print_vty info) aty.aty_result
-
-and print_vty info fmt = function
-  | VTvalue ity -> print_ity info fmt ity
-  | VTarrow aty -> print_aty info fmt aty
 
 let is_letrec = function
   | [fd] -> fd.fun_lambda.l_spec.c_letrec <> 0
@@ -797,8 +726,7 @@ let rec print_expr ?(paren=false) info fmt e =
   | Eghost _ ->
       assert false
   | Eany _ ->
-      fprintf fmt "@[(%a :@ %a)@]" non_executable "any"
-        (print_vty info) e.e_vty
+      assert false
   | Ecase (e1, [_,e2]) when e1.e_ghost ->
       print_expr ~paren info fmt e2
   | Ecase (e1, bl) ->
@@ -880,32 +808,11 @@ let print_let_decl info fmt ld =
   else
     print_let_decl info fmt ld
 
-let rec extract_aty_args args aty =
-  let new_args = List.map (fun pv -> pv.pv_vs) aty.aty_args in
-  let args = List.rev_append new_args args in
-  match aty.aty_result with
-  | VTvalue ity -> List.rev args, ity
-  | VTarrow aty -> extract_aty_args args aty
-
-let extract_lv_args = function
-  | LetV pv -> [], pv.pv_ity
-  | LetA ps -> extract_aty_args [] ps.ps_aty
-
-let print_val_decl info fmt lv =
-  let vars, ity = extract_lv_args lv in
-  fprintf fmt "@[<hov 2>let %a %a : %a =@ %a@]"
-    (print_lv info) lv
-    (print_list space (print_vs_arg info)) vars
-    (print_ity info) ity
-    non_executable "val";
-  forget_vars vars;
-  forget_tvs ()
-
 let print_val_decl info fmt lv =
   if is_ghost_lv lv then
     fprintf fmt "(* val %a *)@\n@\n" (print_lv info) lv
   else
-    fprintf fmt "%a@\n@\n" (print_val_decl info) lv
+    assert false
 
 let print_val_decl info fmt lv =
   let id = lv_name lv in
@@ -1007,7 +914,9 @@ let print_pprojections info fmt (ts, _, _ as d) =
     print_pprojections info fmt d; forget_tvs ()
   end
 
-let pdecl info fmt pd = match pd.pd_node with
+let pdecl info fmt pd =
+  Mlw_exec.check_exec_pdecl pd;
+  match pd.pd_node with
   | PDtype ts ->
       print_type_decl info fmt ts;
       fprintf fmt "@\n@\n"
