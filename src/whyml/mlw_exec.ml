@@ -43,6 +43,12 @@ let is_exec_pv pv =
   else
     is_exec_ident pv.pv_vs.vs_name
 
+let is_exec_ps ps =
+  if ps.ps_ghost then
+    true
+  else
+    is_exec_ident ps.ps_name
+
 let rec is_exec_term t = match t.t_node with
   | Ttrue
   | Tfalse ->
@@ -112,8 +118,8 @@ let rec is_exec_expr e =
         is_exec_term t
     | Evalue pv ->
         is_exec_pv pv
-    | Earrow a ->
-        true (* TODO: Is it good ?*)
+    | Earrow ps ->
+        is_exec_ps ps
     | Elet ({let_sym = lv; _}, e2) when is_ghost_lv lv ->
         is_exec_expr e2
     | Elet ({let_expr = e1; _}, e2) ->
