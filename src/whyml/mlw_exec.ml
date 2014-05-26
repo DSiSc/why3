@@ -11,11 +11,9 @@
 
 open Decl
 open Term
-open Ty
 open Mlw_decl
 open Mlw_expr
 open Mlw_ty
-open Mlw_ty.T
 
 let has_syntax syn id = Ident.Mid.mem id syn
 
