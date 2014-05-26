@@ -281,11 +281,6 @@ let print_projections info fmt (ts, _ as d) =
 
 (** Inductive *)
 
-let name_args l =
-  let r = ref 0 in
-  let mk ty = incr r; create_vsymbol (id_fresh "x") ty in
-  List.map mk l
-
 let print_ind_decl info fmt (ls, _) =
   has_syntax_or_nothing info ls.ls_name fmt "inductive"
 
@@ -619,15 +614,6 @@ let print_pvty info fmt pv =
   fprintf fmt "@[(%a:@ %a)@]"
     (print_lident info) pv.pv_vs.vs_name (print_ity info) pv.pv_ity
 
-let rec print_aty info fmt aty =
-  let print_arg fmt pv = print_ity info fmt pv.pv_ity in
-  fprintf fmt "(%a -> %a)" (print_list Pp.arrow print_arg) aty.aty_args
-    (print_vty info) aty.aty_result
-
-and print_vty info fmt = function
-  | VTvalue ity -> print_ity info fmt ity
-  | VTarrow aty -> print_aty info fmt aty
-
 let is_letrec = function
   | [fd] -> fd.fun_lambda.l_spec.c_letrec <> 0
   | _ -> true
@@ -825,17 +811,6 @@ let print_let_decl info fmt ld =
     fprintf fmt "(* symbol %a is overridden by driver *)" (print_lident info) id
   else
     print_let_decl info fmt ld
-
-let rec extract_aty_args args aty =
-  let new_args = List.map (fun pv -> pv.pv_vs) aty.aty_args in
-  let args = List.rev_append new_args args in
-  match aty.aty_result with
-  | VTvalue ity -> List.rev args, ity
-  | VTarrow aty -> extract_aty_args args aty
-
-let extract_lv_args = function
-  | LetV pv -> [], pv.pv_ity
-  | LetA ps -> extract_aty_args [] ps.ps_aty
 
 let print_val_decl info fmt lv =
   if is_ghost_lv lv then
