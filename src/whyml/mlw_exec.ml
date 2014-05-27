@@ -11,6 +11,7 @@
 
 open Decl
 open Term
+open Ident
 open Mlw_decl
 open Mlw_expr
 open Mlw_ty
@@ -34,18 +35,6 @@ let (mark_idents, is_exec_ident) =
 let is_exec_const = function
   | Number.ConstInt _ -> true
   | Number.ConstReal _ -> false
-
-let is_exec_pv pv =
-  if pv.pv_ghost then
-    true
-  else
-    is_exec_ident pv.pv_vs.vs_name
-
-let is_exec_ps ps =
-  if ps.ps_ghost then
-    true
-  else
-    is_exec_ident ps.ps_name
 
 let rec is_exec_term t = match t.t_node with
   | Ttrue
@@ -76,7 +65,7 @@ and is_exec_branch b =
 and is_exec_bound b =
   let _, t = t_open_bound b in is_exec_term t
 
-let is_exec_logic (ls, ld) =
+let is_exec_logic (_, ld) =
   let (_, e) = open_ls_defn ld in
   is_exec_term e
 
@@ -108,89 +97,67 @@ let is_exec_decl syn d =
       false
   end
 
-let rec is_exec_expr e =
-  if e.e_ghost then
-    true
-  else match e.e_node with
+let rec check_exec_expr e =
+  if not e.e_ghost then
+    match e.e_node with
     | Elogic t ->
-        is_exec_term t
-    | Evalue pv ->
-        is_exec_pv pv
-    | Earrow ps ->
-        is_exec_ps ps
-    | Elet ({let_sym = lv; _}, e2) when is_ghost_lv lv ->
-        is_exec_expr e2
+        if not (is_exec_term t) then
+          Loc.errorm ?loc:e.e_loc "Cannot use logical terms in program";
+    | Evalue _
+    | Earrow _ ->
+        ()
     | Elet ({let_expr = e1; _}, e2) ->
-        is_exec_expr e1 && is_exec_expr e2
-    | Eapp (e, v, _) ->
-        is_exec_expr e && is_exec_pv v
+        check_exec_expr e1;
+        check_exec_expr e2;
+    | Eapp (e, _, _) ->
+        check_exec_expr e
     | Erec (fdl, e) ->
-        let aux = function
-          | {fun_ps = {ps_ghost = true; _}; _} ->
-              true
-          | {fun_lambda = {l_expr; _}; _} ->
-              is_exec_expr l_expr
-        in
-        List.for_all aux fdl && is_exec_expr e
-    | Eif (e0,e1,e2) ->
-        is_exec_expr e0 && is_exec_expr e1 && is_exec_expr e2
-    | Ecase (e1, [_,e2]) when e1.e_ghost ->
-        is_exec_expr e2
+        let aux f = check_exec_expr f.fun_lambda.l_expr in
+        List.iter aux fdl;
+        check_exec_expr e
+    | Eif (e0, e1, e2) ->
+        check_exec_expr e0;
+        check_exec_expr e1;
+        check_exec_expr e2;
     | Ecase (e1, bl) ->
-        let aux (_, e) = (* TODO: Should I ignore the ghost pattern ? *)
-          is_exec_expr e
-        in
-        is_exec_expr e1 && List.for_all aux bl
-    | Eassign (pl, e, _, pv) ->
-        is_exec_expr e && is_exec_pv pv
+        let aux (_, e) = check_exec_expr e in
+        check_exec_expr e1;
+        List.iter aux bl;
+    | Eassign (_, e, _, _) ->
+        check_exec_expr e;
     | Eghost _ ->
         assert false
     | Eany _ ->
-        false
-    | Eloop (_,_,e) ->
-        is_exec_expr e
-    | Efor (pv,(pvfrom, _, pvto),_,e) ->
-        is_exec_pv pv
-        && is_exec_pv pvfrom
-        && is_exec_pv pvto
-        && is_exec_expr e
+        Loc.errorm ?loc:e.e_loc "Cannot use 'any' in programs"
+    | Eloop (_, _, e) ->
+        check_exec_expr e;
+    | Efor (_, _, _, e) ->
+        check_exec_expr e;
     | Eraise (_, e) ->
-        is_exec_expr e
+        check_exec_expr e;
     | Etry (e, bl) ->
-        let aux (_, _, e) = (* TODO: Should we ignore this ? *)
-          is_exec_expr e
-        in
-        is_exec_expr e && List.for_all aux bl
+        let aux (_, _, e) = check_exec_expr e in
+        check_exec_expr e;
+        List.iter aux bl
     | Eabstr (e,_) ->
-        is_exec_expr e
-    | Eassert _ ->
-        true
+        check_exec_expr e;
+    | Eassert _
     | Eabsurd ->
-        true
+        ()
 
-let check_exec_pdecl pd =
-  let is_exec = match pd.pd_node with
-    | PDtype _
-    | PDdata _ ->
-        false
-    | PDval lv when is_ghost_lv lv ->
-        true
-    | PDval _ ->
-        false
-    | PDlet {let_sym = lv; _} when is_ghost_lv lv ->
-        true
-    | PDlet ld ->
-        is_exec_expr ld.let_expr
-    | PDrec fdl ->
-        let aux = function
-          | {fun_ps = {ps_ghost = true; _}; _} ->
-              true
-          | {fun_lambda = {l_expr; _}; _} ->
-              is_exec_expr l_expr
-        in
-        List.for_all aux fdl
-    | PDexn _ ->
-        true
-  in
-  if not is_exec then
-    failwith "Cannot use undefined identifiers in programs"
+let check_exec_pdecl syn pd = match pd.pd_node with
+  | PDtype _
+  | PDexn _
+  | PDdata _ ->
+      ()
+  | PDlet {let_sym = lv; _}
+  | PDval lv when is_ghost_lv lv ->
+      ()
+  | PDval (LetV {pv_vs = {vs_name = name}; _} | LetA {ps_name = name; _}) ->
+      if not (has_syntax syn name) then
+        Loc.errorm ?loc:name.id_loc "Value '%s' not defined" name.id_string;
+  | PDlet ld ->
+      check_exec_expr ld.let_expr
+  | PDrec fdl ->
+      let aux f = check_exec_expr f.fun_lambda.l_expr in
+      List.iter aux fdl

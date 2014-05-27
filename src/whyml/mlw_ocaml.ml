@@ -919,7 +919,7 @@ let print_pprojections info fmt (ts, _, _ as d) =
   end
 
 let pdecl info fmt pd =
-  Mlw_exec.check_exec_pdecl pd;
+  Mlw_exec.check_exec_pdecl info.info_syn pd;
   match pd.pd_node with
   | PDtype ts ->
       print_type_decl info fmt ts;
