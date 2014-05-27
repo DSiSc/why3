@@ -1,0 +1,13 @@
+S src
+S src/whyml
+S src/core
+S src/util
+S src/driver
+S lib/why3
+
+B src
+B src/whyml
+B src/core
+B src/util
+B src/driver
+B lib/why3
