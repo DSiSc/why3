@@ -183,6 +183,7 @@ module array.Array
   syntax val copy          "Why3__Array.copy"
   syntax val fill          "Why3__Array.fill"
   syntax val blit          "Why3__Array.blit"
+  syntax val self_blit     "Why3__Array.self_blit"
 end
 
 module mach.int.Int
