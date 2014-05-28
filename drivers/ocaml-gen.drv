@@ -261,6 +261,11 @@ end
 
 
 module io.StdIO
+  syntax val flushed "ref []"
+  syntax val current_line "ref []"
+  syntax val cur_pos "ref 0"
+  syntax val cur_linenum "ref 0"
+
   syntax val print_char "Pervasives.print_char"
   syntax val print_int "Why3__BigInt.print"
   syntax val print_newline "Pervasives.print_newline"
