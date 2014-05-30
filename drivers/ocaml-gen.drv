@@ -265,3 +265,11 @@ module io.StdIO
   syntax val print_int "Why3__BigInt.print"
   syntax val print_newline "Pervasives.print_newline"
 end
+
+theory map.Map
+  syntax type map "(%1 -> %2)"
+
+  syntax function get "%1 %2"
+  syntax function set "(fun f k v x -> if x = %2 then %3 else f k)"
+  syntax function const "(fun _ -> %1)"
+end
