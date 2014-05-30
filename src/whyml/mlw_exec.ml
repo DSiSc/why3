@@ -71,9 +71,9 @@ let is_exec_logic (_, ld) =
 
 let get_non_exec_logic_idents x =
   if is_exec_logic x then
-    [(fst x).ls_name]
-  else
     []
+  else
+    [(fst x).ls_name]
 
 let is_exec_decl syn d =
   let idents = match d.d_node with
