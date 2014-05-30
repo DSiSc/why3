@@ -102,7 +102,9 @@ let rec check_exec_expr e =
     match e.e_node with
     | Elogic t ->
         if not (is_exec_term t) then
-          Loc.errorm ?loc:e.e_loc "Cannot use logical terms in program";
+          Loc.errorm
+            ?loc:e.e_loc
+            "Cannot use non-executable logical terms in program";
     | Evalue _
     | Earrow _ ->
         ()
