@@ -915,7 +915,7 @@ let print_pprojections info fmt (ts, _, _ as d) =
   end
 
 let pdecl info fmt pd =
-  Mlw_exec.check_exec_pdecl pd;
+  Mlw_exec.check_exec_pdecl info.info_syn pd;
   match pd.pd_node with
   | PDtype ts ->
       print_type_decl info fmt ts;
@@ -924,8 +924,6 @@ let pdecl info fmt pd =
       print_list_next newline (print_pdata_decl info) fmt tl;
       fprintf fmt "@\n@\n";
       print_list nothing (print_pprojections info) fmt tl
-  | PDval (LetV pv) when pv_equal pv Mlw_wp.pv_old ->
-      ()
   | PDval lv ->
       print_val_decl info fmt lv;
       fprintf fmt "@\n@\n"

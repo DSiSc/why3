@@ -183,6 +183,7 @@ module array.Array
   syntax val copy          "Why3__Array.copy"
   syntax val fill          "Why3__Array.fill"
   syntax val blit          "Why3__Array.blit"
+  syntax val self_blit     "Why3__Array.self_blit"
 end
 
 module mach.int.Int
@@ -260,7 +261,20 @@ end
 
 
 module io.StdIO
+  syntax val flushed "ref []"
+  syntax val current_line "ref []"
+  syntax val cur_pos "ref 0"
+  syntax val cur_linenum "ref 0"
+
   syntax val print_char "Pervasives.print_char"
   syntax val print_int "Why3__BigInt.print"
   syntax val print_newline "Pervasives.print_newline"
+end
+
+theory map.Map
+  syntax type map "(%1 -> %2)"
+
+  syntax function get "%1 %2"
+  syntax function set "(fun f k v x -> if x = %2 then %3 else f k)"
+  syntax function const "(fun _ -> %1)"
 end

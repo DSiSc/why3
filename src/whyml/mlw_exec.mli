@@ -10,4 +10,4 @@
 (********************************************************************)
 
 val is_exec_decl : Printer.syntax_map -> Decl.decl -> bool
-val check_exec_pdecl : Mlw_decl.pdecl -> unit
+val check_exec_pdecl : Printer.syntax_map -> Mlw_decl.pdecl -> unit
