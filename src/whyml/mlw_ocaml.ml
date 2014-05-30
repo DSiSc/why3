@@ -931,8 +931,6 @@ let pdecl info fmt pd =
       print_list_next newline (print_pdata_decl info) fmt tl;
       fprintf fmt "@\n@\n";
       print_list nothing (print_pprojections info) fmt tl
-  | PDval (LetV pv) when pv_equal pv Mlw_wp.pv_old ->
-      ()
   | PDval lv ->
       print_val_decl info fmt lv;
       fprintf fmt "@\n@\n"
