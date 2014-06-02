@@ -22,14 +22,14 @@ let is_ghost_lv = function
   | LetV pv -> pv.Mlw_ty.pv_ghost
   | LetA ps -> ps.ps_ghost
 
-let (mark_idents, is_exec_ident) =
-  let marked_idents = Ident.Hid.create 30 in
-  let aux syn id =
-    if not (has_syntax syn id) then
-      Ident.Hid.add marked_idents id ()
+let (mark_lsymbols, is_exec_lsymbol) =
+  let marked_idents = Hls.create 30 in
+  let aux syn ls =
+    if not (has_syntax syn ls.ls_name) then
+      Hls.add marked_idents ls ()
   in
   let mark_idents syn = List.iter (aux syn) in
-  let is_exec_ident x = not (Ident.Hid.mem marked_idents x) in
+  let is_exec_ident x = not (Hls.mem marked_idents x) in
   (mark_idents, is_exec_ident)
 
 let is_exec_const = function
@@ -40,12 +40,12 @@ let rec is_exec_term t = match t.t_node with
   | Ttrue
   | Tfalse ->
       true
-  | Tvar e ->
-      is_exec_ident e.vs_name
+  | Tvar _ ->
+      true
   | Tconst c ->
       is_exec_const c
   | Tapp (f, tl) ->
-      is_exec_ident f.ls_name && List.for_all is_exec_term tl
+      is_exec_lsymbol f && List.for_all is_exec_term tl
   | Tif (t1, t2, t3) ->
       is_exec_term t1 && is_exec_term t2 && is_exec_term t3
   | Tlet (t1, b2) ->
@@ -73,7 +73,7 @@ let get_non_exec_logic_idents x =
   if is_exec_logic x then
     []
   else
-    [(fst x).ls_name]
+    [fst x]
 
 let is_exec_decl syn d =
   let idents = match d.d_node with
@@ -81,11 +81,11 @@ let is_exec_decl syn d =
     | Ddata _ ->
         []
     | Dparam ls ->
-        [ls.ls_name]
+        [ls]
     | Dlogic ll ->
         List.fold_left (fun acc x -> get_non_exec_logic_idents x @ acc) [] ll
     | Dind (_, l) ->
-        List.map (fun (ls, _) -> ls.ls_name) l
+        List.map (fun (ls, _) -> ls) l
     | Dprop (_, _, _) ->
         [] (* Using prop in code cannot happend *)
   in
@@ -93,7 +93,7 @@ let is_exec_decl syn d =
   | [] ->
       true
   | idents ->
-      mark_idents syn idents;
+      mark_lsymbols syn idents;
       false
   end
 
