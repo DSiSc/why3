@@ -43,6 +43,18 @@ module mach.int.UInt32
   syntax val      (<)       "(<)"
   syntax val      (>=)      "(>=)"
   syntax val      (>)       "(>)"
+
+  syntax val      add_with_carry "(fun x y c ->
+    let r = x + y + c in
+    (r land 0xFFFFFFFFL, r lsr 32))"
+
+  syntax val      add3 "(fun x y z ->
+    let r = x + y + z in
+    (r land 0xFFFFFFFFL, r lsr 32))"
+
+  syntax val      mul_double "(fun x y ->
+    let r = x * y in
+    (r land 0xFFFFFFFFL, r lsr 32))"
 end
 
 module mach.int.Int63
