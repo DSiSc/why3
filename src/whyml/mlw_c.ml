@@ -76,7 +76,8 @@ module Module : sig
   val append_builder : string -> builder -> unit
   val append_header : string -> unit
 
-  val create_value : builder -> value
+  val create_value : string -> builder -> value
+  val create_bool : string -> builder -> value
   val unit_value : value
 
   val value_of_string : string -> value
@@ -112,7 +113,7 @@ end = struct
     ; ident = builder.ident
     }
 
-  let create_value builder =
+  let create_fresh_name builder =
     let v = sprintf "X%i__" builder.ident in
     builder.ident <- succ builder.ident;
     v
@@ -141,12 +142,22 @@ end = struct
     builder.builder <- x :: builder.builder
 
   let append_header str =
-    header := !header @ [str]
+    header := str :: !header
 
   let append_block f g builder =
     let builder' = create_block builder in
     g builder';
     append_builder (f (string_of_builder builder)) builder
+
+  let create_value value builder =
+    let name = create_fresh_name builder in
+    append_builder (sprintf "value %s = %s;" name value) builder;
+    name
+
+  let create_bool value builder =
+    let name = create_fresh_name builder in
+    append_builder (sprintf "bool %s = %s;" name value) builder;
+    name
 
   let clear () =
     header := [];
@@ -155,7 +166,8 @@ end = struct
   let to_string () =
     let buf = Buffer.create 64 in
     let aux _ = Buffer.add_string buf in
-    List.iter (Buffer.add_string buf) !header;
+    let header = List.rev !header in
+    List.iter (Buffer.add_string buf) header;
     M.iter aux modul;
     Buffer.contents buf
 end
@@ -179,7 +191,7 @@ let get_qident info id =
   with Not_found ->
     assert false (* TODO: Know what to do *)
 
-let get_ls info fmt ls = get_qident info ls.ls_name
+let get_ls info ls = get_qident info ls.ls_name
 
 let protect_on x s = if x then "(" ^^ s ^^ ")" else s
 
@@ -189,7 +201,7 @@ let has_syntax_or_nothing info id =
   if not (has_syntax info id) then
     assert false
 
-let print_const ~paren fmt = function
+let print_const = function
   | ConstInt c ->
       (* Use GMP:
          let f () =
@@ -208,17 +220,11 @@ let print_const ~paren fmt = function
   | ConstReal _ ->
       assert false
 
-let print_binop fmt = function
-  | Tand -> fprintf fmt "&&"
-  | Tor -> fprintf fmt "||"
-  | Tiff -> fprintf fmt "=="
-  | Timplies -> assert false
-
-let rec print_term ?(paren=false) info fmt t = match t.t_node with
+let rec print_term info t builder = match t.t_node with
   | Tvar v ->
       assert false
   | Tconst c ->
-      print_const ~paren fmt c
+      print_const c
   | Tapp (fs, tl) ->
       assert false
   | Tif (f,t1,t2) ->
@@ -231,23 +237,53 @@ let rec print_term ?(paren=false) info fmt t = match t.t_node with
   | Tquant _ ->
       assert false
   | Ttrue ->
-      fprintf fmt "true"
+      Module.create_bool "true" builder
   | Tfalse ->
-      fprintf fmt "false"
+      Module.create_bool "false" builder
   | Tbinop (Timplies,f1,f2) ->
-      fprintf fmt (protect_on paren "!%a || %a")
-        (print_term_p info) f1 (print_term_p info) f2
-  | Tbinop (b,f1,f2) ->
-      fprintf fmt (protect_on paren "@[<hov 1>%a %a@ %a@]")
-        (print_term_p info) f1 print_binop b (print_term_p info) f2
+      let f1 = print_term info f1 builder in
+      let res = Module.create_bool (sprintf "!%s" (Module.string_of_value f1)) builder in
+      Module.append_block
+        (sprintf "@[<hv>if(!%s) {@\n@;<1 2>@[%s@]}@]@\n" (Module.string_of_value res))
+        (fun builder ->
+           let v = print_term info f2 builder in
+           Module.append_builder (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+        )
+        builder;
+      res
+  | Tbinop (Tand,f1,f2) ->
+      let f1 = print_term info f1 builder in
+      let res = Module.create_bool (Module.string_of_value f1) builder in
+      Module.append_block
+        (sprintf "@[<hv>if(%s) {@\n@;<1 2>@[%s@]}@]@\n" (Module.string_of_value res))
+        (fun builder ->
+           let v = print_term info f2 builder in
+           Module.append_builder (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+        )
+        builder;
+      res
+  | Tbinop (Tor,f1,f2) ->
+      let f1 = print_term info f1 builder in
+      let res = Module.create_bool (Module.string_of_value f1) builder in
+      Module.append_block
+        (sprintf "@[<hv>if(!%s) {@\n@;<1 2>@[%s@]}@]@\n" (Module.string_of_value res))
+        (fun builder ->
+           let v = print_term info f2 builder in
+           Module.append_builder (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+        )
+        builder;
+      res
+  | Tbinop (Tiff,f1,f2) ->
+      let f1 = print_term info f1 builder in
+      let f2 = print_term info f2 builder in
+      Module.create_value (sprintf "%s == %s" (Module.string_of_value f1) (Module.string_of_value f2)) builder
   | Tnot f ->
-      fprintf fmt (protect_on paren "!%a") (print_term_p info) f
-
-and print_term_p info fmt t = print_term ~paren:true info fmt t
+      let v = print_term info f builder in
+      Module.create_value (sprintf "!%s" (Module.string_of_value v)) builder
 
 (** Logic Declarations *)
 
-let logic_decl info fmt d = match d.d_node with
+let logic_decl info d = match d.d_node with
   | Dtype _
   | Ddata _ ->
       () (* Types are useless for C *)
@@ -261,12 +297,12 @@ let logic_decl info fmt d = match d.d_node with
   | Dprop (_pk, _pr, _) ->
       assert false
 
-let logic_decl info fmt td = match td.td_node with
+let logic_decl info td = match td.td_node with
   | Decl d ->
       if Mlw_exec.is_exec_decl info.info_syn d then begin
         let union = Sid.union d.d_syms d.d_news in
         let inter = Mid.set_inter union info.mo_known_map in
-        if Sid.is_empty inter then logic_decl info fmt d
+        if Sid.is_empty inter then logic_decl info d
       end
   | Use _ | Clone _ | Meta _ ->
       ()
@@ -283,8 +319,9 @@ let extract_theory drv ?old ?fname fmt th =
     th_known_map = th.th_known;
     mo_known_map = Mid.empty;
     fname = Opt.map clean_fname fname; } in
-  print_list nothing (logic_decl info) fmt th.th_decls;
-  fprintf fmt "@."
+  Module.clear ();
+  List.iter (logic_decl info) th.th_decls;
+  fprintf fmt "%s@." (Module.to_string ())
 
 (** Programs *)
 
@@ -310,7 +347,7 @@ let get_lv info = function
 
 let get_xs info xs = get_qident info xs.xs_name
 
-let rec print_expr ?(paren=false) info builder e =
+let rec print_expr info builder e =
   if e.e_ghost then
     Module.unit_value
   else match e.e_node with
