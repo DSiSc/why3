@@ -74,12 +74,15 @@ module Module : sig
   val append_global : ident -> string -> unit
   val append_block : (string -> string) -> (builder -> unit) -> builder -> unit
   val append_builder : string -> builder -> unit
+  val append_header : string -> unit
 
   val create_value : builder -> value
   val unit_value : value
 
   val value_of_string : string -> value
   val string_of_value : value -> string
+
+  val clear : unit -> unit
 
   val to_string : unit -> string
 end = struct
@@ -96,6 +99,7 @@ end = struct
     let hash = Hashtbl.hash
   end)
 
+  let header = ref []
   let modul = M.create 64
 
   let define_global () =
@@ -136,14 +140,22 @@ end = struct
   let append_builder x builder =
     builder.builder <- x :: builder.builder
 
+  let append_header str =
+    header := !header @ [str]
+
   let append_block f g builder =
     let builder' = create_block builder in
     g builder';
     append_builder (f (string_of_builder builder)) builder
 
+  let clear () =
+    header := [];
+    M.clear modul
+
   let to_string () =
     let buf = Buffer.create 64 in
     let aux _ = Buffer.add_string buf in
+    List.iter (Buffer.add_string buf) !header;
     M.iter aux modul;
     Buffer.contents buf
 end
@@ -235,15 +247,6 @@ and print_term_p info fmt t = print_term ~paren:true info fmt t
 
 (** Logic Declarations *)
 
-let print_list_next sep print fmt = function
-  | [] ->
-      ()
-  | [x] ->
-      print true fmt x
-  | x :: r ->
-      print true fmt x; sep fmt ();
-      print_list sep (print false) fmt r
-
 let logic_decl info fmt d = match d.d_node with
   | Dtype _
   | Ddata _ ->
@@ -307,10 +310,6 @@ let get_lv info = function
 
 let get_xs info xs = get_qident info xs.xs_name
 
-let is_letrec = function
-  | [fd] -> fd.fun_lambda.l_spec.c_letrec <> 0
-  | _ -> true
-
 let rec print_expr ?(paren=false) info builder e =
   if e.e_ghost then
     Module.unit_value
@@ -367,7 +366,7 @@ let rec print_expr ?(paren=false) info builder e =
   | Erec (fdl, e) ->
       assert false
 
-and print_rec lr info fst { fun_ps = ps ; fun_lambda = lam } =
+and print_rec info { fun_ps = ps ; fun_lambda = lam } =
   if not ps.ps_ghost then
     Module.append_function
       ps.ps_name
@@ -379,8 +378,8 @@ and print_rec lr info fst { fun_ps = ps ; fun_lambda = lam } =
            builder;
       )
 
-and print_rec_decl lr info fst fmt fd =
-  print_rec lr info fst fd
+and print_rec_decl info fd =
+  print_rec info fd
   (*forget_tvs ()*)
 
 let is_ghost_lv = function
@@ -397,7 +396,7 @@ let print_exn_decl info xs =
        (* TODO: Improve pretty-printing *)
     )
 
-let pdecl info fmt pd =
+let pdecl info pd =
   Mlw_exec.check_exec_pdecl info.info_syn pd;
   match pd.pd_node with
   | PDtype ts ->
@@ -415,8 +414,7 @@ let pdecl info fmt pd =
           (ps1.ps_ghost || has_syntax info ps1.ps_name)
           (ps2.ps_ghost || has_syntax info ps2.ps_name) in
       let fdl = List.sort cmp fdl in
-      print_list_next newline (print_rec_decl (is_letrec fdl) info) fmt fdl;
-      fprintf fmt "@\n@\n"
+      List.iter (print_rec_decl info) fdl;
   | PDexn xs ->
       print_exn_decl info xs
 
@@ -433,9 +431,9 @@ let extract_module drv ?old ?fname fmt m =
     th_known_map = th.th_known;
     mo_known_map = m.mod_known;
     fname = Opt.map clean_fname fname; } in
-  fprintf fmt "#include <stdbool.h>@\n";
-  fprintf fmt "#include <gmp.h>@\n";
-  fprintf fmt "typedef void* value;";
-  fprintf fmt "@\n@\n";
-  print_list nothing (pdecl info) fmt m.mod_decls;
-  fprintf fmt "@."
+  Module.clear ();
+  Module.append_header "#include <stdbool.h>";
+  Module.append_header "#include <gmp.h>";
+  Module.append_header "typedef void* value;";
+  List.iter (pdecl info) m.mod_decls;
+  fprintf fmt "%s@." (Module.to_string ())
