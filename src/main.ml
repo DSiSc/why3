@@ -636,8 +636,9 @@ let extract_to_c ~fname th =
   let cout = open_out file in
   let fcout = formatter_of_out_channel cout in
   fun ?fname:_ _ extract ->
-    extract file ?old fcout;
-    close_out cout
+    extract file ?old fcout
+(*    close_out cout *)
+(* TODO *)
 
 let use_iter f th =
   List.iter (fun d -> match d.td_node with Use t -> f t | _ -> ()) th.th_decls
