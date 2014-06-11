@@ -516,7 +516,7 @@ let logic_decl info fmt d = match d.d_node with
 
 let logic_decl info fmt td = match td.td_node with
   | Decl d ->
-      if Mlw_exec.is_exec_decl info.info_syn d then begin
+      if Mlw_extract.is_exec_decl info.info_syn d then begin
         let union = Sid.union d.d_syms d.d_news in
         let inter = Mid.set_inter union info.mo_known_map in
         if Sid.is_empty inter then logic_decl info fmt d
@@ -919,7 +919,7 @@ let print_pprojections info fmt (ts, _, _ as d) =
   end
 
 let pdecl info fmt pd =
-  Mlw_exec.check_exec_pdecl info.info_syn pd;
+  Mlw_extract.check_exec_pdecl info.info_syn pd;
   match pd.pd_node with
   | PDtype ts ->
       print_type_decl info fmt ts;
