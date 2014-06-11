@@ -22,7 +22,7 @@ let is_ghost_lv = function
   | LetV pv -> pv.Mlw_ty.pv_ghost
   | LetA ps -> ps.ps_ghost
 
-let (mark_lsymbols, is_exec_lsymbol) =
+let (mark_lsymbols, is_exec_lsymbol, get_htbl_length) =
   let marked_idents = Hls.create 30 in
   let aux syn ls =
     if not (has_syntax syn ls.ls_name) then
@@ -30,7 +30,18 @@ let (mark_lsymbols, is_exec_lsymbol) =
   in
   let mark_idents syn = List.iter (aux syn) in
   let is_exec_ident x = not (Hls.mem marked_idents x) in
-  (mark_idents, is_exec_ident)
+  (mark_idents, is_exec_ident, (fun () -> Hls.length marked_idents))
+
+let fix f ll =
+  let rec loop len ll =
+    let ll = List.filter f ll in
+    let new_len = get_htbl_length () in
+    if len = new_len then
+      loop new_len ll
+    else
+      ll
+  in
+  loop (get_htbl_length ()) ll
 
 let is_exec_const = function
   | Number.ConstInt _ -> true
@@ -65,15 +76,9 @@ and is_exec_branch b =
 and is_exec_bound b =
   let _, t = t_open_bound b in is_exec_term t
 
-let is_exec_logic (_, ld) =
+let is_exec_logic ld =
   let (_, e) = open_ls_defn ld in
   is_exec_term e
-
-let get_non_exec_logic_idents x =
-  if is_exec_logic x then
-    []
-  else
-    [fst x]
 
 let is_exec_decl syn d =
   let idents = match d.d_node with
@@ -83,7 +88,14 @@ let is_exec_decl syn d =
     | Dparam ls ->
         [ls]
     | Dlogic ll ->
-        List.fold_left (fun acc x -> get_non_exec_logic_idents x @ acc) [] ll
+        let aux (ls, ld) =
+          let res = is_exec_logic ld in
+          if res then
+            mark_lsymbols syn [ls];
+          res
+        in
+        let ll = fix aux ll in
+        List.map fst ll (* TODO: Fix this *)
     | Dind (_, l) ->
         List.map (fun (ls, _) -> ls) l
     | Dprop (_, _, _) ->
