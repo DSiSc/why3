@@ -516,10 +516,13 @@ let logic_decl info fmt d = match d.d_node with
 
 let logic_decl info fmt td = match td.td_node with
   | Decl d ->
-      if Mlw_extract.is_exec_decl info.info_syn d then begin
-        let union = Sid.union d.d_syms d.d_news in
-        let inter = Mid.set_inter union info.mo_known_map in
-        if Sid.is_empty inter then logic_decl info fmt d
+      begin match Mlw_extract.get_exec_decl info.info_syn d with
+      | Some d ->
+          let union = Sid.union d.d_syms d.d_news in
+          let inter = Mid.set_inter union info.mo_known_map in
+          if Sid.is_empty inter then logic_decl info fmt d
+      | None ->
+          ()
       end
   | Use _ | Clone _ | Meta _ ->
       ()

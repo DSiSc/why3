@@ -9,5 +9,5 @@
 (*                                                                  *)
 (********************************************************************)
 
-val is_exec_decl : Printer.syntax_map -> Decl.decl -> bool
+val get_exec_decl : Printer.syntax_map -> Decl.decl -> Decl.decl option
 val check_exec_pdecl : Printer.syntax_map -> Mlw_decl.pdecl -> unit

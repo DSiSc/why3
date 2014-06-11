@@ -22,15 +22,14 @@ let is_ghost_lv = function
   | LetV pv -> pv.Mlw_ty.pv_ghost
   | LetA ps -> ps.ps_ghost
 
-let (mark_lsymbols, is_exec_lsymbol, get_htbl_length) =
+let (mark_lsymbol, is_exec_lsymbol, get_htbl_length) =
   let marked_idents = Hls.create 30 in
-  let aux syn ls =
+  let mark_ident syn ls =
     if not (has_syntax syn ls.ls_name) then
       Hls.add marked_idents ls ()
   in
-  let mark_idents syn = List.iter (aux syn) in
   let is_exec_ident x = not (Hls.mem marked_idents x) in
-  (mark_idents, is_exec_ident, (fun () -> Hls.length marked_idents))
+  (mark_ident, is_exec_ident, (fun () -> Hls.length marked_idents))
 
 let fix f ll =
   let rec loop len ll =
@@ -80,34 +79,30 @@ let is_exec_logic ld =
   let (_, e) = open_ls_defn ld in
   is_exec_term e
 
-let is_exec_decl syn d =
-  let idents = match d.d_node with
+let get_exec_decl syn d =
+  match d.d_node with
     | Dtype _
     | Ddata _ ->
-        []
+        Some d
     | Dparam ls ->
-        [ls]
+        mark_lsymbol syn ls;
+        None
     | Dlogic ll ->
         let aux (ls, ld) =
           let res = is_exec_logic ld in
           if res then
-            mark_lsymbols syn [ls];
+            mark_lsymbol syn ls;
           res
         in
-        let ll = fix aux ll in
-        List.map fst ll (* TODO: Fix this *)
+        begin match fix aux ll with
+        | [] -> None
+        | ll -> Some (create_logic_decl ll)
+        end
     | Dind (_, l) ->
-        List.map (fun (ls, _) -> ls) l
+        List.iter (fun (ls, _) -> mark_lsymbol syn ls) l;
+        None
     | Dprop (_, _, _) ->
-        [] (* Using prop in code cannot happend *)
-  in
-  begin match idents with
-  | [] ->
-      true
-  | idents ->
-      mark_lsymbols syn idents;
-      false
-  end
+        None (* Using prop in code cannot happend *)
 
 let rec check_exec_expr e =
   if not e.e_ghost then
