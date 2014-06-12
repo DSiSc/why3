@@ -25,8 +25,9 @@ let is_ghost_lv = function
 let (mark_lsymbol, is_exec_lsymbol, get_htbl_length) =
   let marked_idents = Hls.create 30 in
   let mark_ident syn ls =
-    if not (has_syntax syn ls.ls_name) then
-      Hls.add marked_idents ls ()
+    if not (Hls.mem marked_idents ls) then
+      if not (has_syntax syn ls.ls_name) then
+        Hls.add marked_idents ls ()
   in
   let is_exec_ident x = not (Hls.mem marked_idents x) in
   (mark_ident, is_exec_ident, (fun () -> Hls.length marked_idents))
@@ -36,9 +37,9 @@ let fix f ll =
     let ll = List.filter f ll in
     let new_len = get_htbl_length () in
     if len = new_len then
-      loop new_len ll
-    else
       ll
+    else
+      loop new_len ll
   in
   loop (get_htbl_length ()) ll
 
@@ -90,7 +91,7 @@ let get_exec_decl syn d =
     | Dlogic ll ->
         let aux (ls, ld) =
           let res = is_exec_logic ld in
-          if res then
+          if not res then
             mark_lsymbol syn ls;
           res
         in
