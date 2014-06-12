@@ -39,11 +39,14 @@ module TestExtraction
     to_int (f64 (of_int 31) +
       (of_int 33 / of_int 3 + of_int 2 - of_int 4) - (- of_int 1))
 
+(* UInt64 doesn't have a syntax and can't be extracted *)
+(*
   use import mach.int.UInt64
   let fu64 (x: uint64) : uint64 = x + of_int 1
   let test_uint64 () =
     to_int (fu64 (of_int 31) +
       (of_int 33 / of_int 3 + of_int 2 - of_int 4) - (- of_int 1))
+*)
 
   use import int.Int
   use import ref.Ref

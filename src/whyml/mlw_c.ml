@@ -299,10 +299,13 @@ let logic_decl info d = match d.d_node with
 
 let logic_decl info td = match td.td_node with
   | Decl d ->
-      if Mlw_exec.is_exec_decl info.info_syn d then begin
-        let union = Sid.union d.d_syms d.d_news in
-        let inter = Mid.set_inter union info.mo_known_map in
-        if Sid.is_empty inter then logic_decl info d
+      begin match Mlw_extract.get_exec_decl info.info_syn d with
+      | Some d ->
+          let union = Sid.union d.d_syms d.d_news in
+          let inter = Mid.set_inter union info.mo_known_map in
+          if Sid.is_empty inter then logic_decl info d
+      | None ->
+          ()
       end
   | Use _ | Clone _ | Meta _ ->
       ()
@@ -434,7 +437,7 @@ let print_exn_decl info xs =
     )
 
 let pdecl info pd =
-  Mlw_exec.check_exec_pdecl info.info_syn pd;
+  Mlw_extract.check_exec_pdecl info.info_syn pd;
   match pd.pd_node with
   | PDtype ts ->
       assert false
