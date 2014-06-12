@@ -204,9 +204,7 @@ lib/why3/why3.cmx: $(LIBCMX)
 
 # clean and depend
 
-ifneq "$(MAKECMDGOALS)" "clean"
-include $(LIBDEP)
-endif
+-include $(LIBDEP)
 
 depend: $(LIBDEP)
 
@@ -403,9 +401,7 @@ PLUGCLEAN = $(addsuffix /*.cm[iox], $(PLUGSDIRS)) \
 
 # depend and clean targets
 
-ifneq "$(MAKECMDGOALS)" "clean"
-include $(PLUGDEP)
-endif
+-include $(PLUGDEP)
 
 depend: $(PLUGDEP)
 
@@ -446,9 +442,7 @@ install_no_local::
 
 install_local: bin/why3
 
-ifneq "$(MAKECMDGOALS)" "clean"
-include src/main.dep
-endif
+-include src/main.dep
 
 depend: src/main.dep
 
@@ -560,9 +554,7 @@ bin/why3config: bin/why3config.@OCAMLBEST@
 
 # depend and clean targets
 
-ifneq "$(MAKECMDGOALS)" "clean"
-include $(CONFIGDEP)
-endif
+-include $(CONFIGDEP)
 
 depend: $(CONFIGDEP)
 
@@ -625,9 +617,7 @@ src/ide/resetgc.o: src/ide/resetgc.c
 
 # depend and clean targets
 
-ifneq "$(MAKECMDGOALS)" "clean"
-include $(IDEDEP)
-endif
+-include $(IDEDEP)
 
 depend: $(IDEDEP)
 
@@ -681,9 +671,7 @@ bin/why3replayer: bin/why3replayer.@OCAMLBEST@
 
 # depend and clean targets
 
-ifneq "$(MAKECMDGOALS)" "clean"
-include $(REPLAYERDEP)
-endif
+-include $(REPLAYERDEP)
 
 depend: $(REPLAYERDEP)
 
@@ -737,9 +725,7 @@ bin/why3session: bin/why3session.@OCAMLBEST@
 
 # depend and clean targets
 
-ifneq "$(MAKECMDGOALS)" "clean"
-include $(SESSIONDEP)
-endif
+-include $(SESSIONDEP)
 
 depend: $(SESSIONDEP)
 
@@ -795,9 +781,7 @@ bin/why3bench: bin/why3bench.@OCAMLBEST@
 
 # depend and clean targets
 
-ifneq "$(MAKECMDGOALS)" "clean"
-include $(BENCHDEP)
-endif
+-include $(BENCHDEP)
 
 depend: $(BENCHDEP)
 
@@ -872,9 +856,7 @@ src/coq-tactic/.why3-vo-opt: lib/coq-tactic/Why3.v lib/coq-tactic/why3tac.cmxs
 
 # depend and clean targets
 
-ifneq "$(MAKECMDGOALS)" "clean"
-include $(COQPDEP)
-endif
+-include $(COQPDEP)
 
 depend: $(COQPDEP)
 
@@ -996,10 +978,8 @@ endif
 
 install_local: $(COQVO) drivers/coq-realizations.aux
 
-ifneq "$(MAKECMDGOALS)" "clean"
 ifneq "$(MAKECMDGOALS:update-coq%=update-coq)" "update-coq"
-include $(COQVD)
-endif
+-include $(COQVD)
 endif
 
 depend: $(COQVD)
@@ -1260,9 +1240,7 @@ $(OCAMLLIBS_DEP): DEPFLAGS += -I src/util -I lib/ocaml @BIGINTINCLUDE@
 $(OCAMLLIBS_CMO) $(OCAMLLIBS_CMX): INCLUDES += -I src/util -I lib/ocaml  @BIGINTINCLUDE@
 $(OCAMLLIBS_CMX): OFLAGS += -for-pack Why3extract
 
-ifneq "$(MAKECMDGOALS)" "clean"
-include $(OCAMLLIBS_DEP)
-endif
+-include $(OCAMLLIBS_DEP)
 
 $(OCAMLLIBS_DEP): lib/ocaml/why3__BigInt_compat.ml
 
@@ -1379,9 +1357,7 @@ bin/why3wc.byte: $(WHY3WCCMO)
 bin/why3wc: bin/why3wc.@OCAMLBEST@
 	ln -sf why3wc.@OCAMLBEST@ $@
 
-ifneq "$(MAKECMDGOALS)" "clean"
-include $(WHY3WCDEP)
-endif
+-include $(WHY3WCDEP)
 
 depend: $(WHY3WCDEP)
 
@@ -1436,9 +1412,7 @@ bin/why3doc: bin/why3doc.@OCAMLBEST@
 
 # depend and clean targets
 
-ifneq "$(MAKECMDGOALS)" "clean"
-include $(WHY3DOCDEP)
-endif
+-include $(WHY3DOCDEP)
 
 depend: $(WHY3DOCDEP)
 
