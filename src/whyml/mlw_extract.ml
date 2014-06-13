@@ -33,15 +33,13 @@ let (mark_lsymbol, is_exec_lsymbol, get_htbl_length) =
   (mark_ident, is_exec_ident, (fun () -> Hls.length marked_idents))
 
 let fix f ll =
-  let rec loop len ll =
-    let ll = List.filter f ll in
+  let rec loop len =
+    List.iter f ll;
     let new_len = get_htbl_length () in
-    if len = new_len then
-      ll
-    else
-      loop new_len ll
+    if len <> new_len then
+      loop new_len
   in
-  loop (get_htbl_length ()) ll
+  loop (get_htbl_length ())
 
 let is_exec_const = function
   | Number.ConstInt _ -> true
@@ -93,9 +91,9 @@ let get_exec_decl syn d =
           let res = is_exec_logic ld in
           if not res then
             mark_lsymbol syn ls;
-          res
         in
-        begin match fix aux ll with
+        fix aux ll;
+        begin match List.filter (fun (ls, _) -> is_exec_lsymbol ls) ll with
         | [] -> None
         | ll -> Some (create_logic_decl ll)
         end
