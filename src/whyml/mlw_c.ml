@@ -70,9 +70,9 @@ module Module : sig
   type builder
   type value
 
-  val append_function : ident -> (string -> string) -> (builder -> unit) -> unit
+  val append_function : ident -> string -> (builder -> unit) -> unit
   val append_global : ident -> string -> unit
-  val append_block : (string -> string) -> (builder -> unit) -> builder -> unit
+  val append_block : string -> (builder -> unit) -> builder -> unit
   val append_builder : string -> builder -> unit
   val append_header : string -> unit
 
@@ -90,6 +90,7 @@ end = struct
   type builder =
     { mutable builder : string list
     ; mutable ident : int
+    ; mutable indent_level : int
     }
 
   type value = string
@@ -103,14 +104,18 @@ end = struct
   let header = ref []
   let modul = M.create 64
 
+  let initial_indent_level = 2
+
   let define_global () =
     { builder = []
     ; ident = 0
+    ; indent_level = initial_indent_level
     }
 
   let create_block builder =
     { builder = []
     ; ident = builder.ident
+    ; indent_level = builder.indent_level + initial_indent_level
     }
 
   let create_fresh_name builder =
@@ -133,27 +138,36 @@ end = struct
       assert false;
     M.add modul id x
 
-  let append_function id f g =
+  let append_function id x g =
     let builder = define_global () in
     g builder;
-    append_global id (f (string_of_builder builder))
+    let x = x ^ "\n" in
+    let x = x ^ "{\n" in
+    let x = x ^ string_of_builder builder ^ "\n" in
+    let x = x ^ "}\n" in
+    append_global id x
 
   let append_builder x builder =
-    builder.builder <- x :: builder.builder
+    let indent = String.make builder.indent_level ' ' in
+    builder.builder <- (indent ^ x) :: builder.builder
 
   let append_header str =
     header := str :: !header
 
-  let append_block f g builder =
+  let append_block x g builder =
     let builder' = create_block builder in
     g builder';
-    append_builder (f (string_of_builder builder)) builder
+    append_builder x builder;
+    append_builder "{" builder;
+    builder.builder <- (string_of_builder builder') :: builder.builder;
+    append_builder "}" builder
 
   let create_value value builder =
     let name = create_fresh_name builder in
     append_builder (sprintf "value %s = %s;" name value) builder;
     name
 
+  (* TODO: Remove this *)
   let create_bool value builder =
     let name = create_fresh_name builder in
     append_builder (sprintf "bool %s = %s;" name value) builder;
@@ -165,10 +179,16 @@ end = struct
 
   let to_string () =
     let buf = Buffer.create 64 in
-    let aux _ = Buffer.add_string buf in
+    let aux x =
+      Buffer.add_string buf x;
+      Buffer.add_char buf '\n';
+      Buffer.add_char buf '\n';
+    in
     let header = List.rev !header in
-    List.iter (Buffer.add_string buf) header;
-    M.iter aux modul;
+    List.iter aux header;
+    Buffer.add_char buf '\n';
+    Buffer.add_char buf '\n';
+    M.iter (fun _ -> aux) modul;
     Buffer.contents buf
 end
 
@@ -244,7 +264,7 @@ let rec print_term info t builder = match t.t_node with
       let f1 = print_term info f1 builder in
       let res = Module.create_bool (sprintf "!%s" (Module.string_of_value f1)) builder in
       Module.append_block
-        (sprintf "@[<hv>if(!%s) {@\n@;<1 2>@[%s@]}@]@\n" (Module.string_of_value res))
+        (sprintf "if(!%s)" (Module.string_of_value res))
         (fun builder ->
            let v = print_term info f2 builder in
            Module.append_builder (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
@@ -255,7 +275,7 @@ let rec print_term info t builder = match t.t_node with
       let f1 = print_term info f1 builder in
       let res = Module.create_bool (Module.string_of_value f1) builder in
       Module.append_block
-        (sprintf "@[<hv>if(%s) {@\n@;<1 2>@[%s@]}@]@\n" (Module.string_of_value res))
+        (sprintf "if(%s)" (Module.string_of_value res))
         (fun builder ->
            let v = print_term info f2 builder in
            Module.append_builder (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
@@ -266,7 +286,7 @@ let rec print_term info t builder = match t.t_node with
       let f1 = print_term info f1 builder in
       let res = Module.create_bool (Module.string_of_value f1) builder in
       Module.append_block
-        (sprintf "@[<hv>if(!%s) {@\n@;<1 2>@[%s@]}@]@\n" (Module.string_of_value res))
+        (sprintf "if(!%s)" (Module.string_of_value res))
         (fun builder ->
            let v = print_term info f2 builder in
            Module.append_builder (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
@@ -371,13 +391,13 @@ let rec print_expr info builder e =
       assert false
   | Eif (e0,e1,e2) ->
       let e0 = print_expr info builder e0 in
-      Module.append_builder (sprintf "@[<hv>if()@]") builder;
+      Module.append_builder (sprintf "if(%s)" (Module.string_of_value e0)) builder;
       Module.unit_value
   | Eassign (pl,e,_,pv) ->
       assert false
   | Eloop (_,_,e) ->
       Module.append_block
-        (sprintf "@[<hv>while(true) {@\n@;<1 2>@[%s@]}@]@\n")
+        "while(true)"
         (fun builder -> ignore (print_expr info builder e))
         builder;
       Module.unit_value
@@ -410,7 +430,7 @@ and print_rec info { fun_ps = ps ; fun_lambda = lam } =
   if not ps.ps_ghost then
     Module.append_function
       ps.ps_name
-      (sprintf "@[<hov 2>value __lambda1(value lol) {@\n%s}@\n@]")
+      "value __lambda1(value lol)"
       (fun builder ->
          let v = print_expr info builder lam.l_expr in
          Module.append_builder
