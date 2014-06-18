@@ -73,12 +73,15 @@ module Module : sig
   val append_function : ident -> string -> (builder -> unit) -> unit
   val append_global : ident -> string -> unit
   val append_block : string -> (builder -> unit) -> builder -> unit
-  val append_builder : string -> builder -> unit
+  val append_expr : string -> builder -> unit
   val append_header : string -> unit
+
+  val create_global_fresh_name : unit -> value
 
   val create_value : string -> builder -> value
   val create_bool : string -> builder -> value
   val unit_value : value
+  val null_value : value
 
   val value_of_string : string -> value
   val string_of_value : value -> string
@@ -103,6 +106,7 @@ end = struct
 
   let header = ref []
   let modul = M.create 64
+  let ident = ref 0
 
   let initial_indent_level = 2
 
@@ -118,6 +122,11 @@ end = struct
     ; indent_level = builder.indent_level + initial_indent_level
     }
 
+  let create_global_fresh_name () =
+    let name = sprintf "Lambda%d__" !ident in
+    incr ident;
+    name
+
   let create_fresh_name builder =
     let v = sprintf "X%i__" builder.ident in
     builder.ident <- succ builder.ident;
@@ -130,6 +139,7 @@ end = struct
   let value_of_string x = x
 
   let unit_value = "unit__Unit"
+  let null_value = "NULL"
 
   let string_of_value x = x
 
@@ -150,6 +160,9 @@ end = struct
   let append_builder x builder =
     let indent = String.make builder.indent_level ' ' in
     builder.builder <- (indent ^ x) :: builder.builder
+
+  let append_expr x builder =
+    append_builder (x ^ ";") builder
 
   let append_header str =
     header := str :: !header
@@ -191,6 +204,11 @@ end = struct
     M.iter (fun _ -> aux) modul;
     Buffer.contents buf
 end
+
+type value =
+  | Value of Module.value
+  | Env of int
+  | Glob of int
 
 let get_qident info id =
   try
@@ -240,15 +258,50 @@ let print_const = function
   | ConstReal _ ->
       assert false
 
-let rec print_term info t builder = match t.t_node with
+let print_if f builder (e,t1,t2) =
+  let e = f e builder in
+  let res = Module.create_value "NULL" builder in
+  Module.append_block
+    (sprintf "if(%s)" (Module.string_of_value e))
+    (fun builder ->
+       let v = f t1 builder in
+       Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+    )
+    builder;
+  Module.append_block
+    "else"
+    (fun builder ->
+       let v = f t2 builder in
+       Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+    )
+    builder;
+  res
+
+let get_value id gamma builder =
+  match Mid.find_opt id gamma with
+  | None ->
+      Module.create_value id.id_string builder
+  | Some v ->
+      begin match v with
+      | Value v ->
+          v
+      | Env i ->
+          Module.create_value (sprintf "Env__[%d]" i) builder
+      | Glob i ->
+          Module.create_value (sprintf "Glob__[%d]" i) builder
+      end
+
+let rec print_term info gamma t builder = match t.t_node with
   | Tvar v ->
       assert false
   | Tconst c ->
       print_const c
+  | Tapp (fs, []) ->
+      get_value fs.ls_name gamma builder
   | Tapp (fs, tl) ->
       assert false
-  | Tif (f,t1,t2) ->
-      assert false
+  | Tif (e, t1, t2) ->
+      print_if (print_term info gamma) builder (e, t1, t2)
   | Tlet (t1,tb) ->
       assert false
   | Tcase (t1,bl) ->
@@ -261,44 +314,44 @@ let rec print_term info t builder = match t.t_node with
   | Tfalse ->
       Module.create_bool "false" builder
   | Tbinop (Timplies,f1,f2) ->
-      let f1 = print_term info f1 builder in
+      let f1 = print_term info gamma f1 builder in
       let res = Module.create_bool (sprintf "!%s" (Module.string_of_value f1)) builder in
       Module.append_block
         (sprintf "if(!%s)" (Module.string_of_value res))
         (fun builder ->
-           let v = print_term info f2 builder in
-           Module.append_builder (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+           let v = print_term info gamma f2 builder in
+           Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
         )
         builder;
       res
   | Tbinop (Tand,f1,f2) ->
-      let f1 = print_term info f1 builder in
+      let f1 = print_term info gamma f1 builder in
       let res = Module.create_bool (Module.string_of_value f1) builder in
       Module.append_block
         (sprintf "if(%s)" (Module.string_of_value res))
         (fun builder ->
-           let v = print_term info f2 builder in
-           Module.append_builder (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+           let v = print_term info gamma f2 builder in
+           Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
         )
         builder;
       res
   | Tbinop (Tor,f1,f2) ->
-      let f1 = print_term info f1 builder in
+      let f1 = print_term info gamma f1 builder in
       let res = Module.create_bool (Module.string_of_value f1) builder in
       Module.append_block
         (sprintf "if(!%s)" (Module.string_of_value res))
         (fun builder ->
-           let v = print_term info f2 builder in
-           Module.append_builder (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+           let v = print_term info gamma f2 builder in
+           Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
         )
         builder;
       res
   | Tbinop (Tiff,f1,f2) ->
-      let f1 = print_term info f1 builder in
-      let f2 = print_term info f2 builder in
+      let f1 = print_term info gamma f1 builder in
+      let f2 = print_term info gamma f2 builder in
       Module.create_value (sprintf "%s == %s" (Module.string_of_value f1) (Module.string_of_value f2)) builder
   | Tnot f ->
-      let v = print_term info f builder in
+      let v = print_term info gamma f builder in
       Module.create_value (sprintf "!%s" (Module.string_of_value v)) builder
 
 (** Logic Declarations *)
@@ -370,12 +423,12 @@ let get_lv info = function
 
 let get_xs info xs = get_qident info xs.xs_name
 
-let rec print_expr info builder e =
+let rec print_expr info gamma e builder =
   if e.e_ghost then
     Module.unit_value
   else match e.e_node with
   | Elogic t ->
-      assert false
+      print_term info gamma t builder
   | Evalue v ->
       get_pv info v
   | Earrow a ->
@@ -390,29 +443,29 @@ let rec print_expr info builder e =
     when ls_equal ls fs_void ->
       assert false
   | Eif (e0,e1,e2) ->
-      let e0 = print_expr info builder e0 in
-      Module.append_builder (sprintf "if(%s)" (Module.string_of_value e0)) builder;
-      Module.unit_value
+      print_if (print_expr info gamma) builder (e0, e1, e2)
   | Eassign (pl,e,_,pv) ->
       assert false
   | Eloop (_,_,e) ->
       Module.append_block
         "while(true)"
-        (fun builder -> ignore (print_expr info builder e))
+        (fun builder -> ignore (print_expr info gamma e builder))
         builder;
       Module.unit_value
   | Efor (pv,(pvfrom,dir,pvto),_,e) ->
       assert false
   | Eraise (xs,_) when xs_equal xs xs_exit ->
-      assert false
+      Module.unit_value
   | Eraise (xs,e) ->
       assert false
   | Etry (e,bl) ->
-      print_expr info builder e
+      (* TODO *)
+      print_expr info gamma e builder
   | Eabstr (e,_) ->
-      assert false
+      print_expr info gamma e builder
   | Eabsurd ->
-      Module.unit_value (* TODO: Change *)
+      Module.append_expr "abort()" builder;
+      Module.null_value
   | Eassert _ ->
       Module.unit_value
   | Eghost _ ->
@@ -426,20 +479,24 @@ let rec print_expr info builder e =
   | Erec (fdl, e) ->
       assert false
 
-and print_rec info { fun_ps = ps ; fun_lambda = lam } =
-  if not ps.ps_ghost then
+and print_rec info gamma index { fun_ps = ps ; fun_lambda = lam } =
+  if not ps.ps_ghost then begin
+    let fresh_name = Module.create_global_fresh_name () in
     Module.append_function
       ps.ps_name
-      "value __lambda1(value lol)"
+      (sprintf "value %s(value param)" (Module.string_of_value fresh_name))
       (fun builder ->
-         let v = print_expr info builder lam.l_expr in
-         Module.append_builder
-           (sprintf "return %s;" (Module.string_of_value v))
+         let v = print_expr info gamma lam.l_expr builder in
+         Module.append_expr
+           (sprintf "return %s" (Module.string_of_value v))
            builder;
-      )
+      );
+    Mid.add ps.ps_name (Glob index) gamma
+  end else
+    gamma
 
-and print_rec_decl info fd =
-  print_rec info fd
+and print_rec_decl info gamma index fd =
+  print_rec info gamma index fd
   (*forget_tvs ()*)
 
 let is_ghost_lv = function
@@ -456,27 +513,37 @@ let print_exn_decl info xs =
        (* TODO: Improve pretty-printing *)
     )
 
-let pdecl info pd =
-  Mlw_extract.check_exec_pdecl info.info_syn pd;
-  match pd.pd_node with
-  | PDtype ts ->
-      assert false
-  | PDdata tl ->
-      assert false
-  | PDval lv ->
-      () (* LOL *)
-  | PDlet ld ->
-      assert false
-  | PDrec fdl ->
-      (* print defined, non-ghost first *)
-      let cmp {fun_ps=ps1} {fun_ps=ps2} =
-        Pervasives.compare
-          (ps1.ps_ghost || has_syntax info ps1.ps_name)
-          (ps2.ps_ghost || has_syntax info ps2.ps_name) in
-      let fdl = List.sort cmp fdl in
-      List.iter (print_rec_decl info) fdl;
-  | PDexn xs ->
-      print_exn_decl info xs
+let rec pdecl info gamma = function
+  | pd::decls ->
+      Mlw_extract.check_exec_pdecl info.info_syn pd;
+      begin match pd.pd_node with
+      | PDtype ts ->
+          (* TODO *)
+          pdecl info gamma decls
+      | PDdata tl ->
+          (* TODO *)
+          pdecl info gamma decls
+      | PDval lv ->
+          (* TODO *)
+          pdecl info gamma decls
+      | PDlet ld ->
+          (* TODO *)
+          pdecl info gamma decls
+      | PDrec fdl ->
+          (* print defined, non-ghost first *)
+          let cmp {fun_ps=ps1} {fun_ps=ps2} =
+            Pervasives.compare
+              (ps1.ps_ghost || has_syntax info ps1.ps_name)
+              (ps2.ps_ghost || has_syntax info ps2.ps_name) in
+          let fdl = List.sort cmp fdl in
+          let gamma = Lists.fold_lefti (print_rec_decl info) gamma fdl in
+          pdecl info gamma decls
+      | PDexn xs ->
+          print_exn_decl info xs;
+          pdecl info gamma decls
+      end
+  | [] ->
+      ()
 
 (** Modules *)
 
@@ -491,9 +558,9 @@ let extract_module drv ?old ?fname fmt m =
     th_known_map = th.th_known;
     mo_known_map = m.mod_known;
     fname = Opt.map clean_fname fname; } in
-  Module.clear ();
+  Module.append_header "#include <stdlib.h>";
   Module.append_header "#include <stdbool.h>";
   Module.append_header "#include <gmp.h>";
   Module.append_header "typedef void* value;";
-  List.iter (pdecl info) m.mod_decls;
+  pdecl info Mid.empty m.mod_decls;
   fprintf fmt "%s@." (Module.to_string ())
