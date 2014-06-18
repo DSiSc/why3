@@ -138,7 +138,7 @@ end = struct
 
   let value_of_string x = x
 
-  let unit_value = "unit__Unit"
+  let unit_value = "Tuple0"
   let null_value = "NULL"
 
   let string_of_value x = x
@@ -193,6 +193,20 @@ end = struct
     Buffer.add_char buf '\n';
     M.iter (fun _ -> aux) modul;
     Buffer.contents buf
+
+  let () = begin
+    append_header "#include <stdlib.h>";
+    append_header "#include <stdbool.h>";
+    append_header "#include <gmp.h>";
+    append_header "typedef void* value;";
+    append_header "struct variant {int key; value val;};";
+    append_header "struct variant ___False = {0, NULL};";
+    append_header "value __False = &___False;";
+    append_header "struct variant ___True = {1, NULL};";
+    append_header "value __True = &___True;";
+    append_header "struct variant ___Tuple0 = {0, NULL};";
+    append_header "value Tuple0 = &___Tuple0;";
+  end
 end
 
 type value =
@@ -552,14 +566,6 @@ let extract_module drv ?old ?fname fmt m =
     th_known_map = th.th_known;
     mo_known_map = m.mod_known;
     fname = Opt.map clean_fname fname; } in
-  Module.append_header "#include <stdlib.h>";
-  Module.append_header "#include <gmp.h>";
-  Module.append_header "typedef void* value;";
-  Module.append_header "struct variant {int key; value val};";
-  Module.append_header "variant ___False = {0, NULL};";
-  Module.append_header "value __False = &___False;";
-  Module.append_header "variant ___True = {1, NULL};";
-  Module.append_header "value __True = &___True;";
   pdecl info Mid.empty m.mod_decls
 
 let finalize () =
