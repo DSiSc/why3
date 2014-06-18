@@ -252,7 +252,7 @@ let print_if f builder (e,t1,t2) =
   let e = f e builder in
   let res = Module.create_value "NULL" builder in
   Module.append_block
-    (sprintf "if(%s)" (Module.string_of_value e))
+    (sprintf "if(%s == __True)" (Module.string_of_value e))
     (fun builder ->
        let v = f t1 builder in
        Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
