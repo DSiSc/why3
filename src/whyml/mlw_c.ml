@@ -41,6 +41,9 @@ open Decl
 open Theory
 open Printer
 
+(* TODO: Remove this hack *)
+let hack_fmt = ref None
+
 let clean_fname fname =
   let fname = Filename.basename fname in
   (try Filename.chop_extension fname with _ -> fname)
@@ -84,8 +87,6 @@ module Module : sig
 
   val value_of_string : string -> value
   val string_of_value : value -> string
-
-  val clear : unit -> unit
 
   val to_string : unit -> string
 end = struct
@@ -178,11 +179,6 @@ end = struct
     let name = create_fresh_name builder in
     append_builder (sprintf "value %s = %s;" name value) builder;
     name
-
-  (* Not used ? *)
-  let clear () =
-    header := [];
-    M.clear modul
 
   let to_string () =
     let buf = Buffer.create 64 in
@@ -383,6 +379,7 @@ let logic_decl info td = match td.td_node with
 (** Theories *)
 
 let extract_theory drv ?old ?fname fmt th =
+  hack_fmt := Some fmt;
   ignore (old); ignore (fname);
   let info = {
     info_syn = drv.Mlw_driver.drv_syntax;
@@ -392,9 +389,7 @@ let extract_theory drv ?old ?fname fmt th =
     th_known_map = th.th_known;
     mo_known_map = Mid.empty;
     fname = Opt.map clean_fname fname; } in
-  Module.clear ();
-  List.iter (logic_decl info) th.th_decls;
-  fprintf fmt "%s@." (Module.to_string ())
+  List.iter (logic_decl info) th.th_decls
 
 (** Programs *)
 
@@ -546,6 +541,7 @@ let rec pdecl info gamma = function
 (** Modules *)
 
 let extract_module drv ?old ?fname fmt m =
+  hack_fmt := Some fmt;
   ignore (old); ignore (fname);
   let th = m.mod_theory in
   let info = {
@@ -564,5 +560,11 @@ let extract_module drv ?old ?fname fmt m =
   Module.append_header "value __False = &___False;";
   Module.append_header "variant ___True = {1, NULL};";
   Module.append_header "value __True = &___True;";
-  pdecl info Mid.empty m.mod_decls;
-  fprintf fmt "%s@." (Module.to_string ())
+  pdecl info Mid.empty m.mod_decls
+
+let finalize () =
+  match !hack_fmt with
+  | None ->
+      ()
+  | Some fmt ->
+      fprintf fmt "%s@." (Module.to_string ())

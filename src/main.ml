@@ -732,7 +732,8 @@ let do_local_extract edrv fname cin tlist =
       let thm = Mstr.fold do_m mm thm in
       Mstr.iter (fun _ th -> do_extract_theory edrv ~fname th) thm
     end else
-      Queue.iter (do_extract_module_from edrv fname mm thm) tlist
+      Queue.iter (do_extract_module_from edrv fname mm thm) tlist;
+    Mlw_backends.finalize ();
   end else begin
     let env = Env.env_of_library lib in
     let m = Env.read_channel ?format:!opt_parser env fname cin in

@@ -23,6 +23,8 @@ val extract_module:
   Mlw_driver.driver -> ?old:Pervasives.in_channel -> ?fname:string ->
   Format.formatter -> Mlw_module.modul -> unit
 
+val finalize : unit -> unit
+
 (** Switches *)
 
 module Switch : sig
