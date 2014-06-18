@@ -70,8 +70,8 @@ module Module : sig
   type builder
   type value
 
-  val append_function : ident -> string -> (builder -> unit) -> unit
-  val append_global : ident -> string -> unit
+  val append_function : name:string -> string -> (builder -> unit) -> unit
+  val append_global : name:string -> string -> unit
   val append_block : string -> (builder -> unit) -> builder -> unit
   val append_expr : string -> builder -> unit
   val append_header : string -> unit
@@ -79,7 +79,6 @@ module Module : sig
   val create_global_fresh_name : unit -> value
 
   val create_value : string -> builder -> value
-  val create_bool : string -> builder -> value
   val unit_value : value
   val null_value : value
 
@@ -99,8 +98,8 @@ end = struct
   type value = string
 
   module M = Hashtbl.Make(struct
-    type t = ident
-    let equal = id_equal
+    type t = string
+    let equal = (=)
     let hash = Hashtbl.hash
   end)
 
@@ -143,19 +142,19 @@ end = struct
 
   let string_of_value x = x
 
-  let append_global id x =
-    if M.mem modul id then
+  let append_global ~name x =
+    if M.mem modul name then
       assert false;
-    M.add modul id x
+    M.add modul name x
 
-  let append_function id x g =
+  let append_function ~name x g =
     let builder = define_global () in
     g builder;
     let x = x ^ "\n" in
     let x = x ^ "{\n" in
     let x = x ^ string_of_builder builder ^ "\n" in
     let x = x ^ "}\n" in
-    append_global id x
+    append_global ~name x
 
   let append_builder x builder =
     let indent = String.make builder.indent_level ' ' in
@@ -180,12 +179,7 @@ end = struct
     append_builder (sprintf "value %s = %s;" name value) builder;
     name
 
-  (* TODO: Remove this *)
-  let create_bool value builder =
-    let name = create_fresh_name builder in
-    append_builder (sprintf "bool %s = %s;" name value) builder;
-    name
-
+  (* Not used ? *)
   let clear () =
     header := [];
     M.clear modul
@@ -291,6 +285,9 @@ let get_value id gamma builder =
           Module.create_value (sprintf "Glob__[%d]" i) builder
       end
 
+let bool_not b =
+  Module.create_value (sprintf "((variant *)(%s)->key) ? __False : __True" (Module.string_of_value b))
+
 let rec print_term info gamma t builder = match t.t_node with
   | Tvar v ->
       assert false
@@ -310,14 +307,14 @@ let rec print_term info gamma t builder = match t.t_node with
   | Tquant _ ->
       assert false
   | Ttrue ->
-      Module.create_bool "true" builder
+      Module.create_value "__True" builder
   | Tfalse ->
-      Module.create_bool "false" builder
+      Module.create_value "__False" builder
   | Tbinop (Timplies,f1,f2) ->
       let f1 = print_term info gamma f1 builder in
-      let res = Module.create_bool (sprintf "!%s" (Module.string_of_value f1)) builder in
+      let res = bool_not f1 builder in
       Module.append_block
-        (sprintf "if(!%s)" (Module.string_of_value res))
+        (sprintf "if(%s == __True)" (Module.string_of_value f1))
         (fun builder ->
            let v = print_term info gamma f2 builder in
            Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
@@ -326,9 +323,9 @@ let rec print_term info gamma t builder = match t.t_node with
       res
   | Tbinop (Tand,f1,f2) ->
       let f1 = print_term info gamma f1 builder in
-      let res = Module.create_bool (Module.string_of_value f1) builder in
+      let res = Module.create_value (Module.string_of_value f1) builder in
       Module.append_block
-        (sprintf "if(%s)" (Module.string_of_value res))
+        (sprintf "if(%s == __True)" (Module.string_of_value f1))
         (fun builder ->
            let v = print_term info gamma f2 builder in
            Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
@@ -337,9 +334,9 @@ let rec print_term info gamma t builder = match t.t_node with
       res
   | Tbinop (Tor,f1,f2) ->
       let f1 = print_term info gamma f1 builder in
-      let res = Module.create_bool (Module.string_of_value f1) builder in
+      let res = Module.create_value (Module.string_of_value f1) builder in
       Module.append_block
-        (sprintf "if(!%s)" (Module.string_of_value res))
+        (sprintf "if(%s == __False)" (Module.string_of_value f1))
         (fun builder ->
            let v = print_term info gamma f2 builder in
            Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
@@ -352,7 +349,7 @@ let rec print_term info gamma t builder = match t.t_node with
       Module.create_value (sprintf "%s == %s" (Module.string_of_value f1) (Module.string_of_value f2)) builder
   | Tnot f ->
       let v = print_term info gamma f builder in
-      Module.create_value (sprintf "!%s" (Module.string_of_value v)) builder
+      bool_not v builder
 
 (** Logic Declarations *)
 
@@ -455,6 +452,7 @@ let rec print_expr info gamma e builder =
   | Efor (pv,(pvfrom,dir,pvto),_,e) ->
       assert false
   | Eraise (xs,_) when xs_equal xs xs_exit ->
+      (* TODO *)
       Module.unit_value
   | Eraise (xs,e) ->
       assert false
@@ -483,7 +481,7 @@ and print_rec info gamma index { fun_ps = ps ; fun_lambda = lam } =
   if not ps.ps_ghost then begin
     let fresh_name = Module.create_global_fresh_name () in
     Module.append_function
-      ps.ps_name
+      ~name:ps.ps_name.id_string
       (sprintf "value %s(value param)" (Module.string_of_value fresh_name))
       (fun builder ->
          let v = print_expr info gamma lam.l_expr builder in
@@ -506,7 +504,7 @@ let is_ghost_lv = function
 (* TODO: Handle driver *)
 let print_exn_decl info xs =
   Module.append_global
-    xs.xs_name
+    ~name:xs.xs_name.id_string
     (sprintf "char const * const tag_%s = \"%s\";@\n@\n"
        (Module.string_of_value (get_xs info xs))
        (Module.string_of_value (get_xs info xs))
@@ -559,8 +557,12 @@ let extract_module drv ?old ?fname fmt m =
     mo_known_map = m.mod_known;
     fname = Opt.map clean_fname fname; } in
   Module.append_header "#include <stdlib.h>";
-  Module.append_header "#include <stdbool.h>";
   Module.append_header "#include <gmp.h>";
   Module.append_header "typedef void* value;";
+  Module.append_header "struct variant {int key; value val};";
+  Module.append_header "variant ___False = {0, NULL};";
+  Module.append_header "value __False = &___False;";
+  Module.append_header "variant ___True = {1, NULL};";
+  Module.append_header "value __True = &___True;";
   pdecl info Mid.empty m.mod_decls;
   fprintf fmt "%s@." (Module.to_string ())
