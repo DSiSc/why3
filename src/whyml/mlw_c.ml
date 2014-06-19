@@ -520,7 +520,7 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Eany _ ->
       assert false
   | Ecase (e1, [_,e2]) when e1.e_ghost ->
-      assert false
+      print_expr info ~raise_expr gamma e2 builder
   | Ecase (e1, bl) ->
       assert false
   | Erec (fdl, e) ->
