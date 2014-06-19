@@ -82,6 +82,7 @@ module Module : sig
   val create_global_fresh_name : unit -> value
 
   val create_value : string -> builder -> value
+  val create_exn : builder -> value
   val unit_value : value
   val null_value : value
 
@@ -180,6 +181,11 @@ end = struct
     append_builder (sprintf "value %s = %s;" name value) builder;
     name
 
+  let create_exn builder =
+    let name = create_fresh_name builder in
+    append_builder (sprintf "struct exn* %s = NULL;" name) builder;
+    name
+
   let to_string () =
     let buf = Buffer.create 64 in
     let aux x =
@@ -200,6 +206,7 @@ end = struct
     append_header "#include <gmp.h>";
     append_header "typedef void* value;";
     append_header "struct variant {int key; value val;};";
+    append_header "struct exn {char const * const key; value val;};";
     append_header "struct variant ___False = {0, NULL};";
     append_header "value __False = &___False;";
     append_header "struct variant ___True = {1, NULL};";
@@ -429,7 +436,7 @@ let get_lv info = function
 
 let get_xs info xs = get_qident info xs.xs_name
 
-let rec print_expr info gamma e builder =
+let rec print_expr info ~raise_expr gamma e builder =
   if e.e_ghost then
     Module.unit_value
   else match e.e_node with
@@ -449,13 +456,26 @@ let rec print_expr info gamma e builder =
     when ls_equal ls fs_void ->
       assert false
   | Eif (e0,e1,e2) ->
-      print_if (print_expr info gamma) builder (e0, e1, e2)
+      print_if (print_expr info ~raise_expr gamma) builder (e0, e1, e2)
   | Eassign (pl,e,_,pv) ->
       assert false
   | Eloop (_,_,e) ->
+      let exn = Module.create_exn builder in
       Module.append_block
         "while(true)"
-        (fun builder -> ignore (print_expr info gamma e builder))
+        (fun builder ->
+           let new_raise_expr value builder =
+             Module.append_expr
+               (sprintf "%s = %s" (Module.string_of_value exn) (Module.string_of_value value))
+               builder;
+             Module.append_expr "break" builder;
+           in
+           ignore (print_expr info ~raise_expr:new_raise_expr gamma e builder)
+        )
+        builder;
+      Module.append_block
+        (sprintf "if(%s != NULL)" (Module.string_of_value exn))
+        (fun builder -> raise_expr exn builder)
         builder;
       Module.unit_value
   | Efor (pv,(pvfrom,dir,pvto),_,e) ->
@@ -466,10 +486,30 @@ let rec print_expr info gamma e builder =
   | Eraise (xs,e) ->
       assert false
   | Etry (e,bl) ->
-      (* TODO *)
-      print_expr info gamma e builder
+      let exn = Module.create_exn builder in
+      let res = Module.create_value "NULL" builder in
+      Module.append_block
+        "do"
+        (fun builder ->
+           let new_raise_expr value builder =
+             Module.append_expr
+               (sprintf "%s = %s" (Module.string_of_value exn) (Module.string_of_value value))
+               builder;
+             Module.append_expr "break" builder;
+           in
+           let value = print_expr info ~raise_expr:new_raise_expr gamma e builder in
+           Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value value)) builder;
+        )
+        builder;
+      Module.append_expr "while(false)" builder;
+      Module.append_block
+        (sprintf "if(%s != NULL)" (Module.string_of_value exn))
+        (* TODO *)
+        (fun builder -> raise_expr exn builder)
+        builder;
+      Module.unit_value
   | Eabstr (e,_) ->
-      print_expr info gamma e builder
+      print_expr info ~raise_expr gamma e builder
   | Eabsurd ->
       Module.append_expr "abort()" builder;
       Module.null_value
@@ -493,7 +533,11 @@ and print_rec info gamma index { fun_ps = ps ; fun_lambda = lam } =
       ~name:ps.ps_name.id_string
       (sprintf "value %s(value param)" (Module.string_of_value fresh_name))
       (fun builder ->
-         let v = print_expr info gamma lam.l_expr builder in
+         (* TODO *)
+         let raise_expr _ builder =
+           Module.append_expr "abort()" builder;
+         in
+         let v = print_expr info ~raise_expr gamma lam.l_expr builder in
          Module.append_expr
            (sprintf "return %s" (Module.string_of_value v))
            builder;
