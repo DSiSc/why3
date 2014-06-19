@@ -504,8 +504,13 @@ let rec print_expr info ~raise_expr gamma e builder =
       Module.append_expr "while(false)" builder;
       Module.append_block
         (sprintf "if(%s != NULL)" (Module.string_of_value exn))
-        (* TODO *)
-        (fun builder -> raise_expr exn builder)
+        (fun builder ->
+           List.iter
+             (fun x ->
+                print_xbranch info gamma ~raise_expr ~exn ~res x builder
+             )
+             bl
+        )
         builder;
       Module.unit_value
   | Eabstr (e,_) ->
@@ -545,6 +550,19 @@ and print_rec info gamma index { fun_ps = ps ; fun_lambda = lam } =
     Mid.add ps.ps_name (Glob index) gamma
   end else
     gamma
+
+and print_xbranch info gamma ~raise_expr ~exn ~res (xs, pv, e) builder =
+  if ity_equal xs.xs_ity ity_unit then
+    Module.append_block
+      (sprintf "if(%s->key == %s)" (Module.string_of_value exn) (Module.string_of_value (get_xs info xs)))
+      (fun builder ->
+         let value = print_expr info ~raise_expr gamma e builder in
+         Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value value)) builder;
+      )
+      builder
+  else
+    (* TODO: Handle params *)
+    assert false
 
 and print_rec_decl info gamma index fd =
   print_rec info gamma index fd
