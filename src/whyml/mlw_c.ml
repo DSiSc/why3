@@ -480,11 +480,10 @@ let rec print_expr info ~raise_expr gamma e builder =
       Module.unit_value
   | Efor (pv,(pvfrom,dir,pvto),_,e) ->
       assert false
-  | Eraise (xs,_) when xs_equal xs xs_exit ->
-      (* TODO *)
-      Module.unit_value
   | Eraise (xs,e) ->
-      assert false
+      let e = print_expr info ~raise_expr gamma e builder in
+      raise_expr e builder;
+      Module.null_value
   | Etry (e,bl) ->
       let exn = Module.create_exn builder in
       let res = Module.create_value "NULL" builder in
@@ -505,9 +504,10 @@ let rec print_expr info ~raise_expr gamma e builder =
       Module.append_block
         (sprintf "if(%s != NULL)" (Module.string_of_value exn))
         (fun builder ->
-           List.iter
-             (fun x ->
-                print_xbranch info gamma ~raise_expr ~exn ~res x builder
+           List.iteri
+             (fun i x ->
+                print_xbranch info ~first:(i = 0) gamma ~raise_expr ~exn ~res x builder;
+                Module.append_block "else" (raise_expr exn) builder;
              )
              bl
         )
@@ -536,11 +536,13 @@ and print_rec info gamma index { fun_ps = ps ; fun_lambda = lam } =
     let fresh_name = Module.create_global_fresh_name () in
     Module.append_function
       ~name:ps.ps_name.id_string
-      (sprintf "value %s(value param)" (Module.string_of_value fresh_name))
+      (sprintf "value %s(value Param__, value Env__, struct exn **Exn__)" (Module.string_of_value fresh_name))
       (fun builder ->
-         (* TODO *)
-         let raise_expr _ builder =
-           Module.append_expr "abort()" builder;
+         let raise_expr value builder =
+           Module.append_expr
+             (sprintf "*Exn__ = %s" (Module.string_of_value value))
+             builder;
+           Module.append_expr "return NULL" builder;
          in
          let v = print_expr info ~raise_expr gamma lam.l_expr builder in
          Module.append_expr
@@ -551,10 +553,10 @@ and print_rec info gamma index { fun_ps = ps ; fun_lambda = lam } =
   end else
     gamma
 
-and print_xbranch info gamma ~raise_expr ~exn ~res (xs, pv, e) builder =
+and print_xbranch info ~first gamma ~raise_expr ~exn ~res (xs, pv, e) builder =
   if ity_equal xs.xs_ity ity_unit then
     Module.append_block
-      (sprintf "if(%s->key == %s)" (Module.string_of_value exn) (Module.string_of_value (get_xs info xs)))
+      (sprintf "%sif(%s->key == %s)" (if first then "" else "else ") (Module.string_of_value exn) (Module.string_of_value (get_xs info xs)))
       (fun builder ->
          let value = print_expr info ~raise_expr gamma e builder in
          Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value value)) builder;
