@@ -48,13 +48,13 @@ let clean_fname fname =
   let fname = Filename.basename fname in
   (try Filename.chop_extension fname with _ -> fname)
 
-let modulename ?fname path t =
+let modulename ?(separator="__") ?fname path t =
   let fname = match fname, path with
     | Some fname, _ -> clean_fname fname
     | None, [] -> "why3"
-    | None, _ -> String.concat "__" path
+    | None, _ -> String.concat separator path
   in
-  fname ^ "__" ^ t
+  fname ^ separator ^ t
 
 let extract_filename ?fname th =
   (modulename ?fname th.th_path th.th_name.Ident.id_string) ^ ".c"
@@ -73,8 +73,9 @@ module Module : sig
   type builder
   type value
 
-  val append_function : name:string -> string -> (builder -> unit) -> unit
-  val append_global : name:string -> string -> unit
+  val append_function : string -> (builder -> unit) -> unit
+  val append_global : name:string -> value:string -> unit
+  val define_global : string -> unit
   val append_block : string -> (builder -> unit) -> builder -> unit
   val append_expr : string -> builder -> unit
   val append_header : string -> unit
@@ -85,9 +86,12 @@ module Module : sig
   val create_exn : builder -> value
   val unit_value : value
   val null_value : value
+  val malloc_closure : builder -> value
 
   val value_of_string : string -> value
   val string_of_value : value -> string
+
+  val init_builder : builder
 
   val to_string : unit -> string
 end = struct
@@ -149,14 +153,17 @@ end = struct
       assert false;
     M.add modul name x
 
-  let append_function ~name x g =
+  let append_function name g =
     let builder = define_global () in
     g builder;
-    let x = x ^ "\n" in
+    let x = name ^ "\n" in
     let x = x ^ "{\n" in
     let x = x ^ string_of_builder builder ^ "\n" in
-    let x = x ^ "}\n" in
+    let x = x ^ "}" in
     append_global ~name x
+
+  let append_global ~name ~value =
+    append_global ~name (sprintf "%s = %s;" name value)
 
   let append_builder x builder =
     let indent = String.make builder.indent_level ' ' in
@@ -167,6 +174,9 @@ end = struct
 
   let append_header str =
     header := str :: !header
+
+  let define_global name =
+    append_header ("value " ^ name ^ ";")
 
   let append_block x g builder =
     let builder' = create_block builder in
@@ -186,57 +196,72 @@ end = struct
     append_builder (sprintf "struct exn* %s = NULL;" name) builder;
     name
 
+  let malloc_closure builder =
+    let name = create_fresh_name builder in
+    append_builder (sprintf "struct closure* %s = GC_malloc(sizeof(struct closure));" name) builder;
+    name
+
+  let init_builder =
+    { builder = []
+    ; ident = 0
+    ; indent_level = initial_indent_level
+    }
+
   let to_string () =
     let buf = Buffer.create 64 in
     let aux x =
-      Buffer.add_string buf x;
       Buffer.add_char buf '\n';
+      Buffer.add_string buf x;
       Buffer.add_char buf '\n';
     in
     let header = List.rev !header in
-    List.iter aux header;
-    Buffer.add_char buf '\n';
+    List.iter (fun x -> Buffer.add_string buf x; Buffer.add_string buf "\n") header;
+    M.iter (fun x _ -> aux (x ^ ";")) modul;
     Buffer.add_char buf '\n';
     M.iter (fun _ -> aux) modul;
+    Buffer.add_char buf '\n';
+    Buffer.add_string buf "void __init__()\n";
+    Buffer.add_string buf "{\n";
+    Buffer.add_string buf (string_of_builder init_builder ^ "\n");
+    Buffer.add_string buf "}\n";
     Buffer.contents buf
 
   let () = begin
     append_header "#include <stdlib.h>";
     append_header "#include <stdbool.h>";
+    append_header "#include <gc.h>";
     append_header "#include <gmp.h>";
+    append_header "";
     append_header "typedef void* value;";
+    append_header "typedef char const * const exn_tag;";
     append_header "struct variant {int key; value val;};";
-    append_header "struct exn {char const * const key; value val;};";
+    append_header "struct exn {exn_tag key; value val;};";
+    append_header "struct closure {value f; value env;};";
+    append_header "";
     append_header "struct variant ___False = {0, NULL};";
     append_header "value __False = &___False;";
     append_header "struct variant ___True = {1, NULL};";
     append_header "value __True = &___True;";
     append_header "struct variant ___Tuple0 = {0, NULL};";
     append_header "value Tuple0 = &___Tuple0;";
+    append_header "\n";
   end
 end
 
 type value =
   | Value of Module.value
   | Env of int
-  | Glob of int
 
-let get_qident info id =
+let get_qident ?(separator="__") info id =
   try
     let lp, t, p =
       try Mlw_module.restore_path id
       with Not_found -> Theory.restore_path id in
-    let s = String.concat "__" p in
+    let s = String.concat separator p in
     let s = Ident.sanitizer char_to_alpha char_to_alnumus s in
-    if Sid.mem id info.current_theory.th_local ||
-       Opt.fold (fun _ m -> Sid.mem id m.Mlw_module.mod_local)
-        false info.current_module
-    then
-      Module.value_of_string (sprintf "%s" s)
-    else
-      let fname = if lp = [] then info.fname else None in
-      let m = modulename ?fname lp t in
-      Module.value_of_string (sprintf "%s__%s" m s)
+    let fname = if lp = [] then info.fname else None in
+    let m = modulename ~separator ?fname lp t in
+    Module.value_of_string (sprintf "%s%s%s" m separator s)
   with Not_found ->
     assert false (* TODO: Know what to do *)
 
@@ -291,15 +316,13 @@ let print_if f builder (e,t1,t2) =
 let get_value id gamma builder =
   match Mid.find_opt id gamma with
   | None ->
-      Module.create_value id.id_string builder
+      Module.value_of_string id.id_string
   | Some v ->
       begin match v with
       | Value v ->
           v
       | Env i ->
           Module.create_value (sprintf "Env__[%d]" i) builder
-      | Glob i ->
-          Module.create_value (sprintf "Glob__[%d]" i) builder
       end
 
 let bool_not b =
@@ -368,9 +391,11 @@ let rec print_term info gamma t builder = match t.t_node with
       let v = print_term info gamma f builder in
       bool_not v builder
 
+(*let print_logic_decl info (ls, ld) =*)
+
 (** Logic Declarations *)
 
-let logic_decl info d = match d.d_node with
+let logic_decl info builder d = match d.d_node with
   | Dtype _
   | Ddata _ ->
       () (* Types are useless for C *)
@@ -384,13 +409,13 @@ let logic_decl info d = match d.d_node with
   | Dprop (_pk, _pr, _) ->
       assert false
 
-let logic_decl info td = match td.td_node with
+let logic_decl info builder td = match td.td_node with
   | Decl d ->
       begin match Mlw_extract.get_exec_decl info.info_syn d with
       | Some d ->
           let union = Sid.union d.d_syms d.d_news in
           let inter = Mid.set_inter union info.mo_known_map in
-          if Sid.is_empty inter then logic_decl info d
+          if Sid.is_empty inter then logic_decl info builder d
       | None ->
           ()
       end
@@ -410,7 +435,8 @@ let extract_theory drv ?old ?fname fmt th =
     th_known_map = th.th_known;
     mo_known_map = Mid.empty;
     fname = Opt.map clean_fname fname; } in
-  List.iter (logic_decl info) th.th_decls
+  let builder = Module.init_builder in
+  List.iter (logic_decl info builder) th.th_decls
 
 (** Programs *)
 
@@ -434,7 +460,7 @@ let get_lv info = function
   | LetV pv -> get_pv info pv
   | LetA ps -> get_ps info ps
 
-let get_xs info xs = get_qident info xs.xs_name
+let get_xs ?separator info xs = get_qident ?separator info xs.xs_name
 
 let rec print_expr info ~raise_expr gamma e builder =
   if e.e_ghost then
@@ -531,11 +557,10 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Erec (fdl, e) ->
       assert false
 
-and print_rec info gamma index { fun_ps = ps ; fun_lambda = lam } =
+and print_rec info gamma builder { fun_ps = ps ; fun_lambda = lam } =
   if not ps.ps_ghost then begin
     let fresh_name = Module.create_global_fresh_name () in
     Module.append_function
-      ~name:ps.ps_name.id_string
       (sprintf "value %s(value Param__, value Env__, struct exn **Exn__)" (Module.string_of_value fresh_name))
       (fun builder ->
          let raise_expr value builder =
@@ -549,14 +574,17 @@ and print_rec info gamma index { fun_ps = ps ; fun_lambda = lam } =
            (sprintf "return %s" (Module.string_of_value v))
            builder;
       );
-    Mid.add ps.ps_name (Glob index) gamma
-  end else
-    gamma
+    Module.define_global ps.ps_name.id_string;
+    let value = Module.malloc_closure builder in
+    Module.append_expr (sprintf "%s->f = %s" (Module.string_of_value value) (Module.string_of_value fresh_name)) builder;
+    Module.append_expr (sprintf "%s->env = NULL" (Module.string_of_value value)) builder;
+    Module.append_expr (sprintf "%s = %s" ps.ps_name.id_string (Module.string_of_value value)) builder;
+  end
 
 and print_xbranch info ~first gamma ~raise_expr ~exn ~res (xs, pv, e) builder =
   if ity_equal xs.xs_ity ity_unit then
     Module.append_block
-      (sprintf "%sif(%s->key == %s)" (if first then "" else "else ") (Module.string_of_value exn) (Module.string_of_value (get_xs info xs)))
+      (sprintf "%sif(%s->key == tag_%s)" (if first then "" else "else ") (Module.string_of_value exn) (Module.string_of_value (get_xs info xs)))
       (fun builder ->
          let value = print_expr info ~raise_expr gamma e builder in
          Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value value)) builder;
@@ -566,8 +594,8 @@ and print_xbranch info ~first gamma ~raise_expr ~exn ~res (xs, pv, e) builder =
     (* TODO: Handle params *)
     assert false
 
-and print_rec_decl info gamma index fd =
-  print_rec info gamma index fd
+and print_rec_decl info gamma builder fd =
+  print_rec info gamma builder fd
   (*forget_tvs ()*)
 
 let is_ghost_lv = function
@@ -577,29 +605,25 @@ let is_ghost_lv = function
 (* TODO: Handle driver *)
 let print_exn_decl info xs =
   Module.append_global
-    ~name:xs.xs_name.id_string
-    (sprintf "char const * const tag_%s = \"%s\";@\n@\n"
-       (Module.string_of_value (get_xs info xs))
-       (Module.string_of_value (get_xs info xs))
-       (* TODO: Improve pretty-printing *)
-    )
+    (sprintf "exn_tag tag_%s" (Module.string_of_value (get_xs info xs)))
+    (sprintf "\"%s\"" (Module.string_of_value (get_xs ~separator:"." info xs)))
 
-let rec pdecl info gamma = function
+let rec pdecl info gamma builder = function
   | pd::decls ->
       Mlw_extract.check_exec_pdecl info.info_syn pd;
       begin match pd.pd_node with
       | PDtype ts ->
           (* TODO *)
-          pdecl info gamma decls
+          pdecl info gamma builder decls
       | PDdata tl ->
           (* TODO *)
-          pdecl info gamma decls
+          pdecl info gamma builder decls
       | PDval lv ->
           (* TODO *)
-          pdecl info gamma decls
+          pdecl info gamma builder decls
       | PDlet ld ->
           (* TODO *)
-          pdecl info gamma decls
+          pdecl info gamma builder decls
       | PDrec fdl ->
           (* print defined, non-ghost first *)
           let cmp {fun_ps=ps1} {fun_ps=ps2} =
@@ -607,11 +631,11 @@ let rec pdecl info gamma = function
               (ps1.ps_ghost || has_syntax info ps1.ps_name)
               (ps2.ps_ghost || has_syntax info ps2.ps_name) in
           let fdl = List.sort cmp fdl in
-          let gamma = Lists.fold_lefti (print_rec_decl info) gamma fdl in
-          pdecl info gamma decls
+          List.iter (print_rec_decl info gamma builder) fdl;
+          pdecl info gamma builder decls
       | PDexn xs ->
           print_exn_decl info xs;
-          pdecl info gamma decls
+          pdecl info gamma builder decls
       end
   | [] ->
       ()
@@ -630,11 +654,12 @@ let extract_module drv ?old ?fname fmt m =
     th_known_map = th.th_known;
     mo_known_map = m.mod_known;
     fname = Opt.map clean_fname fname; } in
-  pdecl info Mid.empty m.mod_decls
+  let builder = Module.init_builder in
+  pdecl info Mid.empty builder m.mod_decls
 
 let finalize () =
   match !hack_fmt with
   | None ->
       ()
   | Some fmt ->
-      fprintf fmt "%s@." (Module.to_string ())
+      fprintf fmt "%s" (Module.to_string ())
