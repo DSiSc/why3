@@ -87,6 +87,7 @@ module Module : sig
   val unit_value : value
   val null_value : value
   val malloc_closure : builder -> value
+  val malloc_exn : builder -> value
 
   val value_of_string : string -> value
   val string_of_value : value -> string
@@ -201,6 +202,11 @@ end = struct
     append_builder (sprintf "struct closure* %s = GC_malloc(sizeof(struct closure));" name) builder;
     name
 
+  let malloc_exn builder =
+    let name = create_fresh_name builder in
+    append_builder (sprintf "struct exn* %s = GC_malloc(sizeof(struct exn));" name) builder;
+    name
+
   let init_builder =
     { builder = []
     ; ident = 0
@@ -233,7 +239,7 @@ end = struct
     append_header "#include <gmp.h>";
     append_header "";
     append_header "typedef void* value;";
-    append_header "typedef char const * const exn_tag;";
+    append_header "typedef char const * exn_tag;";
     append_header "struct variant {int key; value val;};";
     append_header "struct exn {exn_tag key; value val;};";
     append_header "struct closure {value f; value env;};";
@@ -508,7 +514,10 @@ let rec print_expr info ~raise_expr gamma e builder =
       assert false
   | Eraise (xs,e) ->
       let e = print_expr info ~raise_expr gamma e builder in
-      raise_expr e builder;
+      let value = Module.malloc_exn builder in
+      Module.append_expr (sprintf "%s->key = tag_%s" (Module.string_of_value value) (Module.string_of_value (get_xs info xs))) builder;
+      Module.append_expr (sprintf "%s->val = %s" (Module.string_of_value value) (Module.string_of_value e)) builder;
+      raise_expr value builder;
       Module.null_value
   | Etry (e,bl) ->
       let exn = Module.create_exn builder in
