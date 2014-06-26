@@ -137,7 +137,8 @@ let () = begin
   append_header "typedef char const * exn_tag;";
   append_header "struct variant {int key; value val;};";
   append_header "struct exn {exn_tag key; value val;};";
-  append_header "struct closure {value f; value env;};";
+  append_header "struct closure {value (*f)(value, value); value env;};";
+  append_header "struct closure_with_exn {value (*f)(value, value, struct exn **); value env;};";
   append_header "";
   append_header "struct variant ___False = {0, NULL};";
   append_header "value __False = &___False;";
@@ -151,6 +152,9 @@ end
 (************************)
 (* High-level functions *)
 (************************)
+
+let get_closure_name raises =
+  if raises then "closure_with_exn" else "closure"
 
 let unit_value = "Tuple0"
 let null_value = "NULL"
@@ -170,9 +174,16 @@ let create_array size builder =
   append_builder (fmt "value %s[%d] = {NULL};" name size) builder;
   name
 
-let malloc_closure builder =
+let cast_to_closure ~raises value builder =
   let name = create_fresh_name builder in
-  define_local_var "struct closure*" name "GC_malloc(sizeof(struct closure))" builder;
+  let closure = get_closure_name raises in
+  define_local_var (fmt "struct %s*" closure) name (fmt "(struct %s*)%s" closure value) builder;
+  name
+
+let malloc_closure ~raises builder =
+  let name = create_fresh_name builder in
+  let closure = get_closure_name raises in
+  define_local_var (fmt "struct %s*" closure) name (fmt "GC_malloc(sizeof(struct %s))" closure) builder;
   name
 
 let malloc_exn builder =

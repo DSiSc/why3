@@ -309,9 +309,13 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Evalue v ->
       get_pv info v
   | Earrow a ->
-      assert false
-  | Eapp (e,v,_) ->
-      assert false
+      get_value a.ps_name gamma builder
+  | Eapp (e,v,spec) ->
+      let e = print_expr info ~raise_expr gamma e builder in
+      let v = get_value v.pv_vs.vs_name gamma builder in
+      let raises = not (Sexn.is_empty spec.c_effect.eff_raises) in
+      let closure = Module.cast_to_closure ~raises v builder in
+      Module.create_value (sprintf "(%s->f)(%s, %s->env)" (Module.string_of_value closure) (Module.string_of_value v) (Module.string_of_value closure)) builder
   | Elet ({ let_expr = e1 }, e2) when e1.e_ghost ->
       print_expr info ~raise_expr gamma e2 builder
   | Elet ({ let_sym = lv ; let_expr = e1 }, e2) ->
@@ -422,7 +426,7 @@ and print_rec info ~env ~raise_expr builder gamma { fun_ps = ps ; fun_lambda = l
     | [] ->
         print_expr info ~raise_expr gamma lam.l_expr builder
     | arg::xs ->
-        let closure = Module.malloc_closure builder in
+        let closure = Module.malloc_closure ~raises builder in
         let gamma = Mid.add arg.pv_vs.vs_name (Value closure) gamma in
         let env = Module.malloc_env (Mid.cardinal gamma) builder in
         let gamma = fold_env env gamma builder in

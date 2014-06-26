@@ -39,7 +39,9 @@ val create_value : string -> builder -> value
 val create_array : int -> builder -> value
 val create_exn : builder -> value
 
-val malloc_closure : builder -> value
+val cast_to_closure : raises:bool -> value -> builder -> value
+
+val malloc_closure : raises:bool -> builder -> value
 val malloc_exn : builder -> value
 val malloc_env : int -> builder -> value
 
