@@ -73,7 +73,6 @@ type info = {
 
 type value =
   | Value of Module.value
-  | ValueRec of (Module.value * int)
   | Env of int
 
 let get_qident ?(separator="__") info id =
@@ -146,9 +145,7 @@ let get_value id gamma builder =
       | Value v ->
           v
       | Env i ->
-          Module.create_value (sprintf "Env__[%d]" i) builder
-      | ValueRec (value, i) ->
-          Module.create_value (sprintf "%s[%d]" (Module.string_of_value value) i) builder
+          Module.create_value (sprintf "Env__0[%d]" i) builder
       end
 
 let bool_not b =
@@ -286,7 +283,22 @@ let get_lv info = function
   | LetV pv -> get_pv info pv
   | LetA ps -> get_ps info ps
 
+let get_id_from_let = function
+  | LetV pv -> pv.pv_vs.vs_name
+  | LetA ps -> ps.ps_name
+
 let get_xs ?separator info xs = get_qident ?separator info xs.xs_name
+
+let fold_env env gamma builder =
+  let aux id x (index, gamma) = match x with
+    | Value v ->
+        Module.append_expr (sprintf "%s[%d] = %s" (Module.string_of_value env) index (Module.string_of_value v)) builder;
+        (succ index, Mid.add id (Env index) gamma)
+    | Env i ->
+        Module.append_expr (sprintf "%s[%d] = Env__0[%d]" (Module.string_of_value env) index i) builder;
+        (succ index, Mid.add id (Env index) gamma)
+  in
+  snd (Mid.fold aux gamma (0, Mid.empty))
 
 let rec print_expr info ~raise_expr gamma e builder =
   if e.e_ghost then
@@ -301,9 +313,11 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Eapp (e,v,_) ->
       assert false
   | Elet ({ let_expr = e1 }, e2) when e1.e_ghost ->
-      assert false
+      print_expr info ~raise_expr gamma e2 builder
   | Elet ({ let_sym = lv ; let_expr = e1 }, e2) ->
-      assert false
+      let v = print_expr info ~raise_expr gamma e1 builder in
+      let gamma = Mid.add (get_id_from_let lv) (Value v) gamma in
+      print_expr info ~raise_expr gamma e2 builder
   | Eif (e0, e1, { e_node = Elogic { t_node = Tapp (ls, []) }})
     when ls_equal ls fs_void ->
       assert false
@@ -384,27 +398,47 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Ecase (e1, bl) ->
       assert false
   | Erec (fdl, e) ->
+      let local_arr = Module.create_array (List.length fdl) builder in
+      let gamma =
+        let aux gamma index fd =
+          let store = Module.value_of_string (sprintf "%s[%d]" (Module.string_of_value local_arr) index) in
+          Mid.add fd.fun_ps.ps_name (Value store) gamma
+        in
+        Lists.fold_lefti aux gamma fdl
+      in
       let aux index fd =
-        let local_arr = Module.create_array (List.length fdl) builder in
         let store = Module.value_of_string (sprintf "%s[%d]" (Module.string_of_value local_arr) index) in
         if not fd.fun_ps.ps_ghost then begin
-          let v = print_rec info ~env:Module.null_value builder gamma fd in
+          let v = print_rec info ~env:Module.null_value ~raise_expr builder gamma fd in
           Module.append_expr (sprintf "%s = %s" (Module.string_of_value store) (Module.string_of_value v)) builder;
         end
       in
       Lists.iteri aux fdl;
       print_expr info ~raise_expr gamma e builder
 
-and print_rec info ~env builder gamma { fun_ps = ps ; fun_lambda = lam } =
-  let lambda =
-    Module.create_lambda
-      ~raises:(not (Sexn.is_empty ps.ps_aty.aty_spec.c_effect.eff_raises))
-      (fun ~raise_expr ->
-         let gamma = Mid.add ps.ps_name (Value (Module.value_of_string "Param__0")) gamma in
-         print_expr info ~raise_expr gamma lam.l_expr
-      )
+and print_rec info ~env ~raise_expr builder gamma { fun_ps = ps ; fun_lambda = lam } =
+  let raises = not (Sexn.is_empty ps.ps_aty.aty_spec.c_effect.eff_raises) in
+  let rec aux ~raise_expr gamma builder = function
+    | [] ->
+        print_expr info ~raise_expr gamma lam.l_expr builder
+    | arg::xs ->
+        let closure = Module.malloc_closure builder in
+        let gamma = Mid.add arg.pv_vs.vs_name (Value closure) gamma in
+        let env = Module.malloc_env (Mid.cardinal gamma) builder in
+        let gamma = fold_env env gamma builder in
+        let lambda =
+          Module.create_lambda
+            ~raises
+            (fun ~raise_expr builder ->
+               let gamma = Mid.add ps.ps_name (Value (Module.value_of_string "Param__0")) gamma in
+               aux ~raise_expr gamma builder xs
+            )
+        in
+        Module.append_expr (sprintf "%s->f = %s" (Module.string_of_value closure) (Module.string_of_value lambda)) builder;
+        Module.append_expr (sprintf "%s->env = %s" (Module.string_of_value closure) (Module.string_of_value env)) builder;
+        closure
   in
-  Module.create_closure ~lambda ~env builder
+  aux ~raise_expr gamma builder lam.l_args
 
 and print_xbranch info ~first gamma ~raise_expr ~exn ~res (xs, pv, e) builder =
   if ity_equal xs.xs_ity ity_unit then
@@ -424,7 +458,7 @@ and print_rec_decl info gamma builder fdl =
     let store = get_ps info fd.fun_ps in
     Module.define_global store;
     if not fd.fun_ps.ps_ghost then begin
-      let v = print_rec info ~env:Module.null_value builder gamma fd in
+      let v = print_rec info ~env:Module.null_value ~raise_expr:(fun _ _ -> assert false) builder gamma fd in
       Module.append_expr (sprintf "%s = %s" (Module.string_of_value store) (Module.string_of_value v)) builder;
     end
   in

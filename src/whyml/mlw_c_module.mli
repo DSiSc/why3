@@ -41,10 +41,9 @@ val create_exn : builder -> value
 
 val malloc_closure : builder -> value
 val malloc_exn : builder -> value
+val malloc_env : int -> builder -> value
 
 val create_lambda :
   raises:bool ->
   (raise_expr:(value -> builder -> unit) -> builder -> value) ->
   value
-
-val create_closure : lambda:value -> env:value -> builder -> value

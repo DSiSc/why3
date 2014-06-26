@@ -167,7 +167,7 @@ let create_exn builder =
 
 let create_array size builder =
   let name = create_fresh_name builder in
-  append_builder (fmt "value %s[%d];" name size) builder;
+  append_builder (fmt "value %s[%d] = {NULL};" name size) builder;
   name
 
 let malloc_closure builder =
@@ -180,6 +180,11 @@ let malloc_exn builder =
   define_local_var "struct exn*" name "GC_malloc(sizeof(struct exn))" builder;
   name
 
+let malloc_env size builder =
+  let name = create_fresh_name builder in
+  append_builder (fmt "value* %s = GC_malloc(sizeof(value) * %d);" name size) builder;
+  name
+
 let create_lambda ~raises f =
   let name = create_global_fresh_name () in
   let exn = if raises then ", struct exn **Exn__0" else "" in
@@ -187,7 +192,6 @@ let create_lambda ~raises f =
     let raise_expr value builder =
       if raises then begin
         append_expr (fmt "*Exn__0 = %s" value) builder;
-        append_expr "return NULL" builder;
       end
     in
     let v = f ~raise_expr builder in
@@ -195,9 +199,3 @@ let create_lambda ~raises f =
   in
   append_function (fmt "value %s(value Param__0, value Env__0%s)" name exn) f;
   name
-
-let create_closure ~lambda ~env builder =
-  let value = malloc_closure builder in
-  append_expr (fmt "%s->f = %s" value lambda) builder;
-  append_expr (fmt "%s->env = %s" value env) builder;
-  value
