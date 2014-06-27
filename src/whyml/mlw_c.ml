@@ -334,7 +334,19 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Eif (e0,e1,e2) ->
       print_if (print_expr info ~raise_expr gamma) builder (e0, e1, e2)
   | Eassign (pl,e,_,pv) ->
-      assert false
+      let ty = match e.e_vty with
+        | VTvalue {ity_node = Ityapp ({its_ts; _}, _, _)} ->
+            get_qident info its_ts.ts_name
+        | VTvalue {ity_node = Ityvar _}
+        | VTvalue {ity_node = Itypur _}
+        | VTarrow _ ->
+            assert false
+      in
+      let e = print_expr info ~raise_expr gamma e builder in
+      let pv = get_value pv.pv_vs.vs_name gamma builder in
+      let pl = get_value pl.pl_ls.ls_name gamma builder in
+      Module.append_expr (sprintf "((struct %s*)%s)->%s = %s" (Module.string_of_value ty) (Module.string_of_value e) (Module.string_of_value pl) (Module.string_of_value pv)) builder;
+      Module.unit_value
   | Eloop (_,_,e) ->
       let exn = Module.create_exn builder in
       Module.append_block
