@@ -153,7 +153,7 @@ let bool_not b =
 
 let rec print_term info gamma t builder = match t.t_node with
   | Tvar v ->
-      assert false
+      get_value v.vs_name gamma builder
   | Tconst c ->
       print_const c
   | Tapp (fs, []) ->
@@ -331,9 +331,6 @@ let rec print_expr info ~raise_expr gamma e builder =
       let v = print_expr info ~raise_expr gamma e1 builder in
       let gamma = Mid.add (get_id_from_let lv) (Value v) gamma in
       print_expr info ~raise_expr gamma e2 builder
-  | Eif (e0, e1, { e_node = Elogic { t_node = Tapp (ls, []) }})
-    when ls_equal ls fs_void ->
-      assert false
   | Eif (e0,e1,e2) ->
       print_if (print_expr info ~raise_expr gamma) builder (e0, e1, e2)
   | Eassign (pl,e,_,pv) ->
