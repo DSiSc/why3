@@ -159,7 +159,16 @@ let rec print_term info gamma t builder = match t.t_node with
   | Tapp (fs, []) ->
       get_value fs.ls_name gamma builder
   | Tapp (fs, tl) ->
-      assert false
+      let rec aux = function
+        | [] ->
+            get_value fs.ls_name gamma builder
+        | x::xs ->
+            let f = aux xs in
+            let closure = Module.cast_to_closure ~raises:false f builder in
+            let v = print_term info gamma x builder in
+            Module.create_value (sprintf "(%s->f)(%s, %s->env)" (Module.string_of_value closure) (Module.string_of_value v) (Module.string_of_value closure)) builder
+      in
+      aux (List.rev tl)
   | Tif (e, t1, t2) ->
       print_if (print_term info gamma) builder (e, t1, t2)
   | Tlet (t1,tb) ->
