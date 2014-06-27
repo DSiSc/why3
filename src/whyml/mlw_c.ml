@@ -511,7 +511,12 @@ let rec pdecl info gamma builder = function
           (* TODO *)
           pdecl info gamma builder decls
       | PDlet ld ->
-          (* TODO *)
+          if not (is_ghost_lv ld.let_sym) then begin
+            let store = get_lv info ld.let_sym in
+            Module.define_global store;
+            let v = print_expr info ~raise_expr:(fun _ _ -> assert false) gamma ld.let_expr builder in
+            Module.append_expr (sprintf "%s = %s" (Module.string_of_value store) (Module.string_of_value v)) builder;
+          end;
           pdecl info gamma builder decls
       | PDrec fdl ->
           print_rec_decl info gamma builder fdl;
