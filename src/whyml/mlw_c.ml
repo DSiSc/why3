@@ -315,7 +315,13 @@ let rec print_expr info ~raise_expr gamma e builder =
       let v = get_value v.pv_vs.vs_name gamma builder in
       let raises = not (Sexn.is_empty spec.c_effect.eff_raises) in
       let closure = Module.cast_to_closure ~raises v builder in
-      Module.create_value (sprintf "(%s->f)(%s, %s->env)" (Module.string_of_value closure) (Module.string_of_value v) (Module.string_of_value closure)) builder
+      let exn = Module.create_exn builder in
+      let res = Module.create_value (sprintf "(%s->f)(%s, %s->env%s)" (Module.string_of_value closure) (Module.string_of_value v) (Module.string_of_value closure) (if raises then sprintf ", &%s" (Module.string_of_value exn) else "")) builder in
+      Module.append_block
+        (sprintf "if(%s != NULL)" (Module.string_of_value exn))
+        (fun builder -> raise_expr exn builder)
+        builder;
+      res
   | Elet ({ let_expr = e1 }, e2) when e1.e_ghost ->
       print_expr info ~raise_expr gamma e2 builder
   | Elet ({ let_sym = lv ; let_expr = e1 }, e2) ->
