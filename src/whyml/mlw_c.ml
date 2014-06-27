@@ -163,7 +163,10 @@ let rec print_term info gamma t builder = match t.t_node with
   | Tif (e, t1, t2) ->
       print_if (print_term info gamma) builder (e, t1, t2)
   | Tlet (t1,tb) ->
-      assert false
+      let v,t2 = t_open_bound tb in
+      let t1 = print_term info gamma t1 builder in
+      let gamma = Mid.add v.vs_name (Value t1) gamma in
+      print_term info gamma t2 builder
   | Tcase (t1,bl) ->
       assert false
   | Teps _
