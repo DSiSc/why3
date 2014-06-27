@@ -49,3 +49,5 @@ val create_lambda :
   raises:bool ->
   (raise_expr:(value -> builder -> unit) -> builder -> value) ->
   value
+
+val define_record : value -> string list -> unit

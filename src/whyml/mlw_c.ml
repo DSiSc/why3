@@ -75,6 +75,25 @@ type value =
   | Value of Module.value
   | Env of int
 
+let get_record info ls =
+  match Mid.find_opt ls.ls_name info.th_known_map with
+    | Some { d_node = Ddata dl } ->
+        let rec lookup = function
+        | [] -> []
+        | (_, [cs, pjl]) :: _ when ls_equal cs ls ->
+          (try List.map Opt.get pjl with _ -> [])
+        | _ :: dl -> lookup dl
+        in
+        lookup dl
+    | Some _ | None ->
+        []
+
+let c_keywords = []
+
+let iprinter =
+  let isanitize = sanitizer char_to_alpha char_to_alnumus in
+  create_ident_printer c_keywords ~sanitizer:isanitize
+
 let get_qident ?(separator="__") info id =
   try
     let lp, t, p =
@@ -86,9 +105,10 @@ let get_qident ?(separator="__") info id =
     let m = modulename ~separator ?fname lp t in
     Module.value_of_string (sprintf "%s%s%s" m separator s)
   with Not_found ->
-    assert false (* TODO: Know what to do *)
+    Module.value_of_string (id_unique iprinter id)
 
 let get_ls info ls = get_qident info ls.ls_name
+let get_ts info ts = get_qident info ts.ts_name
 
 let protect_on x s = if x then "(" ^^ s ^^ ")" else s
 
@@ -97,6 +117,16 @@ let has_syntax info id = Mid.mem id info.info_syn
 let has_syntax_or_nothing info id =
   if not (has_syntax info id) then
     assert false
+
+let print_pdata_decl info (ts, csl) =
+  let get_field x = x.ls_name.id_string in
+  match csl with
+    | [cs, _] ->
+        let pjl = get_record info cs in
+        if pjl <> [] then
+          Module.define_record (get_ts info ts) (List.map get_field pjl)
+    | _ ->
+        ()
 
 let print_const = function
   | ConstInt c ->
@@ -148,6 +178,17 @@ let get_value id gamma builder =
           Module.create_value (sprintf "Env__0[%d]" i) builder
       end
 
+let fold_env env gamma builder =
+  let aux id x (index, gamma) = match x with
+    | Value v ->
+        Module.append_expr (sprintf "%s[%d] = %s" (Module.string_of_value env) index (Module.string_of_value v)) builder;
+        (succ index, Mid.add id (Env index) gamma)
+    | Env i ->
+        Module.append_expr (sprintf "%s[%d] = Env__0[%d]" (Module.string_of_value env) index i) builder;
+        (succ index, Mid.add id (Env index) gamma)
+  in
+  snd (Mid.fold aux gamma (0, Mid.empty))
+
 let bool_not b =
   Module.create_value (sprintf "((variant *)(%s)->key) ? __False : __True" (Module.string_of_value b))
 
@@ -159,16 +200,16 @@ let rec print_term info gamma t builder = match t.t_node with
   | Tapp (fs, []) ->
       get_value fs.ls_name gamma builder
   | Tapp (fs, tl) ->
-      let rec aux = function
+      let rec aux f = function
         | [] ->
-            get_value fs.ls_name gamma builder
+            f
         | x::xs ->
-            let f = aux xs in
             let closure = Module.cast_to_closure ~raises:false f builder in
             let v = print_term info gamma x builder in
-            Module.create_value (sprintf "(%s->f)(%s, %s->env)" (Module.string_of_value closure) (Module.string_of_value v) (Module.string_of_value closure)) builder
+            let f = Module.create_value (sprintf "(%s->f)(%s, %s->env)" (Module.string_of_value closure) (Module.string_of_value v) (Module.string_of_value closure)) builder in
+            aux f xs
       in
-      aux (List.rev tl)
+      aux (get_value fs.ls_name gamma builder) tl
   | Tif (e, t1, t2) ->
       print_if (print_term info gamma) builder (e, t1, t2)
   | Tlet (t1,tb) ->
@@ -226,19 +267,51 @@ let rec print_term info gamma t builder = match t.t_node with
       let v = print_term info gamma f builder in
       bool_not v builder
 
-(*let print_logic_decl info (ls, ld) =*)
+let print_logic_decl info gamma builder (ls, ld) =
+  if has_syntax info ls.ls_name then
+    (* TODO *)
+    ()
+  else begin
+    let vl,e = open_ls_defn ld in
+    let store = get_ls info ls in
+    Module.define_global store;
+    let rec aux gamma builder = function
+      | [] ->
+          print_term info gamma e builder
+      | arg::xs ->
+          let closure = Module.malloc_closure ~raises:false builder in
+          let gamma = Mid.add ls.ls_name (Value closure) gamma in
+          let env = Module.malloc_env (Mid.cardinal gamma) builder in
+          let gamma = fold_env env gamma builder in
+          let lambda =
+            Module.create_lambda
+              ~raises:false
+              (fun ~raise_expr builder ->
+                 let gamma = Mid.add arg.vs_name (Value (Module.value_of_string "Param__0")) gamma in
+                 aux gamma builder xs
+              )
+          in
+          Module.append_expr (sprintf "%s->f = %s" (Module.string_of_value closure) (Module.string_of_value lambda)) builder;
+          Module.append_expr (sprintf "%s->env = %s" (Module.string_of_value closure) (Module.string_of_value env)) builder;
+          closure
+    in
+    let v = aux gamma builder vl in
+    Module.append_expr (sprintf "%s = %s" (Module.string_of_value store) (Module.string_of_value v)) builder;
+  end
 
 (** Logic Declarations *)
 
+(* TODO: Think that logical functions are shadowed by program functions *)
+
 let logic_decl info builder d = match d.d_node with
-  | Dtype _
-  | Ddata _ ->
-      () (* Types are useless for C *)
+  | Dtype _ ->
+      ()
+  | Ddata tl ->
+      List.iter (print_pdata_decl info) tl;
   | Decl.Dparam ls ->
-(*      print_qident info fmt ls.ls_name;*)
-      () (* Why is it a non_executable code ? *)
+      assert false
   | Dlogic ll ->
-      () (* TODO *)
+      List.iter (print_logic_decl info Mid.empty builder) ll;
   | Dind (s, il) ->
       assert false
   | Dprop (_pk, _pr, _) ->
@@ -281,6 +354,7 @@ open Mlw_expr
 open Mlw_decl
 open Mlw_module
 
+let get_its info ts = get_ts info ts.its_ts
 let get_pv info pv =
   if pv.pv_ghost then
     Module.unit_value
@@ -300,17 +374,6 @@ let get_id_from_let = function
   | LetA ps -> ps.ps_name
 
 let get_xs ?separator info xs = get_qident ?separator info xs.xs_name
-
-let fold_env env gamma builder =
-  let aux id x (index, gamma) = match x with
-    | Value v ->
-        Module.append_expr (sprintf "%s[%d] = %s" (Module.string_of_value env) index (Module.string_of_value v)) builder;
-        (succ index, Mid.add id (Env index) gamma)
-    | Env i ->
-        Module.append_expr (sprintf "%s[%d] = Env__0[%d]" (Module.string_of_value env) index i) builder;
-        (succ index, Mid.add id (Env index) gamma)
-  in
-  snd (Mid.fold aux gamma (0, Mid.empty))
 
 let rec print_expr info ~raise_expr gamma e builder =
   if e.e_ghost then
@@ -500,21 +563,30 @@ let is_ghost_lv = function
   | LetV pv -> pv.pv_ghost
   | LetA ps -> ps.ps_ghost
 
+let print_pdata_decl info (its, csl, _) =
+  let get_field x = x.ls_name.id_string in
+  match csl with
+    | [cs, _] ->
+        let pjl = get_record info cs.pl_ls in
+        if pjl <> [] then
+          Module.define_record (get_its info its) (List.map get_field pjl)
+    | _ ->
+        ()
+
 (* TODO: Handle driver *)
 let print_exn_decl info xs =
   Module.append_global
-    (sprintf "exn_tag tag_%s" (Module.string_of_value (get_xs info xs)))
-    (sprintf "\"%s\"" (Module.string_of_value (get_xs ~separator:"." info xs)))
+    ~name:(sprintf "exn_tag tag_%s" (Module.string_of_value (get_xs info xs)))
+    ~value:(sprintf "\"%s\"" (Module.string_of_value (get_xs ~separator:"." info xs)))
 
 let rec pdecl info gamma builder = function
   | pd::decls ->
       Mlw_extract.check_exec_pdecl info.info_syn pd;
       begin match pd.pd_node with
-      | PDtype ts ->
-          (* TODO *)
+      | PDtype _ ->
           pdecl info gamma builder decls
       | PDdata tl ->
-          (* TODO *)
+          List.iter (print_pdata_decl info) tl;
           pdecl info gamma builder decls
       | PDval lv ->
           (* TODO *)

@@ -62,9 +62,8 @@ let value_of_string x = x
 let string_of_value x = x
 
 let append_global ~name x =
-  if M.mem modul name then
-    assert false;
-  M.add modul name x
+  if not (M.mem modul name) then
+    M.add modul name x
 
 let append_function name g =
   let builder = define_global () in
@@ -137,8 +136,8 @@ let () = begin
   append_header "typedef char const * exn_tag;";
   append_header "struct variant {int key; value val;};";
   append_header "struct exn {exn_tag key; value val;};";
-  append_header "struct closure {value (*f)(value, value); value env;};";
-  append_header "struct closure_with_exn {value (*f)(value, value, struct exn **); value env;};";
+  append_header "struct closure {value (*f)(value, value*); value* env;};";
+  append_header "struct closure_with_exn {value (*f)(value, value*, struct exn **); value* env;};";
   append_header "";
   append_header "struct variant ___False = {0, NULL};";
   append_header "value __False = &___False;";
@@ -208,5 +207,12 @@ let create_lambda ~raises f =
     let v = f ~raise_expr builder in
     append_expr (fmt "return %s" v) builder
   in
-  append_function (fmt "value %s(value Param__0, value Env__0%s)" name exn) f;
+  append_function (fmt "value %s(value Param__0, value* Env__0%s)" name exn) f;
   name
+
+let define_record name fields =
+  let fields =
+    let aux = fmt "%s  value %s;\n" in
+    List.fold_left aux "" fields
+  in
+  append_header (fmt "struct %s {\n%s};" name fields)
