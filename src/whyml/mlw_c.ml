@@ -75,6 +75,14 @@ type value =
   | Value of Module.value
   | Env of int
 
+let is_constructor info ls =
+  (* eprintf "is_constructor: ls=%s@." ls.ls_name.id_string; *)
+  match Mid.find_opt ls.ls_name info.th_known_map with
+    | Some { d_node = Ddata dl } ->
+        let constr (_,csl) = List.exists (fun (cs,_) -> ls_equal cs ls) csl in
+        List.exists constr dl
+    | _ -> false
+
 let get_record info ls =
   match Mid.find_opt ls.ls_name info.th_known_map with
     | Some { d_node = Ddata dl } ->
@@ -117,6 +125,11 @@ let has_syntax info id = Mid.mem id info.info_syn
 let has_syntax_or_nothing info id =
   if not (has_syntax info id) then
     assert false
+
+let filter_ghost ls def al =
+  let flt fd arg = if fd.Mlw_expr.fd_ghost then def else arg in
+  try List.map2 flt (Mlw_expr.restore_pl ls).Mlw_expr.pl_args al
+  with Not_found -> al
 
 let print_pdata_decl info (ts, csl) =
   let get_field x = x.ls_name.id_string in
@@ -192,7 +205,86 @@ let fold_env env gamma builder =
 let bool_not b =
   Module.create_value (sprintf "((variant *)(%s)->key) ? __False : __True" (Module.string_of_value b))
 
-let rec print_term info gamma t builder = match t.t_node with
+let get_record_name ls =
+  let rec get_ret = function
+    | Tyapp (ts, [_; t2]) when ts_equal ts Ty.ts_func ->
+        get_ret t2.ty_node
+    | Tyapp _ ->
+        assert false
+    | Tyvar tvs ->
+        tvs
+  in
+  match ls.ls_value with
+  | Some {ty_node = ty; _} ->
+      let ty = get_ret ty in
+      ty.tv_name.id_string
+  | None ->
+      assert false
+
+let rec simple_app fs info gamma builder tl =
+  let rec aux f = function
+    | [] ->
+        f
+    | x::xs ->
+        let closure = Module.cast_to_closure ~raises:false f builder in
+        let v = print_term info gamma x builder in
+        let f = Module.create_value (sprintf "(%s->f)(%s, %s->env)" (Module.string_of_value closure) (Module.string_of_value v) (Module.string_of_value closure)) builder in
+        aux f xs
+  in
+  aux (get_value fs.ls_name gamma builder) tl
+
+and print_variant_creation info gamma ~ls ~tl ~pjl builder =
+  let tl = List.map (fun x -> print_term info gamma x builder) tl in
+  let v = Module.malloc_env (List.length tl) builder in
+  Lists.iteri (fun i x -> Module.append_expr (sprintf "%s[%d] = %s" (Module.string_of_value v) i (Module.string_of_value x)) builder) tl;
+  let variant = Module.malloc_variant builder in
+  Module.append_expr (sprintf "%s->key = %d" (Module.string_of_value variant) ls.ls_constr) builder;
+  Module.append_expr (sprintf "%s->val = %s" (Module.string_of_value variant) (Module.string_of_value v)) builder;
+  variant
+
+and print_record_creation info gamma ~ls ~tl ~pjl builder =
+  let tl = List.map (fun x -> print_term info gamma x builder) tl in
+  let v = Module.malloc_record (get_record_name ls) builder in
+  let aux (ls, t) =
+    Module.append_expr (sprintf "%s->%s = %s" (Module.string_of_value v) ls.ls_name.id_string (Module.string_of_value t)) builder;
+  in
+  List.iter aux (List.combine pjl tl);
+  v
+
+and print_record_access info gamma ~t1 ~ls builder =
+  let t1 = print_term info gamma t1 builder in
+  let t1 = get_value ls.ls_name gamma builder in
+  let t1 = Module.cast_to_record ~st:(get_record_name ls) t1 builder in
+  let field = get_value ls.ls_name gamma builder in
+  Module.create_value (sprintf "%s->%s" (Module.string_of_value t1) (Module.string_of_value field)) builder
+
+and print_app ls info gamma builder tl =
+  let isconstr = is_constructor info ls in
+  let is_field (_, csl) = match csl with
+    | [_, pjl] ->
+        let is_ls = function None -> false | Some ls' -> ls_equal ls ls' in
+        List.for_all ((<>) None) pjl && List.exists is_ls pjl
+    | _ -> false in
+  let isfield = match Mid.find_opt ls.ls_name info.th_known_map with
+    | Some { d_node = Ddata dl } -> not isconstr && List.exists is_field dl
+    | _ -> false
+  in
+  match tl with
+  | [] ->
+      get_value ls.ls_name gamma builder
+  | tl when isconstr ->
+      let tl = filter_ghost ls Mlw_expr.t_void tl in
+      let pjl = get_record info ls in
+      if pjl = [] then
+        print_variant_creation info gamma ~ls ~tl ~pjl builder
+      else
+        print_record_creation info gamma ~ls ~tl ~pjl builder
+  | [t1] when isfield ->
+      print_record_access info gamma ~t1 ~ls builder
+  | tl ->
+      simple_app ls info gamma builder tl
+
+and print_term info gamma t builder = match t.t_node with
   | Tvar v ->
       get_value v.vs_name gamma builder
   | Tconst c ->
@@ -200,16 +292,7 @@ let rec print_term info gamma t builder = match t.t_node with
   | Tapp (fs, []) ->
       get_value fs.ls_name gamma builder
   | Tapp (fs, tl) ->
-      let rec aux f = function
-        | [] ->
-            f
-        | x::xs ->
-            let closure = Module.cast_to_closure ~raises:false f builder in
-            let v = print_term info gamma x builder in
-            let f = Module.create_value (sprintf "(%s->f)(%s, %s->env)" (Module.string_of_value closure) (Module.string_of_value v) (Module.string_of_value closure)) builder in
-            aux f xs
-      in
-      aux (get_value fs.ls_name gamma builder) tl
+      print_app fs info gamma builder tl
   | Tif (e, t1, t2) ->
       print_if (print_term info gamma) builder (e, t1, t2)
   | Tlet (t1,tb) ->

@@ -40,10 +40,13 @@ val create_array : int -> builder -> value
 val create_exn : builder -> value
 
 val cast_to_closure : raises:bool -> value -> builder -> value
+val cast_to_record : st:string -> value -> builder -> value
 
 val malloc_closure : raises:bool -> builder -> value
 val malloc_exn : builder -> value
 val malloc_env : int -> builder -> value
+val malloc_variant : builder -> value
+val malloc_record : string -> builder -> value
 
 val create_lambda :
   raises:bool ->
