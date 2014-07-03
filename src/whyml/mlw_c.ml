@@ -205,19 +205,15 @@ let fold_env env gamma builder =
 let bool_not b =
   Module.create_value (sprintf "((variant *)(%s)->key) ? __False : __True" (Module.string_of_value b))
 
-let get_record_name ls =
-  let rec get_ret = function
-    | Tyapp (ts, [_; t2]) when ts_equal ts Ty.ts_func ->
-        get_ret t2.ty_node
-    | Tyapp _ ->
-        assert false
-    | Tyvar tvs ->
-        tvs
-  in
-  match ls.ls_value with
-  | Some {ty_node = ty; _} ->
-      let ty = get_ret ty in
-      ty.tv_name.id_string
+let singleton_opt = function
+  | [x] -> Some x
+  | [] | _::_ -> None
+
+let get_record_name info = function
+  | Some {ty_node = Tyapp (ty, _); _} ->
+      get_ts info ty
+  | Some {ty_node = Tyvar _; _} ->
+      assert false
   | None ->
       assert false
 
@@ -244,7 +240,7 @@ and print_variant_creation info gamma ~ls ~tl ~pjl builder =
 
 and print_record_creation info gamma ~ls ~tl ~pjl builder =
   let tl = List.map (fun x -> print_term info gamma x builder) tl in
-  let v = Module.malloc_record (get_record_name ls) builder in
+  let v = Module.malloc_record (get_record_name info ls.ls_value) builder in
   let aux (ls, t) =
     Module.append_expr (sprintf "%s->%s = %s" (Module.string_of_value v) ls.ls_name.id_string (Module.string_of_value t)) builder;
   in
@@ -253,8 +249,7 @@ and print_record_creation info gamma ~ls ~tl ~pjl builder =
 
 and print_record_access info gamma ~t1 ~ls builder =
   let t1 = print_term info gamma t1 builder in
-  let t1 = get_value ls.ls_name gamma builder in
-  let t1 = Module.cast_to_record ~st:(get_record_name ls) t1 builder in
+  let t1 = Module.cast_to_record ~st:(get_record_name info (singleton_opt ls.ls_args)) t1 builder in
   let field = get_value ls.ls_name gamma builder in
   Module.create_value (sprintf "%s->%s" (Module.string_of_value t1) (Module.string_of_value field)) builder
 
@@ -289,8 +284,6 @@ and print_term info gamma t builder = match t.t_node with
       get_value v.vs_name gamma builder
   | Tconst c ->
       print_const c
-  | Tapp (fs, []) ->
-      get_value fs.ls_name gamma builder
   | Tapp (fs, tl) ->
       print_app fs info gamma builder tl
   | Tif (e, t1, t2) ->
@@ -465,7 +458,7 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Elogic t ->
       print_term info gamma t builder
   | Evalue v ->
-      get_pv info v
+      get_value v.pv_vs.vs_name gamma builder
   | Earrow a ->
       get_value a.ps_name gamma builder
   | Eapp (e,v,spec) ->
@@ -607,7 +600,7 @@ and print_rec info ~env ~raise_expr builder gamma { fun_ps = ps ; fun_lambda = l
           Module.create_lambda
             ~raises
             (fun ~raise_expr builder ->
-               let gamma = Mid.add ps.ps_name (Value (Module.value_of_string "Param__0")) gamma in
+               let gamma = Mid.add arg.pv_vs.vs_name (Value (Module.value_of_string "Param__0")) gamma in
                aux ~raise_expr gamma builder xs
             )
         in

@@ -197,17 +197,17 @@ let malloc_exn builder =
 
 let malloc_env size builder =
   let name = create_fresh_name builder in
-  append_builder (fmt "value* %s = GC_malloc(sizeof(value) * %d);" name size) builder;
+  define_local_var "value*" name (fmt "GC_malloc(sizeof(value) * %d)" size) builder;
   name
 
 let malloc_variant builder =
   let name = create_fresh_name builder in
-  append_builder (fmt "struct variant* %s = GC_malloc(sizeof(struct variant))" name) builder;
+  define_local_var "struct variant*" name "GC_malloc(sizeof(struct variant))" builder;
   name
 
 let malloc_record st builder =
   let name = create_fresh_name builder in
-  append_builder (fmt "struct %s* %s = GC_malloc(sizeof(struct %s))" st name st) builder;
+  define_local_var (fmt "struct %s*" st) name (fmt "GC_malloc(sizeof(struct %s))" st) builder;
   name
 
 let create_lambda ~raises f =
