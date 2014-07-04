@@ -179,10 +179,10 @@ let print_if f builder (e,t1,t2) =
     builder;
   res
 
-let get_value id gamma builder =
+let get_value info id gamma builder =
   match Mid.find_opt id gamma with
   | None ->
-      Module.value_of_string id.id_string
+      get_qident info id
   | Some v ->
       begin match v with
       | Value v ->
@@ -227,7 +227,7 @@ let rec simple_app fs info gamma builder tl =
         let f = Module.create_value (sprintf "(%s->f)(%s, %s->env)" (Module.string_of_value closure) (Module.string_of_value v) (Module.string_of_value closure)) builder in
         aux f xs
   in
-  aux (get_value fs.ls_name gamma builder) tl
+  aux (get_value info fs.ls_name gamma builder) tl
 
 and print_variant_creation info gamma ~ls ~tl ~pjl builder =
   let tl = List.map (fun x -> print_term info gamma x builder) tl in
@@ -250,8 +250,7 @@ and print_record_creation info gamma ~ls ~tl ~pjl builder =
 and print_record_access info gamma ~t1 ~ls builder =
   let t1 = print_term info gamma t1 builder in
   let t1 = Module.cast_to_record ~st:(get_record_name info (singleton_opt ls.ls_args)) t1 builder in
-  let field = get_value ls.ls_name gamma builder in
-  Module.create_value (sprintf "%s->%s" (Module.string_of_value t1) (Module.string_of_value field)) builder
+  Module.create_value (sprintf "%s->%s" (Module.string_of_value t1) ls.ls_name.id_string) builder
 
 and print_app ls info gamma builder tl =
   let isconstr = is_constructor info ls in
@@ -266,7 +265,7 @@ and print_app ls info gamma builder tl =
   in
   match tl with
   | [] ->
-      get_value ls.ls_name gamma builder
+      get_value info ls.ls_name gamma builder
   | tl when isconstr ->
       let tl = filter_ghost ls Mlw_expr.t_void tl in
       let pjl = get_record info ls in
@@ -281,7 +280,7 @@ and print_app ls info gamma builder tl =
 
 and print_term info gamma t builder = match t.t_node with
   | Tvar v ->
-      get_value v.vs_name gamma builder
+      get_value info v.vs_name gamma builder
   | Tconst c ->
       print_const c
   | Tapp (fs, tl) ->
@@ -458,14 +457,14 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Elogic t ->
       print_term info gamma t builder
   | Evalue v ->
-      get_value v.pv_vs.vs_name gamma builder
+      get_value info v.pv_vs.vs_name gamma builder
   | Earrow a ->
-      get_value a.ps_name gamma builder
+      get_value info a.ps_name gamma builder
   | Eapp (e,v,spec) ->
       let e = print_expr info ~raise_expr gamma e builder in
-      let v = get_value v.pv_vs.vs_name gamma builder in
+      let v = get_value info v.pv_vs.vs_name gamma builder in
       let raises = not (Sexn.is_empty spec.c_effect.eff_raises) in
-      let closure = Module.cast_to_closure ~raises v builder in
+      let closure = Module.cast_to_closure ~raises e builder in
       let exn = Module.create_exn builder in
       let res = Module.create_value (sprintf "(%s->f)(%s, %s->env%s)" (Module.string_of_value closure) (Module.string_of_value v) (Module.string_of_value closure) (if raises then sprintf ", &%s" (Module.string_of_value exn) else "")) builder in
       Module.append_block
@@ -491,9 +490,9 @@ let rec print_expr info ~raise_expr gamma e builder =
             assert false
       in
       let e = print_expr info ~raise_expr gamma e builder in
-      let pv = get_value pv.pv_vs.vs_name gamma builder in
-      let pl = get_value pl.pl_ls.ls_name gamma builder in
-      Module.append_expr (sprintf "((struct %s*)%s)->%s = %s" (Module.string_of_value ty) (Module.string_of_value e) (Module.string_of_value pl) (Module.string_of_value pv)) builder;
+      let e = Module.cast_to_record ~st:ty e builder in
+      let pv = get_value info pv.pv_vs.vs_name gamma builder in
+      Module.append_expr (sprintf "%s->%s = %s" (Module.string_of_value e) pl.pl_ls.ls_name.id_string (Module.string_of_value pv)) builder;
       Module.unit_value
   | Eloop (_,_,e) ->
       let exn = Module.create_exn builder in

@@ -144,7 +144,7 @@ let () = begin
   append_header "struct variant ___True = {1, NULL};";
   append_header "value __True = &___True;";
   append_header "struct variant ___Tuple0 = {0, NULL};";
-  append_header "value Tuple0 = &___Tuple0;";
+  append_header "value why3__Tuple0__Tuple0 = &___Tuple0;";
   append_header "\n";
 end
 
@@ -155,7 +155,7 @@ end
 let get_closure_name raises =
   if raises then "closure_with_exn" else "closure"
 
-let unit_value = "Tuple0"
+let unit_value = "why3__Tuple0__Tuple0"
 let null_value = "NULL"
 
 let create_value value builder =
@@ -176,12 +176,12 @@ let create_array size builder =
 let cast_to_closure ~raises value builder =
   let name = create_fresh_name builder in
   let closure = get_closure_name raises in
-  define_local_var (fmt "struct %s*" closure) name (fmt "(struct %s*)%s" closure value) builder;
+  define_local_var (fmt "struct %s*" closure) name value builder;
   name
 
 let cast_to_record ~st value builder =
   let name = create_fresh_name builder in
-  define_local_var (fmt "struct %s*" st) name (fmt "(struct %s*)%s" st value) builder;
+  define_local_var (fmt "struct %s*" st) name value builder;
   name
 
 let malloc_closure ~raises builder =
