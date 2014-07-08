@@ -32,11 +32,11 @@ let extract_filename ?fname theory = match !backend with
 
 let extract_theory driver ?old ?fname formatter theory = match !backend with
   | OCaml -> Mlw_ocaml.extract_theory driver ?old ?fname formatter theory
-  | C -> Mlw_c.extract_theory driver ?old ?fname formatter theory
+  | C -> Mlw_c.extract_theory driver ?fname formatter theory
 
 let extract_module driver ?old ?fname formatter modul = match !backend with
   | OCaml -> Mlw_ocaml.extract_module driver ?old ?fname formatter modul
-  | C -> Mlw_c.extract_module driver ?old ?fname formatter modul
+  | C -> Mlw_c.extract_module driver ?fname formatter modul
 
 let finalize () = match !backend with
   | OCaml -> ()

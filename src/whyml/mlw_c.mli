@@ -14,11 +14,11 @@
 val extract_filename: ?fname:string -> Theory.theory -> string
 
 val extract_theory:
-  Mlw_driver.driver -> ?old:Pervasives.in_channel -> ?fname:string ->
+  Mlw_driver.driver -> ?fname:string ->
   Format.formatter -> Theory.theory -> unit
 
 val extract_module:
-  Mlw_driver.driver -> ?old:Pervasives.in_channel -> ?fname:string ->
+  Mlw_driver.driver -> ?fname:string ->
   Format.formatter -> Mlw_module.modul -> unit
 
 val finalize : unit -> unit

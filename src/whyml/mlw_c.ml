@@ -407,9 +407,8 @@ let logic_decl info builder td = match td.td_node with
 
 (** Theories *)
 
-let extract_theory drv ?old ?fname fmt th =
+let extract_theory drv ?fname fmt th =
   hack_fmt := Some fmt;
-  ignore (old); ignore (fname);
   let info = {
     info_syn = drv.Mlw_driver.drv_syntax;
     converters = drv.Mlw_driver.drv_converter;
@@ -686,9 +685,8 @@ let rec pdecl info gamma builder = function
 
 (** Modules *)
 
-let extract_module drv ?old ?fname fmt m =
+let extract_module drv ?fname fmt m =
   hack_fmt := Some fmt;
-  ignore (old); ignore (fname);
   let th = m.mod_theory in
   let info = {
     info_syn = drv.Mlw_driver.drv_syntax;
