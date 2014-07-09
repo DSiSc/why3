@@ -36,6 +36,7 @@ val unit_value : value
 val null_value : value
 
 val create_value : string -> builder -> value
+val create_named_value : string -> value -> builder -> value
 val create_array : int -> builder -> value
 val create_exn : builder -> value
 
@@ -49,8 +50,9 @@ val malloc_variant : builder -> value
 val malloc_record : value -> builder -> value
 
 val create_lambda :
+  param_name:string ->
   raises:bool ->
-  (raise_expr:(value -> builder -> unit) -> builder -> value) ->
+  (raise_expr:(value -> builder -> unit) -> param:value -> builder -> value) ->
   value
 
 val define_record : value -> string list -> unit

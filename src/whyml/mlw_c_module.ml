@@ -48,8 +48,8 @@ let create_global_fresh_name () =
   incr ident;
   name
 
-let create_fresh_name builder =
-  let v = fmt "X%i__" builder.ident in
+let create_fresh_name ?(name = "X") builder =
+  let v = fmt "%s%i__" name builder.ident in
   builder.ident <- succ builder.ident;
   v
 
@@ -163,6 +163,11 @@ let create_value value builder =
   define_local_var "value" name value builder;
   name
 
+let create_named_value name value builder =
+  let name = create_fresh_name ~name builder in
+  define_local_var "value" name value builder;
+  name
+
 let create_exn builder =
   let name = create_fresh_name builder in
   define_local_var "struct exn*" name null_value builder;
@@ -210,7 +215,8 @@ let malloc_record st builder =
   define_local_var (fmt "struct %s*" st) name (fmt "GC_malloc(sizeof(struct %s))" st) builder;
   name
 
-let create_lambda ~raises f =
+let create_lambda ~param_name ~raises f =
+  let param_name = param_name ^ "__" in
   let name = create_global_fresh_name () in
   let exn = if raises then ", struct exn **Exn__0" else "" in
   let f builder =
@@ -219,10 +225,10 @@ let create_lambda ~raises f =
         append_expr (fmt "*Exn__0 = %s" value) builder;
       end
     in
-    let v = f ~raise_expr builder in
+    let v = f ~raise_expr ~param:param_name builder in
     append_expr (fmt "return %s" v) builder
   in
-  append_function (fmt "value %s(value Param__0, value* Env__0%s)" name exn) f;
+  append_function (fmt "value %s(value %s, value* Env__0%s)" name param_name exn) f;
   name
 
 let define_record name fields =

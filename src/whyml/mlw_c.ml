@@ -290,6 +290,7 @@ and print_term info gamma t builder = match t.t_node with
   | Tlet (t1,tb) ->
       let v,t2 = t_open_bound tb in
       let t1 = print_term info gamma t1 builder in
+      let t1 = Module.create_named_value v.vs_name.id_string t1 builder in
       let gamma = Mid.add v.vs_name (Value t1) gamma in
       print_term info gamma t2 builder
   | Tcase (t1,bl) ->
@@ -360,9 +361,10 @@ let print_logic_decl info gamma builder (ls, ld) =
           let gamma = fold_env env gamma builder in
           let lambda =
             Module.create_lambda
+              ~param_name:arg.vs_name.id_string
               ~raises:false
-              (fun ~raise_expr builder ->
-                 let gamma = Mid.add arg.vs_name (Value (Module.value_of_string "Param__0")) gamma in
+              (fun ~raise_expr ~param builder ->
+                 let gamma = Mid.add arg.vs_name (Value param) gamma in
                  aux gamma builder xs
               )
           in
@@ -478,8 +480,10 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Elet ({ let_expr = e1 }, e2) when e1.e_ghost ->
       print_expr info ~raise_expr gamma e2 builder
   | Elet ({ let_sym = lv ; let_expr = e1 }, e2) ->
+      let id = get_id_from_let lv in
       let v = print_expr info ~raise_expr gamma e1 builder in
-      let gamma = Mid.add (get_id_from_let lv) (Value v) gamma in
+      let v = Module.create_named_value id.id_string v builder in
+      let gamma = Mid.add id (Value v) gamma in
       print_expr info ~raise_expr gamma e2 builder
   | Eif (e0,e1,e2) ->
       print_if (print_expr info ~raise_expr gamma) builder (e0, e1, e2)
@@ -596,9 +600,10 @@ and print_rec info ~env ~raise_expr builder gamma { fun_ps = ps ; fun_lambda = l
         let gamma = fold_env env gamma builder in
         let lambda =
           Module.create_lambda
+            ~param_name:arg.pv_vs.vs_name.id_string
             ~raises
-            (fun ~raise_expr builder ->
-               let gamma = Mid.add arg.pv_vs.vs_name (Value (Module.value_of_string "Param__0")) gamma in
+            (fun ~raise_expr ~param builder ->
+               let gamma = Mid.add arg.pv_vs.vs_name (Value param) gamma in
                aux ~raise_expr gamma builder xs
             )
         in
