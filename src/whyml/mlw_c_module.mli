@@ -54,3 +54,8 @@ val create_lambda :
   value
 
 val define_record : value -> string list -> unit
+
+val build_equal : value -> value -> builder -> value
+val build_store : value -> value -> builder -> unit
+val build_store_field : value -> string -> value -> builder -> unit
+val build_store_field_int : value -> string -> int -> builder -> unit

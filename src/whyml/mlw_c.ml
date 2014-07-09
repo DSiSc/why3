@@ -167,14 +167,14 @@ let print_if f builder (e,t1,t2) =
     (sprintf "if(%s == __True)" (Module.string_of_value e))
     (fun builder ->
        let v = f t1 builder in
-       Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+       Module.build_store res v builder
     )
     builder;
   Module.append_block
     "else"
     (fun builder ->
        let v = f t2 builder in
-       Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+       Module.build_store res v builder
     )
     builder;
   res
@@ -234,15 +234,15 @@ and print_variant_creation info gamma ~ls ~tl ~pjl builder =
   let v = Module.malloc_env (List.length tl) builder in
   Lists.iteri (fun i x -> Module.append_expr (sprintf "%s[%d] = %s" (Module.string_of_value v) i (Module.string_of_value x)) builder) tl;
   let variant = Module.malloc_variant builder in
-  Module.append_expr (sprintf "%s->key = %d" (Module.string_of_value variant) ls.ls_constr) builder;
-  Module.append_expr (sprintf "%s->val = %s" (Module.string_of_value variant) (Module.string_of_value v)) builder;
+  Module.build_store_field_int variant "key" ls.ls_constr builder; (* TODO: WRONG ! ls_constr doesn't contains the index *)
+  Module.build_store_field variant "val" v builder;
   variant
 
 and print_record_creation info gamma ~ls ~tl ~pjl builder =
   let tl = List.map (fun x -> print_term info gamma x builder) tl in
   let v = Module.malloc_record (get_record_name info ls.ls_value) builder in
   let aux (ls, t) =
-    Module.append_expr (sprintf "%s->%s = %s" (Module.string_of_value v) ls.ls_name.id_string (Module.string_of_value t)) builder;
+    Module.build_store_field v ls.ls_name.id_string t builder;
   in
   List.iter aux (List.combine pjl tl);
   v
@@ -308,7 +308,7 @@ and print_term info gamma t builder = match t.t_node with
         (sprintf "if(%s == __True)" (Module.string_of_value f1))
         (fun builder ->
            let v = print_term info gamma f2 builder in
-           Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+           Module.build_store res v builder
         )
         builder;
       res
@@ -319,7 +319,7 @@ and print_term info gamma t builder = match t.t_node with
         (sprintf "if(%s == __True)" (Module.string_of_value f1))
         (fun builder ->
            let v = print_term info gamma f2 builder in
-           Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+           Module.build_store res v builder
         )
         builder;
       res
@@ -330,14 +330,14 @@ and print_term info gamma t builder = match t.t_node with
         (sprintf "if(%s == __False)" (Module.string_of_value f1))
         (fun builder ->
            let v = print_term info gamma f2 builder in
-           Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value v)) builder
+           Module.build_store res v builder
         )
         builder;
       res
   | Tbinop (Tiff,f1,f2) ->
       let f1 = print_term info gamma f1 builder in
       let f2 = print_term info gamma f2 builder in
-      Module.create_value (sprintf "%s == %s" (Module.string_of_value f1) (Module.string_of_value f2)) builder
+      Module.build_equal f1 f2 builder
   | Tnot f ->
       let v = print_term info gamma f builder in
       bool_not v builder
@@ -366,12 +366,12 @@ let print_logic_decl info gamma builder (ls, ld) =
                  aux gamma builder xs
               )
           in
-          Module.append_expr (sprintf "%s->f = %s" (Module.string_of_value closure) (Module.string_of_value lambda)) builder;
-          Module.append_expr (sprintf "%s->env = %s" (Module.string_of_value closure) (Module.string_of_value env)) builder;
+          Module.build_store_field closure "f" lambda builder;
+          Module.build_store_field closure "env" env builder;
           closure
     in
     let v = aux gamma builder vl in
-    Module.append_expr (sprintf "%s = %s" (Module.string_of_value store) (Module.string_of_value v)) builder;
+   Module.build_store store v builder;
   end
 
 (** Logic Declarations *)
@@ -495,7 +495,7 @@ let rec print_expr info ~raise_expr gamma e builder =
       let e = print_expr info ~raise_expr gamma e builder in
       let e = Module.cast_to_record ~st:ty e builder in
       let pv = get_value info pv.pv_vs.vs_name gamma builder in
-      Module.append_expr (sprintf "%s->%s = %s" (Module.string_of_value e) pl.pl_ls.ls_name.id_string (Module.string_of_value pv)) builder;
+      Module.build_store_field e pl.pl_ls.ls_name.id_string pv builder;
       Module.unit_value
   | Eloop (_,_,e) ->
       let exn = Module.create_exn builder in
@@ -503,9 +503,7 @@ let rec print_expr info ~raise_expr gamma e builder =
         "while(true)"
         (fun builder ->
            let new_raise_expr value builder =
-             Module.append_expr
-               (sprintf "%s = %s" (Module.string_of_value exn) (Module.string_of_value value))
-               builder;
+             Module.build_store exn value builder;
              Module.append_expr "break" builder;
            in
            ignore (print_expr info ~raise_expr:new_raise_expr gamma e builder)
@@ -532,13 +530,11 @@ let rec print_expr info ~raise_expr gamma e builder =
         "do"
         (fun builder ->
            let new_raise_expr value builder =
-             Module.append_expr
-               (sprintf "%s = %s" (Module.string_of_value exn) (Module.string_of_value value))
-               builder;
+             Module.build_store exn value builder;
              Module.append_expr "break" builder;
            in
            let value = print_expr info ~raise_expr:new_raise_expr gamma e builder in
-           Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value value)) builder;
+           Module.build_store res value builder;
         )
         builder;
       Module.append_expr "while(false)" builder;
@@ -582,7 +578,7 @@ let rec print_expr info ~raise_expr gamma e builder =
         let store = Module.value_of_string (sprintf "%s[%d]" (Module.string_of_value local_arr) index) in
         if not fd.fun_ps.ps_ghost then begin
           let v = print_rec info ~env:Module.null_value ~raise_expr builder gamma fd in
-          Module.append_expr (sprintf "%s = %s" (Module.string_of_value store) (Module.string_of_value v)) builder;
+          Module.build_store store v builder;
         end
       in
       Lists.iteri aux fdl;
@@ -606,8 +602,8 @@ and print_rec info ~env ~raise_expr builder gamma { fun_ps = ps ; fun_lambda = l
                aux ~raise_expr gamma builder xs
             )
         in
-        Module.append_expr (sprintf "%s->f = %s" (Module.string_of_value closure) (Module.string_of_value lambda)) builder;
-        Module.append_expr (sprintf "%s->env = %s" (Module.string_of_value closure) (Module.string_of_value env)) builder;
+        Module.build_store_field closure "f" lambda builder;
+        Module.build_store_field closure "env" env builder;
         closure
   in
   aux ~raise_expr gamma builder lam.l_args
@@ -618,7 +614,7 @@ and print_xbranch info ~first gamma ~raise_expr ~exn ~res (xs, pv, e) builder =
       (sprintf "%sif(%s->key == tag_%s)" (if first then "" else "else ") (Module.string_of_value exn) (Module.string_of_value (get_xs info xs)))
       (fun builder ->
          let value = print_expr info ~raise_expr gamma e builder in
-         Module.append_expr (sprintf "%s = %s" (Module.string_of_value res) (Module.string_of_value value)) builder;
+         Module.build_store res value builder;
       )
       builder
   else
@@ -631,7 +627,7 @@ and print_rec_decl info gamma builder fdl =
     Module.define_global store;
     if not fd.fun_ps.ps_ghost then begin
       let v = print_rec info ~env:Module.null_value ~raise_expr:(fun _ _ -> assert false) builder gamma fd in
-      Module.append_expr (sprintf "%s = %s" (Module.string_of_value store) (Module.string_of_value v)) builder;
+      Module.build_store store v builder;
     end
   in
   List.iter aux fdl
@@ -674,7 +670,7 @@ let rec pdecl info gamma builder = function
             let store = get_lv info ld.let_sym in
             Module.define_global store;
             let v = print_expr info ~raise_expr:(fun _ _ -> assert false) gamma ld.let_expr builder in
-            Module.append_expr (sprintf "%s = %s" (Module.string_of_value store) (Module.string_of_value v)) builder;
+            Module.build_store store v builder;
           end;
           pdecl info gamma builder decls
       | PDrec fdl ->

@@ -231,3 +231,15 @@ let define_record name fields =
     List.fold_left aux "" fields
   in
   append_header (fmt "struct %s {\n%s};" name fields)
+
+let build_equal x y builder =
+  create_value (fmt "%s == %s" x y) builder
+
+let build_store x y builder =
+  append_expr (fmt "%s = %s" x y) builder
+
+let build_store_field x field y builder =
+  append_expr (fmt "%s->%s = %s" x field y) builder
+
+let build_store_field_int x field y builder =
+  append_expr (fmt "%s->%s = %d" x field y) builder
