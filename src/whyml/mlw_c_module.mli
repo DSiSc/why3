@@ -42,6 +42,7 @@ val create_exn : builder -> value
 
 val cast_to_closure : raises:bool -> value -> builder -> value
 val cast_to_record : st:value -> value -> builder -> value
+val cast_to_variant : value -> builder -> value
 
 val malloc_closure : raises:bool -> builder -> value
 val malloc_exn : builder -> value
@@ -61,3 +62,6 @@ val build_equal : value -> value -> builder -> value
 val build_store : value -> value -> builder -> unit
 val build_store_field : value -> string -> value -> builder -> unit
 val build_store_field_int : value -> string -> int -> builder -> unit
+val build_default_case : builder -> unit
+val build_case : int -> builder -> unit
+val build_break : builder -> unit

@@ -217,6 +217,20 @@ let get_record_name info = function
   | None ->
       assert false
 
+let is_simple_pattern =
+  let aux x =
+    match (fst (t_open_branch x)).pat_node with
+    | Pwild -> true
+    | Papp (_, patterns) ->
+        let aux {pat_node; _} = match pat_node with
+          | Pwild | Pvar _ -> true
+          | Papp _ | Por _ | Pas _ -> false
+        in
+        List.for_all aux patterns
+    | Pvar _ | Por _ | Pas _ -> false
+  in
+  List.for_all aux
+
 let rec simple_app fs info gamma builder tl =
   let rec aux f = function
     | [] ->
@@ -293,8 +307,19 @@ and print_term info gamma t builder = match t.t_node with
       let t1 = Module.create_named_value v.vs_name.id_string t1 builder in
       let gamma = Mid.add v.vs_name (Value t1) gamma in
       print_term info gamma t2 builder
-  | Tcase (t1,bl) ->
-      assert false
+  | Tcase (t1, bl) when is_simple_pattern bl ->
+      let t1 = print_term info gamma t1 builder in
+      print_lbranches info gamma ~t1 ~bl builder
+  | Tcase (t1, bl) ->
+      let ty = match t1.t_ty with
+        | Some ty -> ty
+        | None -> assert false
+      in
+      let bl = List.map (fun x -> let (x, y) = t_open_branch x in ([x], y)) bl in
+      let mk_case = t_case_close in
+      let mk_let = t_let_close_simp in
+      let e2 = Pattern.compile_bare ~mk_case ~mk_let [t1] bl in
+      print_term info gamma e2 builder
   | Teps _
   | Tquant _ ->
       assert false
@@ -342,6 +367,44 @@ and print_term info gamma t builder = match t.t_node with
   | Tnot f ->
       let v = print_term info gamma f builder in
       bool_not v builder
+
+and print_lbranches info gamma ~t1 ~bl builder =
+  let t1 = Module.cast_to_variant t1 builder in
+  let res = Module.create_value "NULL" builder in
+  Module.append_block
+    (sprintf "switch(%s->key)" (Module.string_of_value t1))
+    (fun builder ->
+       List.iteri
+         (fun i p ->
+            let (p, t) = t_open_branch p in
+            begin match p.pat_node with
+            | Pwild ->
+                Module.build_default_case builder;
+                let t = print_term info gamma t builder in
+                Module.build_store res t builder;
+            | Papp (_, patterns) ->
+                Module.build_case i builder;
+                let gamma =
+                  let aux gamma i {pat_node; _} = match pat_node with
+                    | Pwild -> gamma
+                    | Pvar vs ->
+                        let v = Module.create_named_value vs.vs_name.id_string (Module.value_of_string (sprintf "%s->val[%d]" (Module.string_of_value t1) i)) builder in
+                        Mid.add vs.vs_name (Value v) gamma
+                    | Papp _ | Por _ | Pas _ -> assert false
+                  in
+                  Lists.fold_lefti aux gamma patterns
+                in
+                let t = print_term info gamma t builder in
+                Module.build_store res t builder;
+            | Pvar _ | Por _ | Pas _ ->
+                assert false
+            end;
+            Module.build_break builder;
+         )
+         bl
+    )
+    builder;
+  res
 
 let print_logic_decl info gamma builder (ls, ld) =
   if has_syntax info ls.ls_name then
@@ -450,6 +513,19 @@ let get_id_from_let = function
   | LetA ps -> ps.ps_name
 
 let get_xs ?separator info xs = get_qident ?separator info xs.xs_name
+
+let is_simple_ppattern =
+  let aux (x, _) = match x.ppat_pattern.pat_node with
+    | Pwild -> true
+    | Papp (_, patterns) ->
+        let aux {pat_node; _} = match pat_node with
+          | Pwild | Pvar _ -> true
+          | Papp _ | Por _ | Pas _ -> false
+        in
+        List.for_all aux patterns
+    | Pvar _ | Por _ | Pas _ -> false
+  in
+  List.for_all aux
 
 let rec print_expr info ~raise_expr gamma e builder =
   if e.e_ghost then
@@ -567,8 +643,24 @@ let rec print_expr info ~raise_expr gamma e builder =
       assert false
   | Ecase (e1, [_,e2]) when e1.e_ghost ->
       print_expr info ~raise_expr gamma e2 builder
+  | Ecase (e1, bl) when is_simple_ppattern bl ->
+      let e1 = print_expr info ~raise_expr gamma e1 builder in
+      print_branches info ~raise_expr gamma ~e1 ~bl builder
   | Ecase (e1, bl) ->
-      assert false
+      let ty = match e1.e_vty with
+        | VTvalue ity -> ity
+        | VTarrow _ -> assert false
+      in
+      let pv = create_pvsymbol (id_fresh "res") ty in
+      let bl = List.map (fun (x, y) -> ([x.ppat_pattern], y)) bl in
+      let mk_case t patterns =
+        assert false
+      in
+      let mk_let vs t e =
+        assert false
+      in
+      let e2 = Pattern.compile_bare ~mk_case ~mk_let [t_var pv.pv_vs] bl in
+      print_expr info ~raise_expr gamma e2 builder
   | Erec (fdl, e) ->
       let local_arr = Module.create_array (List.length fdl) builder in
       let gamma =
@@ -625,6 +717,43 @@ and print_xbranch info ~first gamma ~raise_expr ~exn ~res (xs, pv, e) builder =
   else
     (* TODO: Handle params *)
     assert false
+
+and print_branches info ~raise_expr gamma ~e1 ~bl builder =
+  let e1 = Module.cast_to_variant e1 builder in
+  let res = Module.create_value "NULL" builder in
+  Module.append_block
+    (sprintf "switch(%s->key)" (Module.string_of_value e1))
+    (fun builder ->
+       List.iteri
+         (fun i (p, e) ->
+            begin match p.ppat_pattern.pat_node with
+            | Pwild ->
+                Module.build_default_case builder;
+                let e = print_expr info ~raise_expr gamma e builder in
+                Module.build_store res e builder;
+            | Papp (_, patterns) ->
+                Module.build_case i builder;
+                let gamma =
+                  let aux gamma i {pat_node; _} = match pat_node with
+                    | Pwild -> gamma
+                    | Pvar vs ->
+                        let v = Module.create_named_value vs.vs_name.id_string (Module.value_of_string (sprintf "%s->val[%d]" (Module.string_of_value e1) i)) builder in
+                        Mid.add vs.vs_name (Value v) gamma
+                    | Papp _ | Por _ | Pas _ -> assert false
+                  in
+                  Lists.fold_lefti aux gamma patterns
+                in
+                let e = print_expr info ~raise_expr gamma e builder in
+                Module.build_store res e builder;
+            | Pvar _ | Por _ | Pas _ ->
+                assert false
+            end;
+            Module.build_break builder;
+         )
+         bl
+    )
+    builder;
+  res
 
 and print_rec_decl info gamma builder fdl =
   let aux fd =

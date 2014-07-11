@@ -134,8 +134,8 @@ let () = begin
   append_header "";
   append_header "typedef void* value;";
   append_header "typedef char const * exn_tag;";
-  append_header "struct variant {int key; value val;};";
-  append_header "struct exn {exn_tag key; value val;};";
+  append_header "struct variant {int key; value* val;};";
+  append_header "struct exn {exn_tag key; value* val;};";
   append_header "struct closure {value (*f)(value, value*); value* env;};";
   append_header "struct closure_with_exn {value (*f)(value, value*, struct exn **); value* env;};";
   append_header "";
@@ -187,6 +187,11 @@ let cast_to_closure ~raises value builder =
 let cast_to_record ~st value builder =
   let name = create_fresh_name builder in
   define_local_var (fmt "struct %s*" st) name value builder;
+  name
+
+let cast_to_variant value builder =
+  let name = create_fresh_name builder in
+  define_local_var "struct variant*" name value builder;
   name
 
 let malloc_closure ~raises builder =
@@ -249,3 +254,12 @@ let build_store_field x field y builder =
 
 let build_store_field_int x field y builder =
   append_expr (fmt "%s->%s = %d" x field y) builder
+
+let build_default_case =
+  append_builder "default: ;" (* HACK: http://stackoverflow.com/questions/18496282/why-do-i-get-a-label-can-only-be-part-of-a-statement-and-a-declaration-is-not-a/18496437#18496437 *)
+
+let build_case i =
+  append_builder (fmt "case %d: ;" i) (* HACK: http://stackoverflow.com/questions/18496282/why-do-i-get-a-label-can-only-be-part-of-a-statement-and-a-declaration-is-not-a/18496437#18496437 *)
+
+let build_break =
+  append_expr "break"
