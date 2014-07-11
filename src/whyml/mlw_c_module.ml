@@ -140,9 +140,9 @@ let () = begin
   append_header "struct closure_with_exn {value (*f)(value, value*, struct exn **); value* env;};";
   append_header "";
   append_header "struct variant ___False = {0, NULL};";
-  append_header "value __False = &___False;";
+  append_header "value why3__Bool__False = &___False;";
   append_header "struct variant ___True = {1, NULL};";
-  append_header "value __True = &___True;";
+  append_header "value why3__Bool__True = &___True;";
   append_header "struct variant ___Tuple0 = {0, NULL};";
   append_header "value why3__Tuple0__Tuple0 = &___Tuple0;";
   append_header "\n";

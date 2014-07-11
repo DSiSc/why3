@@ -164,7 +164,7 @@ let print_if f builder (e,t1,t2) =
   let e = f e builder in
   let res = Module.create_value "NULL" builder in
   Module.append_block
-    (sprintf "if(%s == __True)" (Module.string_of_value e))
+    (sprintf "if(%s == why3__Bool__True)" (Module.string_of_value e))
     (fun builder ->
        let v = f t1 builder in
        Module.build_store res v builder
@@ -203,7 +203,7 @@ let fold_env env gamma builder =
   snd (Mid.fold aux gamma (0, Mid.empty))
 
 let bool_not b =
-  Module.create_value (sprintf "((variant *)(%s)->key) ? __False : __True" (Module.string_of_value b))
+  Module.create_value (sprintf "((variant *)(%s)->key) ? why3__Bool__False : why3__Bool__True" (Module.string_of_value b))
 
 let singleton_opt = function
   | [x] -> Some x
@@ -299,14 +299,14 @@ and print_term info gamma t builder = match t.t_node with
   | Tquant _ ->
       assert false
   | Ttrue ->
-      Module.create_value "__True" builder
+      Module.create_value "why3__Bool__True" builder
   | Tfalse ->
-      Module.create_value "__False" builder
+      Module.create_value "why3__Bool__False" builder
   | Tbinop (Timplies,f1,f2) ->
       let f1 = print_term info gamma f1 builder in
       let res = bool_not f1 builder in
       Module.append_block
-        (sprintf "if(%s == __True)" (Module.string_of_value f1))
+        (sprintf "if(%s == why3__Bool__True)" (Module.string_of_value f1))
         (fun builder ->
            let v = print_term info gamma f2 builder in
            Module.build_store res v builder
@@ -317,7 +317,7 @@ and print_term info gamma t builder = match t.t_node with
       let f1 = print_term info gamma f1 builder in
       let res = Module.create_value (Module.string_of_value f1) builder in
       Module.append_block
-        (sprintf "if(%s == __True)" (Module.string_of_value f1))
+        (sprintf "if(%s == why3__Bool__False)" (Module.string_of_value f1))
         (fun builder ->
            let v = print_term info gamma f2 builder in
            Module.build_store res v builder
@@ -328,7 +328,7 @@ and print_term info gamma t builder = match t.t_node with
       let f1 = print_term info gamma f1 builder in
       let res = Module.create_value (Module.string_of_value f1) builder in
       Module.append_block
-        (sprintf "if(%s == __False)" (Module.string_of_value f1))
+        (sprintf "if(%s == why3__Bool__False)" (Module.string_of_value f1))
         (fun builder ->
            let v = print_term info gamma f2 builder in
            Module.build_store res v builder
