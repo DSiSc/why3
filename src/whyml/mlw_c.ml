@@ -141,22 +141,18 @@ let print_pdata_decl info (ts, csl) =
     | _ ->
         ()
 
-let print_const = function
+let print_const builder = function
   | ConstInt c ->
-      (* Use GMP:
-         let f () =
-           let x = 1 in
-           x
-         <=>
-         void *M_f(void *, void * ) {
-           mpz_t *__fresh_var; (* WHAT ABOUT THE GC *)
-           mpz_init(__fresh_var);
-           mpz_set_si(__fresh_var, 1);
-           void *x = (void* )&__fresh_var; (* PROBLEM *)
-           return x;
-         }
-      *)
-      assert false
+      let (c, base) = match c with
+        | IConstDec x -> (x, 10)
+        | IConstHex x -> (x, 16)
+        | IConstOct x -> (x, 8)
+        | IConstBin x -> (x, 2)
+      in
+      let v = Module.create_mpz builder in
+      Module.append_expr (sprintf "mpz_init(%s)" (Module.string_of_value v)) builder;
+      Module.append_expr (sprintf "mpz_set_str(%s, %S, %d)" (Module.string_of_value v) c base) builder;
+      v
   | ConstReal _ ->
       assert false
 
@@ -296,7 +292,7 @@ and print_term info gamma t builder = match t.t_node with
   | Tvar v ->
       get_value info v.vs_name gamma builder
   | Tconst c ->
-      print_const c
+      print_const builder c
   | Tapp (fs, tl) ->
       print_app fs info gamma builder tl
   | Tif (e, t1, t2) ->

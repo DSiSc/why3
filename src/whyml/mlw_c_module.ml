@@ -173,6 +173,11 @@ let create_exn builder =
   define_local_var "struct exn*" name null_value builder;
   name
 
+let create_mpz builder =
+  let name = create_fresh_name builder in
+  append_expr (fmt "mpz_t %s" name) builder;
+  name
+
 let create_array size builder =
   let name = create_fresh_name builder in
   append_builder (fmt "value %s[%d] = {NULL};" name size) builder;

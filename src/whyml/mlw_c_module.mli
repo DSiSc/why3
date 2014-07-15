@@ -39,6 +39,7 @@ val create_value : string -> builder -> value
 val create_named_value : string -> value -> builder -> value
 val create_array : int -> builder -> value
 val create_exn : builder -> value
+val create_mpz : builder -> value
 
 val cast_to_closure : raises:bool -> value -> builder -> value
 val cast_to_record : st:value -> value -> builder -> value
