@@ -159,8 +159,8 @@ let print_const builder = function
 let print_if f builder (e,t1,t2) =
   let e = f e builder in
   let res = Module.create_value "NULL" builder in
-  Module.append_block
-    (sprintf "if(%s == why3__Bool__True)" (Module.string_of_value e))
+  Module.build_if_true
+    e
     (fun builder ->
        let v = f t1 builder in
        Module.build_store res v builder
@@ -197,9 +197,6 @@ let fold_env env gamma builder =
         (succ index, Mid.add id (Env index) gamma)
   in
   snd (Mid.fold aux gamma (0, Mid.empty))
-
-let bool_not b =
-  Module.create_value (sprintf "((variant *)(%s)->key) ? why3__Bool__False : why3__Bool__True" (Module.string_of_value b))
 
 let singleton_opt = function
   | [x] -> Some x
@@ -260,7 +257,7 @@ and print_record_creation info gamma ~ls ~tl ~pjl builder =
 and print_record_access info gamma ~t1 ~ls builder =
   let t1 = print_term info gamma t1 builder in
   let t1 = Module.cast_to_record ~st:(get_record_name info (singleton_opt ls.ls_args)) t1 builder in
-  Module.create_value (sprintf "%s->%s" (Module.string_of_value t1) ls.ls_name.id_string) builder
+  Module.build_access_field t1 ls.ls_name.id_string builder
 
 and print_app ls info gamma builder tl =
   let isconstr = is_constructor info ls in
@@ -320,14 +317,14 @@ and print_term info gamma t builder = match t.t_node with
   | Tquant _ ->
       assert false
   | Ttrue ->
-      Module.create_value "why3__Bool__True" builder
+      Module.true_value
   | Tfalse ->
-      Module.create_value "why3__Bool__False" builder
+      Module.false_value
   | Tbinop (Timplies,f1,f2) ->
       let f1 = print_term info gamma f1 builder in
-      let res = bool_not f1 builder in
-      Module.append_block
-        (sprintf "if(%s == why3__Bool__True)" (Module.string_of_value f1))
+      let res = Module.build_not f1 builder in
+      Module.build_if_true
+        f1
         (fun builder ->
            let v = print_term info gamma f2 builder in
            Module.build_store res v builder
@@ -336,9 +333,9 @@ and print_term info gamma t builder = match t.t_node with
       res
   | Tbinop (Tand,f1,f2) ->
       let f1 = print_term info gamma f1 builder in
-      let res = Module.create_value (Module.string_of_value f1) builder in
-      Module.append_block
-        (sprintf "if(%s == why3__Bool__False)" (Module.string_of_value f1))
+      let res = Module.clone_value f1 builder in
+      Module.build_if_false
+        f1
         (fun builder ->
            let v = print_term info gamma f2 builder in
            Module.build_store res v builder
@@ -347,9 +344,9 @@ and print_term info gamma t builder = match t.t_node with
       res
   | Tbinop (Tor,f1,f2) ->
       let f1 = print_term info gamma f1 builder in
-      let res = Module.create_value (Module.string_of_value f1) builder in
-      Module.append_block
-        (sprintf "if(%s == why3__Bool__False)" (Module.string_of_value f1))
+      let res = Module.clone_value f1 builder in
+      Module.build_if_false
+        f1
         (fun builder ->
            let v = print_term info gamma f2 builder in
            Module.build_store res v builder
@@ -362,7 +359,7 @@ and print_term info gamma t builder = match t.t_node with
       Module.build_equal f1 f2 builder
   | Tnot f ->
       let v = print_term info gamma f builder in
-      bool_not v builder
+      Module.build_not v builder
 
 and print_lbranches info gamma ~t1 ~bl builder =
   let t1 = Module.cast_to_variant t1 builder in
@@ -541,10 +538,7 @@ let rec print_expr info ~raise_expr gamma e builder =
       if raises then begin
         let exn = Module.create_exn builder in
         let res = Module.create_value (sprintf "(%s->f)(%s, %s->env, &%s)" (Module.string_of_value closure) (Module.string_of_value v) (Module.string_of_value closure) (Module.string_of_value exn)) builder in
-        Module.append_block
-          (sprintf "if(%s != NULL)" (Module.string_of_value exn))
-          (fun builder -> raise_expr exn builder)
-          builder;
+        Module.build_if_not_null exn (raise_expr exn) builder;
         res
       end else begin
         Module.create_value (sprintf "(%s->f)(%s, %s->env)" (Module.string_of_value closure) (Module.string_of_value v) (Module.string_of_value closure)) builder
@@ -580,15 +574,12 @@ let rec print_expr info ~raise_expr gamma e builder =
         (fun builder ->
            let new_raise_expr value builder =
              Module.build_store exn value builder;
-             Module.append_expr "break" builder;
+             Module.build_break builder;
            in
            ignore (print_expr info ~raise_expr:new_raise_expr gamma e builder)
         )
         builder;
-      Module.append_block
-        (sprintf "if(%s != NULL)" (Module.string_of_value exn))
-        (fun builder -> raise_expr exn builder)
-        builder;
+      Module.build_if_not_null exn (raise_expr exn) builder;
       Module.unit_value
   | Efor (pv,(pvfrom,dir,pvto),_,e) ->
       assert false
@@ -596,7 +587,7 @@ let rec print_expr info ~raise_expr gamma e builder =
       let e = print_expr info ~raise_expr gamma e builder in
       let value = Module.malloc_exn builder in
       Module.append_expr (sprintf "%s->key = tag_%s" (Module.string_of_value value) (Module.string_of_value (get_xs info xs))) builder;
-      Module.append_expr (sprintf "%s->val = %s" (Module.string_of_value value) (Module.string_of_value e)) builder;
+      Module.build_store_field value "val" e builder;
       raise_expr value builder;
       Module.null_value
   | Etry (e,bl) ->
@@ -607,15 +598,15 @@ let rec print_expr info ~raise_expr gamma e builder =
         (fun builder ->
            let new_raise_expr value builder =
              Module.build_store exn value builder;
-             Module.append_expr "break" builder;
+             Module.build_break builder;
            in
            let value = print_expr info ~raise_expr:new_raise_expr gamma e builder in
            Module.build_store res value builder;
         )
         builder;
       Module.append_expr "while(false)" builder;
-      Module.append_block
-        (sprintf "if(%s != NULL)" (Module.string_of_value exn))
+      Module.build_if_not_null
+        exn
         (fun builder ->
            List.iteri
              (fun i x ->

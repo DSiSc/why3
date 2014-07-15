@@ -34,12 +34,16 @@ val to_string : unit -> string
 
 val unit_value : value
 val null_value : value
+val true_value : value
+val false_value : value
 
 val create_value : string -> builder -> value
 val create_named_value : string -> value -> builder -> value
 val create_array : int -> builder -> value
 val create_exn : builder -> value
 val create_mpz : builder -> value
+
+val clone_value : value -> builder -> value
 
 val cast_to_closure : raises:bool -> value -> builder -> value
 val cast_to_record : st:value -> value -> builder -> value
@@ -66,3 +70,8 @@ val build_store_field_int : value -> string -> int -> builder -> unit
 val build_default_case : builder -> unit
 val build_case : int -> builder -> unit
 val build_break : builder -> unit
+val build_if_not_null : value -> (builder -> unit) -> builder -> unit
+val build_if_true : value -> (builder -> unit) -> builder -> unit
+val build_if_false : value -> (builder -> unit) -> builder -> unit
+val build_access_field : value -> string -> builder -> value
+val build_not : value -> builder -> value

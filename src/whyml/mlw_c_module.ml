@@ -157,6 +157,8 @@ let get_closure_name raises =
 
 let unit_value = "why3__Tuple0__Tuple0"
 let null_value = "NULL"
+let true_value = "why3__Bool__True"
+let false_value = "why3__Bool__False"
 
 let create_value value builder =
   let name = create_fresh_name builder in
@@ -182,6 +184,8 @@ let create_array size builder =
   let name = create_fresh_name builder in
   append_builder (fmt "value %s[%d] = {NULL};" name size) builder;
   name
+
+let clone_value = create_value
 
 let cast_to_closure ~raises value builder =
   let name = create_fresh_name builder in
@@ -270,3 +274,20 @@ let build_case i =
 
 let build_break =
   append_expr "break"
+
+let build_if_not_null v f builder =
+  append_block (fmt "if(%s != NULL)" v) f builder
+
+let build_if_true v f builder =
+  append_block (fmt "if(%s == %s)" v true_value) f builder
+
+let build_if_false v f builder =
+  append_block (fmt "if(%s == %s)" v false_value) f builder
+
+let build_access_field v field builder =
+  create_value (fmt "%s->%s" v field) builder
+
+let build_not v builder =
+  create_value
+    (fmt "((struct variant*)(%s)->key) ? %s : %s" v false_value true_value)
+    builder
