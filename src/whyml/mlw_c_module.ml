@@ -228,6 +228,8 @@ let create_lambda ~param_name ~raises f =
     let raise_expr value builder =
       if raises then begin
         append_expr (fmt "*Exn__0 = %s" value) builder;
+      end else begin
+        append_expr "abort()" builder;
       end
     in
     let v = f ~raise_expr ~param:param_name builder in
