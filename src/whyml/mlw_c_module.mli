@@ -67,11 +67,12 @@ val build_equal : value -> value -> builder -> value
 val build_store : value -> value -> builder -> unit
 val build_store_field : value -> string -> value -> builder -> unit
 val build_store_field_int : value -> string -> int -> builder -> unit
-val build_default_case : builder -> unit
-val build_case : int -> builder -> unit
 val build_break : builder -> unit
 val build_if_not_null : value -> (builder -> unit) -> builder -> unit
 val build_if_true : value -> (builder -> unit) -> builder -> unit
 val build_if_false : value -> (builder -> unit) -> builder -> unit
 val build_access_field : value -> string -> builder -> value
 val build_not : value -> builder -> value
+val build_do_while : (builder -> unit) -> builder -> unit
+val build_abort : builder -> unit
+val build_switch : value -> (int option * (builder -> unit)) list -> builder -> unit

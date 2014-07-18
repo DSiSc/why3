@@ -266,12 +266,6 @@ let build_store_field x field y builder =
 let build_store_field_int x field y builder =
   append_expr (fmt "%s->%s = %d" x field y) builder
 
-let build_default_case =
-  append_builder "default: ;" (* HACK: http://stackoverflow.com/questions/18496282/why-do-i-get-a-label-can-only-be-part-of-a-statement-and-a-declaration-is-not-a/18496437#18496437 *)
-
-let build_case i =
-  append_builder (fmt "case %d: ;" i) (* HACK: http://stackoverflow.com/questions/18496282/why-do-i-get-a-label-can-only-be-part-of-a-statement-and-a-declaration-is-not-a/18496437#18496437 *)
-
 let build_break =
   append_expr "break"
 
@@ -291,3 +285,21 @@ let build_not v builder =
   create_value
     (fmt "((struct variant*)(%s)->key) ? %s : %s" v false_value true_value)
     builder
+
+let build_do_while f builder =
+  append_block "do" f builder;
+  append_expr "while(false)" builder
+
+let build_abort =
+  append_expr "abort()"
+
+let build_switch e l =
+  let aux builder = function
+    | (None, f) ->
+        append_block "default: " f builder
+    | (Some i, f) ->
+        append_block (fmt "case %d: " i) f builder
+  in
+  append_block
+    (fmt "switch(%s->key)" e)
+    (fun builder -> List.iter (aux builder) l; build_break builder)

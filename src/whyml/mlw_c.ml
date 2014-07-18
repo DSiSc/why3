@@ -364,39 +364,40 @@ and print_term info gamma t builder = match t.t_node with
 and print_lbranches info gamma ~t1 ~bl builder =
   let t1 = Module.cast_to_variant t1 builder in
   let res = Module.create_value "NULL" builder in
-  Module.append_block
-    (sprintf "switch(%s->key)" (Module.string_of_value t1))
-    (fun builder ->
-       List.iteri
-         (fun i p ->
-            let (p, t) = t_open_branch p in
-            begin match p.pat_node with
-            | Pwild ->
-                Module.build_default_case builder;
-                let t = print_term info gamma t builder in
-                Module.build_store res t builder;
-            | Papp (_, patterns) ->
-                Module.build_case i builder;
-                let gamma =
-                  let aux gamma i {pat_node; _} = match pat_node with
-                    | Pwild -> gamma
-                    | Pvar vs ->
-                        let v = Module.create_named_value vs.vs_name.id_string (Module.value_of_string (sprintf "%s->val[%d]" (Module.string_of_value t1) i)) builder in
-                        Mid.add vs.vs_name (Value v) gamma
-                    | Papp _ | Por _ | Pas _ -> assert false
-                  in
-                  Lists.fold_lefti aux gamma patterns
-                in
-                let t = print_term info gamma t builder in
-                Module.build_store res t builder;
-            | Pvar _ | Por _ | Pas _ ->
-                assert false
-            end;
-            Module.build_break builder;
-         )
-         bl
-    )
-    builder;
+  let bl =
+    List.mapi
+      (fun i p ->
+         let (p, t) = t_open_branch p in
+         begin match p.pat_node with
+         | Pwild ->
+             let f builder =
+               let t = print_term info gamma t builder in
+               Module.build_store res t builder;
+             in
+             (None, f)
+         | Papp (_, patterns) ->
+             let f builder =
+               let gamma =
+                 let aux gamma i {pat_node; _} = match pat_node with
+                   | Pwild -> gamma
+                   | Pvar vs ->
+                       let v = Module.create_named_value vs.vs_name.id_string (Module.value_of_string (sprintf "%s->val[%d]" (Module.string_of_value t1) i)) builder in
+                       Mid.add vs.vs_name (Value v) gamma
+                   | Papp _ | Por _ | Pas _ -> assert false
+                 in
+                 Lists.fold_lefti aux gamma patterns
+               in
+               let t = print_term info gamma t builder in
+               Module.build_store res t builder;
+             in
+             (Some i, f)
+         | Pvar _ | Por _ | Pas _ ->
+             assert false
+         end
+      )
+      bl
+  in
+  Module.build_switch t1 bl builder;
   res
 
 let print_logic_decl info gamma builder (ls, ld) =
@@ -593,8 +594,7 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Etry (e,bl) ->
       let exn = Module.create_exn builder in
       let res = Module.create_value "NULL" builder in
-      Module.append_block
-        "do"
+      Module.build_do_while
         (fun builder ->
            let new_raise_expr value builder =
              Module.build_store exn value builder;
@@ -604,7 +604,6 @@ let rec print_expr info ~raise_expr gamma e builder =
            Module.build_store res value builder;
         )
         builder;
-      Module.append_expr "while(false)" builder;
       Module.build_if_not_null
         exn
         (fun builder ->
@@ -620,7 +619,7 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Eabstr (e,_) ->
       print_expr info ~raise_expr gamma e builder
   | Eabsurd ->
-      Module.append_expr "abort()" builder;
+      Module.build_abort builder;
       Module.null_value
   | Eassert _ ->
       Module.unit_value
@@ -708,38 +707,39 @@ and print_xbranch info ~first gamma ~raise_expr ~exn ~res (xs, pv, e) builder =
 and print_branches info ~raise_expr gamma ~e1 ~bl builder =
   let e1 = Module.cast_to_variant e1 builder in
   let res = Module.create_value "NULL" builder in
-  Module.append_block
-    (sprintf "switch(%s->key)" (Module.string_of_value e1))
-    (fun builder ->
-       List.iteri
-         (fun i (p, e) ->
-            begin match p.ppat_pattern.pat_node with
-            | Pwild ->
-                Module.build_default_case builder;
-                let e = print_expr info ~raise_expr gamma e builder in
-                Module.build_store res e builder;
-            | Papp (_, patterns) ->
-                Module.build_case i builder;
-                let gamma =
-                  let aux gamma i {pat_node; _} = match pat_node with
-                    | Pwild -> gamma
-                    | Pvar vs ->
-                        let v = Module.create_named_value vs.vs_name.id_string (Module.value_of_string (sprintf "%s->val[%d]" (Module.string_of_value e1) i)) builder in
-                        Mid.add vs.vs_name (Value v) gamma
-                    | Papp _ | Por _ | Pas _ -> assert false
-                  in
-                  Lists.fold_lefti aux gamma patterns
-                in
-                let e = print_expr info ~raise_expr gamma e builder in
-                Module.build_store res e builder;
-            | Pvar _ | Por _ | Pas _ ->
-                assert false
-            end;
-            Module.build_break builder;
-         )
-         bl
-    )
-    builder;
+  let bl =
+    List.mapi
+      (fun i (p, e) ->
+         begin match p.ppat_pattern.pat_node with
+         | Pwild ->
+             let f builder =
+               let e = print_expr info ~raise_expr gamma e builder in
+               Module.build_store res e builder;
+             in
+             (None, f)
+         | Papp (_, patterns) ->
+             let f builder =
+               let gamma =
+                 let aux gamma i {pat_node; _} = match pat_node with
+                   | Pwild -> gamma
+                   | Pvar vs ->
+                       let v = Module.create_named_value vs.vs_name.id_string (Module.value_of_string (sprintf "%s->val[%d]" (Module.string_of_value e1) i)) builder in
+                       Mid.add vs.vs_name (Value v) gamma
+                   | Papp _ | Por _ | Pas _ -> assert false
+                 in
+                 Lists.fold_lefti aux gamma patterns
+               in
+               let e = print_expr info ~raise_expr gamma e builder in
+               Module.build_store res e builder;
+             in
+             (Some i, f)
+         | Pvar _ | Por _ | Pas _ ->
+             assert false
+         end
+      )
+      bl
+  in
+  Module.build_switch e1 bl builder;
   res
 
 and print_rec_decl info gamma builder fdl =
