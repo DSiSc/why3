@@ -241,7 +241,16 @@ and print_variant_creation info gamma ~ls ~tl ~pjl builder =
   let v = Module.malloc_env (List.length tl) builder in
   Lists.iteri (fun i x -> Module.append_expr (sprintf "%s[%d] = %s" (Module.string_of_value v) i (Module.string_of_value x)) builder) tl;
   let variant = Module.malloc_variant builder in
-  Module.build_store_field_int variant "key" ls.ls_constr builder; (* TODO: WRONG ! ls_constr doesn't contains the index *)
+  let index =
+    let ty = match ls.ls_value with
+      | Some {ty_node = Tyapp (tys, _); _} -> tys
+      | Some {ty_node = Tyvar _; _}
+      | None -> assert false
+    in
+    let constrs = Decl.find_constructors info.th_known_map ty in
+    Lists.find_nth (fun (ls', _) -> ls_equal ls' ls) constrs
+  in
+  Module.build_store_field_int variant "key" index builder;
   Module.build_store_field variant "val" v builder;
   variant
 
@@ -271,8 +280,6 @@ and print_app ls info gamma builder tl =
     | _ -> false
   in
   match tl with
-  | [] ->
-      get_value info ls.ls_name gamma builder
   | tl when isconstr ->
       let tl = filter_ghost ls Mlw_expr.t_void tl in
       let pjl = get_record info ls in
@@ -280,6 +287,8 @@ and print_app ls info gamma builder tl =
         print_variant_creation info gamma ~ls ~tl ~pjl builder
       else
         print_record_creation info gamma ~ls ~tl ~pjl builder
+  | [] ->
+      get_value info ls.ls_name gamma builder
   | [t1] when isfield ->
       print_record_access info gamma ~t1 ~ls builder
   | tl ->
