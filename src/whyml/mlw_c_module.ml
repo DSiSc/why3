@@ -299,10 +299,12 @@ let build_abort =
 let build_switch e l =
   let aux builder = function
     | (None, f) ->
-        append_block "default: " f builder
+        append_block "default: " f builder;
+        build_break builder;
     | (Some i, f) ->
-        append_block (fmt "case %d: " i) f builder
+        append_block (fmt "case %d: " i) f builder;
+        build_break builder;
   in
   append_block
     (fmt "switch(%s->key)" e)
-    (fun builder -> List.iter (aux builder) l; build_break builder)
+    (fun builder -> List.iter (aux builder) l)
