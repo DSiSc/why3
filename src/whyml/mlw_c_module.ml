@@ -135,7 +135,7 @@ let () = begin
   append_header "typedef void* value;";
   append_header "typedef char const * exn_tag;";
   append_header "struct variant {int key; value* val;};";
-  append_header "struct exn {exn_tag key; value* val;};";
+  append_header "struct exn {exn_tag key; value val;};";
   append_header "struct closure {value (*f)(value, value*); value* env;};";
   append_header "struct closure_with_exn {value (*f)(value, value*, struct exn **); value* env;};";
   append_header "";
