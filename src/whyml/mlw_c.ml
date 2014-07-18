@@ -624,7 +624,7 @@ let rec print_expr info ~raise_expr gamma e builder =
              bl
         )
         builder;
-      Module.unit_value
+      res
   | Eabstr (e,_) ->
       print_expr info ~raise_expr gamma e builder
   | Eabsurd ->
