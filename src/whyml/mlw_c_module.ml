@@ -214,10 +214,13 @@ let malloc_exn builder =
   define_local_var "struct exn*" name "GC_malloc(sizeof(struct exn))" builder;
   name
 
-let malloc_env size builder =
-  let name = create_fresh_name builder in
-  define_local_var "value*" name (fmt "GC_malloc(sizeof(value) * %d)" size) builder;
-  name
+let malloc_env size builder = match size with
+  | 0 ->
+      null_value
+  | size ->
+      let name = create_fresh_name builder in
+      define_local_var "value*" name (fmt "GC_malloc(sizeof(value) * %d)" size) builder;
+      name
 
 let malloc_variant builder =
   let name = create_fresh_name builder in
