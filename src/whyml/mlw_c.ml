@@ -184,7 +184,7 @@ let get_value info id gamma builder =
       | Value v ->
           v
       | Env i ->
-          Module.create_value (sprintf "Env__0[%d]" i) builder
+          Module.create_value (sprintf "Env[%d]" i) builder
       end
 
 let fold_env env gamma builder =
@@ -193,7 +193,7 @@ let fold_env env gamma builder =
         Module.append_expr (sprintf "%s[%d] = %s" (Module.string_of_value env) index (Module.string_of_value v)) builder;
         (succ index, Mid.add id (Env index) gamma)
     | Env i ->
-        Module.append_expr (sprintf "%s[%d] = Env__0[%d]" (Module.string_of_value env) index i) builder;
+        Module.append_expr (sprintf "%s[%d] = Env[%d]" (Module.string_of_value env) index i) builder;
         (succ index, Mid.add id (Env index) gamma)
   in
   snd (Mid.fold aux gamma (0, Mid.empty))

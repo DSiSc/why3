@@ -13,7 +13,7 @@ let fmt = Printf.sprintf
 
 type builder =
   { mutable builder : string list
-  ; mutable ident : int
+  ; mutable ident : Ident.ident_printer
   ; mutable indent_level : int
   }
 
@@ -31,9 +31,17 @@ let ident = ref 0
 
 let initial_indent_level = 2
 
-let define_global () =
+let c_keywords =
+  [ "auto"; "break"; "case"; "char"; "const"; "continue"; "default"; "do"
+  ; "double"; "else"; "enum"; "extern"; "float"; "for"; "goto"; "if"; "int"
+  ; "long"; "register"; "return"; "short"; "signed"; "sizeof"; "static"
+  ; "struct"; "switch"; "typedef"; "union"; "unsigned"; "void"; "volatile"
+  ; "while"
+  ]
+
+let define_global_builder () =
   { builder = []
-  ; ident = 0
+  ; ident = Ident.create_ident_printer c_keywords
   ; indent_level = initial_indent_level
   }
 
@@ -44,14 +52,12 @@ let create_block builder =
   }
 
 let create_global_fresh_name () =
-  let name = fmt "Lambda%d__" !ident in
+  let name = fmt "Lambda%d" !ident in
   incr ident;
   name
 
 let create_fresh_name ?(name = "X") builder =
-  let v = fmt "%s%i__" name builder.ident in
-  builder.ident <- succ builder.ident;
-  v
+  Ident.string_unique builder.ident name
 
 let string_of_builder builder =
   let builder = List.rev builder.builder in
@@ -66,7 +72,7 @@ let append_global ~name x =
     M.add modul name x
 
 let append_function name g =
-  let builder = define_global () in
+  let builder = define_global_builder () in
   g builder;
   let x = name ^ "\n" in
   let x = x ^ "{\n" in
@@ -102,10 +108,7 @@ let append_block x g builder =
   append_builder "}" builder
 
 let init_builder =
-  { builder = []
-  ; ident = 0
-  ; indent_level = initial_indent_level
-  }
+  define_global_builder ()
 
 let to_string () =
   let buf = Buffer.create 64 in
@@ -120,7 +123,7 @@ let to_string () =
   Buffer.add_char buf '\n';
   M.iter (fun _ -> aux) modul;
   Buffer.add_char buf '\n';
-  Buffer.add_string buf "void __init__()\n";
+  Buffer.add_string buf "void Init()\n";
   Buffer.add_string buf "{\n";
   Buffer.add_string buf (string_of_builder init_builder ^ "\n");
   Buffer.add_string buf "}\n";
@@ -233,13 +236,18 @@ let malloc_record st builder =
   name
 
 let create_lambda ~param_name ~raises f =
-  let param_name = param_name ^ "__" in
   let name = create_global_fresh_name () in
-  let exn = if raises then ", struct exn **Exn__0" else "" in
+  let exn = if raises then ", struct exn **Exn" else "" in
   let f builder =
+    if Ident.string_unique builder.ident param_name <> param_name then
+      assert false;
+    if Ident.string_unique builder.ident "Env" <> "Env" then
+      assert false;
+    if Ident.string_unique builder.ident "Exn" <> "Exn" then
+      assert false;
     let raise_expr value builder =
       if raises then begin
-        append_expr (fmt "*Exn__0 = %s" value) builder;
+        append_expr (fmt "*Exn = %s" value) builder;
       end else begin
         append_expr "abort()" builder;
       end
@@ -247,7 +255,7 @@ let create_lambda ~param_name ~raises f =
     let v = f ~raise_expr ~param:param_name builder in
     append_expr (fmt "return %s" v) builder
   in
-  append_function (fmt "value %s(value %s, value* Env__0%s)" name param_name exn) f;
+  append_function (fmt "value %s(value %s, value* Env%s)" name param_name exn) f;
   name
 
 let define_record name fields =
