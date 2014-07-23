@@ -71,8 +71,11 @@ val build_break : builder -> unit
 val build_if_not_null : value -> (builder -> unit) -> builder -> unit
 val build_if_true : value -> (builder -> unit) -> builder -> unit
 val build_if_false : value -> (builder -> unit) -> builder -> unit
+val build_if_cmp_zero : value -> string -> (builder -> unit) -> builder -> unit
+val build_else : (builder -> unit) -> builder -> unit
 val build_access_field : value -> string -> builder -> value
 val build_not : value -> builder -> value
 val build_do_while : (builder -> unit) -> builder -> unit
 val build_abort : builder -> unit
 val build_switch : value -> (int option * (builder -> unit)) list -> builder -> unit
+val build_while : (builder -> unit) -> builder -> unit

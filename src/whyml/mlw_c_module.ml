@@ -289,6 +289,12 @@ let build_if_true v f builder =
 let build_if_false v f builder =
   append_block (fmt "if(%s == %s)" v false_value) f builder
 
+let build_if_cmp_zero cmp signe f =
+  append_block (fmt "if(%s %s 0)" cmp signe) f
+
+let build_else f =
+  append_block "else" f
+
 let build_access_field v field builder =
   create_value (fmt "%s->%s" v field) builder
 
@@ -316,3 +322,6 @@ let build_switch e l =
   append_block
     (fmt "switch(%s->key)" e)
     (fun builder -> List.iter (aux builder) l)
+
+let build_while f =
+  append_block "while(true)" f

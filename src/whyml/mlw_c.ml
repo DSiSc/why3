@@ -41,6 +41,8 @@ open Decl
 open Theory
 open Printer
 
+let fmt = Printf.sprintf
+
 module Module = Mlw_c_module
 
 (* TODO: Remove this hack *)
@@ -591,8 +593,32 @@ let rec print_expr info ~raise_expr gamma e builder =
         builder;
       Module.build_if_not_null exn (raise_expr exn) builder;
       Module.unit_value
-  | Efor (pv,(pvfrom,dir,pvto),_,e) ->
-      assert false
+  | Efor (pv, (pvfrom, dir, pvto), _, e) ->
+      let exn = Module.create_exn builder in
+      let i = get_value info pvfrom.pv_vs.vs_name gamma builder in
+      let pvto = get_value info pvto.pv_vs.vs_name gamma builder in
+      let gamma = Mid.add pv.pv_vs.vs_name (Value i) gamma in
+      Module.build_while
+        (fun builder ->
+           let cmp = Module.create_value (fmt "mpz_cmp(%s, %s)" (Module.string_of_value i) (Module.string_of_value pvto)) builder in
+           Module.build_if_cmp_zero
+             cmp
+             (match dir with To -> "<=" | DownTo -> ">=")
+             (fun builder ->
+                let new_raise_expr value builder =
+                  Module.build_store exn value builder;
+                  Module.build_break builder;
+                in
+                ignore (print_expr info ~raise_expr:new_raise_expr gamma e builder)
+             )
+             builder;
+           Module.build_else Module.build_break builder;
+           let name_i = Module.string_of_value i in
+           Module.append_expr (fmt "mpz_add_ui(%s, %s, 1)" name_i name_i) builder;
+        )
+        builder;
+      Module.build_if_not_null exn (raise_expr exn) builder;
+      Module.unit_value
   | Eraise (xs,e) ->
       let e = print_expr info ~raise_expr gamma e builder in
       let value = Module.malloc_exn builder in
