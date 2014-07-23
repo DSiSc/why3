@@ -168,8 +168,7 @@ let print_if f builder (e,t1,t2) =
        Module.build_store res v builder
     )
     builder;
-  Module.append_block
-    "else"
+  Module.build_else
     (fun builder ->
        let v = f t2 builder in
        Module.build_store res v builder
@@ -581,8 +580,7 @@ let rec print_expr info ~raise_expr gamma e builder =
       Module.unit_value
   | Eloop (_,_,e) ->
       let exn = Module.create_exn builder in
-      Module.append_block
-        "while(true)"
+      Module.build_while
         (fun builder ->
            let new_raise_expr value builder =
              Module.build_store exn value builder;
@@ -645,7 +643,7 @@ let rec print_expr info ~raise_expr gamma e builder =
            List.iteri
              (fun i x ->
                 print_xbranch info ~first:(i = 0) gamma ~raise_expr ~exn ~res x builder;
-                Module.append_block "else" (raise_expr exn) builder;
+                Module.build_else (raise_expr exn) builder;
              )
              bl
         )
