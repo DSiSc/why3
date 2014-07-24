@@ -691,14 +691,14 @@ let rec print_expr info ~raise_expr gamma e builder =
       let aux index fd =
         let store = Module.value_of_string (sprintf "%s[%d]" (Module.string_of_value local_arr) index) in
         if not fd.fun_ps.ps_ghost then begin
-          let v = print_rec info ~env:Module.null_value ~raise_expr builder gamma fd in
+          let v = print_rec info ~raise_expr builder gamma fd in
           Module.build_store store v builder;
         end
       in
       Lists.iteri aux fdl;
       print_expr info ~raise_expr gamma e builder
 
-and print_rec info ~env ~raise_expr builder gamma {fun_ps = ps; fun_lambda = lam} =
+and print_rec info ~raise_expr builder gamma {fun_ps = ps; fun_lambda = lam} =
   let raises = not (Sexn.is_empty ps.ps_aty.aty_spec.c_effect.eff_raises) in
   let rec aux ~raise_expr gamma builder = function
     | [] ->
@@ -723,18 +723,23 @@ and print_rec info ~env ~raise_expr builder gamma {fun_ps = ps; fun_lambda = lam
   in
   aux ~raise_expr gamma builder lam.l_args
 
+(* TODO: Handle xs_exit *)
+
 and print_xbranch info ~first gamma ~raise_expr ~exn ~res (xs, pv, e) builder =
-  if ity_equal xs.xs_ity ity_unit then
-    Module.append_block
-      (sprintf "%sif(%s->key == tag_%s)" (if first then "" else "else ") (Module.string_of_value exn) (Module.string_of_value (get_xs info xs)))
-      (fun builder ->
-         let value = print_expr info ~raise_expr gamma e builder in
-         Module.build_store res value builder;
-      )
-      builder
-  else
-    (* TODO: Handle params *)
-    assert false
+  Module.append_block
+    (sprintf "%sif(%s->key == tag_%s)" (if first then "" else "else ") (Module.string_of_value exn) (Module.string_of_value (get_xs info xs)))
+    (fun builder ->
+       let gamma =
+         if ity_equal xs.xs_ity ity_unit then
+           gamma
+         else
+           let param = Module.build_access_field exn "val" builder in
+           Mid.add pv.pv_vs.vs_name (Value param) gamma
+       in
+       let value = print_expr info ~raise_expr gamma e builder in
+       Module.build_store res value builder;
+    )
+    builder
 
 and print_branches info ~raise_expr gamma ~e1 ~bl builder =
   let e1 = Module.cast_to_variant e1 builder in
@@ -779,7 +784,7 @@ and print_rec_decl info gamma builder fdl =
     let store = get_ps info fd.fun_ps in
     Module.define_global store;
     if not fd.fun_ps.ps_ghost then begin
-      let v = print_rec info ~env:Module.null_value ~raise_expr:(fun _ _ -> assert false) builder gamma fd in
+      let v = print_rec info ~raise_expr:(fun _ _ -> assert false) builder gamma fd in
       Module.build_store store v builder;
     end
   in
