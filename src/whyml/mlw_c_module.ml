@@ -178,9 +178,10 @@ let create_exn builder =
   define_local_var "struct exn*" name null_value builder;
   name
 
-let create_mpz builder =
+let create_mpz str base builder =
   let name = create_fresh_name builder in
   append_expr (fmt "mpz_t %s" name) builder;
+  append_expr (fmt "mpz_init_set_str(%s, %S, %d)" name str base) builder;
   name
 
 let create_array size builder =
@@ -189,6 +190,12 @@ let create_array size builder =
   name
 
 let clone_value = create_value
+
+let clone_mpz value builder =
+  let name = create_fresh_name builder in
+  append_expr (fmt "mpz_t %s" name) builder;
+  append_expr (fmt "mpz_init_set(%s, %s)" name value) builder;
+  name
 
 let cast_to_closure ~raises value builder =
   let name = create_fresh_name builder in
@@ -325,3 +332,11 @@ let build_switch e l =
 
 let build_while f =
   append_block "while(true)" f
+
+let build_mpz_cmp x y builder =
+  let name = create_fresh_name builder in
+  define_local_var "int" name (fmt "mpz_cmp(%s, %s)" x y) builder;
+  name
+
+let build_mpz_succ value =
+  append_expr (fmt "mpz_add_ui(%s, %s, 1)" value value)

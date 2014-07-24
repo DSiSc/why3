@@ -151,10 +151,7 @@ let print_const builder = function
         | IConstOct x -> (x, 8)
         | IConstBin x -> (x, 2)
       in
-      let v = Module.create_mpz builder in
-      Module.append_expr (sprintf "mpz_init(%s)" (Module.string_of_value v)) builder;
-      Module.append_expr (sprintf "mpz_set_str(%s, %S, %d)" (Module.string_of_value v) c base) builder;
-      v
+      Module.create_mpz c base builder
   | ConstReal _ ->
       assert false
 
@@ -594,15 +591,17 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Efor (pv, (pvfrom, dir, pvto), _, e) ->
       let exn = Module.create_exn builder in
       let i = get_value info pvfrom.pv_vs.vs_name gamma builder in
+      let i = Module.clone_mpz i builder in
       let pvto = get_value info pvto.pv_vs.vs_name gamma builder in
-      let gamma = Mid.add pv.pv_vs.vs_name (Value i) gamma in
       Module.build_while
         (fun builder ->
-           let cmp = Module.create_value (fmt "mpz_cmp(%s, %s)" (Module.string_of_value i) (Module.string_of_value pvto)) builder in
+           let cmp = Module.build_mpz_cmp i pvto builder in
            Module.build_if_cmp_zero
              cmp
              (match dir with To -> "<=" | DownTo -> ">=")
              (fun builder ->
+                let i = Module.clone_mpz i builder in
+                let gamma = Mid.add pv.pv_vs.vs_name (Value i) gamma in
                 let new_raise_expr value builder =
                   Module.build_store exn value builder;
                   Module.build_break builder;
@@ -611,8 +610,7 @@ let rec print_expr info ~raise_expr gamma e builder =
              )
              builder;
            Module.build_else Module.build_break builder;
-           let name_i = Module.string_of_value i in
-           Module.append_expr (fmt "mpz_add_ui(%s, %s, 1)" name_i name_i) builder;
+           Module.build_mpz_succ i builder;
         )
         builder;
       Module.build_if_not_null exn (raise_expr exn) builder;

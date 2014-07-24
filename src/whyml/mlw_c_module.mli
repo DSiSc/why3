@@ -41,9 +41,10 @@ val create_value : string -> builder -> value
 val create_named_value : string -> value -> builder -> value
 val create_array : int -> builder -> value
 val create_exn : builder -> value
-val create_mpz : builder -> value
+val create_mpz : string -> int -> builder -> value
 
 val clone_value : value -> builder -> value
+val clone_mpz : value -> builder -> value
 
 val cast_to_closure : raises:bool -> value -> builder -> value
 val cast_to_record : st:value -> value -> builder -> value
@@ -79,3 +80,5 @@ val build_do_while : (builder -> unit) -> builder -> unit
 val build_abort : builder -> unit
 val build_switch : value -> (int option * (builder -> unit)) list -> builder -> unit
 val build_while : (builder -> unit) -> builder -> unit
+val build_mpz_cmp : value -> value -> builder -> value
+val build_mpz_succ : value -> builder -> unit
