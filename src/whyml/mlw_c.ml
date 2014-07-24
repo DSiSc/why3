@@ -497,6 +497,11 @@ open Mlw_expr
 open Mlw_decl
 open Mlw_module
 
+type pre_expr =
+  | PreM of (term * (pattern * pre_expr) list)
+  | PreL of (vsymbol * term * pre_expr)
+  | Expr of expr
+
 let get_its info ts = get_ts info ts.its_ts
 let get_pv info pv =
   if pv.pv_ghost then
@@ -517,6 +522,10 @@ let get_id_from_let = function
   | LetA ps -> ps.ps_name
 
 let get_xs ?separator info xs = get_qident ?separator info xs.xs_name
+
+let ity_of_expr = function
+  | VTvalue ty -> ty
+  | VTarrow _ -> assert false
 
 let is_simple_ppattern =
   let aux (x, _) = match x.ppat_pattern.pat_node with
@@ -661,25 +670,14 @@ let rec print_expr info ~raise_expr gamma e builder =
       assert false
   | Eany _ ->
       assert false
-  | Ecase (e1, [_,e2]) when e1.e_ghost ->
-      print_expr info ~raise_expr gamma e2 builder
-  | Ecase (e1, bl) when is_simple_ppattern bl ->
-      let e1 = print_expr info ~raise_expr gamma e1 builder in
-      print_branches info ~raise_expr gamma ~e1 ~bl builder
   | Ecase (e1, bl) ->
-      let ty = match e1.e_vty with
-        | VTvalue ity -> ity
-        | VTarrow _ -> assert false
-      in
+      let ty = ity_of_expr e1.e_vty in
       let pv = create_pvsymbol (id_fresh "res") ty in
-      let bl = List.map (fun (x, y) -> ([x.ppat_pattern], y)) bl in
-      let mk_case t patterns =
-        assert false
-      in
-      let mk_let vs t e =
-        assert false
-      in
+      let bl = List.map (fun (x, y) -> ([x.ppat_pattern], Expr y)) bl in
+      let mk_case t pattern = PreM (t, pattern) in
+      let mk_let vs t pe = PreL (vs, t, pe) in
       let e2 = Pattern.compile_bare ~mk_case ~mk_let [t_var pv.pv_vs] bl in
+      let e2 = assert false in
       print_expr info ~raise_expr gamma e2 builder
   | Erec (fdl, e) ->
       let local_arr = Module.create_array (List.length fdl) builder in
