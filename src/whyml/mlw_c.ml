@@ -32,7 +32,6 @@
 open Format
 open Pp
 
-open Stdlib
 open Number
 open Ident
 open Ty
@@ -40,8 +39,6 @@ open Term
 open Decl
 open Theory
 open Printer
-
-let fmt = Printf.sprintf
 
 module Module = Mlw_c_module
 
@@ -120,13 +117,15 @@ let get_qident ?(separator="__") info id =
 let get_ls info ls = get_qident info ls.ls_name
 let get_ts info ts = get_qident info ts.ts_name
 
-let protect_on x s = if x then "(" ^^ s ^^ ")" else s
-
 let has_syntax info id = Mid.mem id info.info_syn
 
 let has_syntax_or_nothing info id =
   if not (has_syntax info id) then
     assert false
+
+let has_syntax_or_ghost_or_nothing info is_ghost id =
+  if not is_ghost then
+    has_syntax_or_nothing info id
 
 let filter_ghost ls def al =
   let flt fd arg = if fd.Mlw_expr.fd_ghost then def else arg in
@@ -142,6 +141,11 @@ let print_pdata_decl info (ts, csl) =
           Module.define_record (get_ts info ts) (List.map get_field pjl)
     | _ ->
         ()
+
+(** Inductive *)
+
+let print_ind_decl info (ls, _) =
+  has_syntax_or_nothing info ls.ls_name
 
 let print_const builder = function
   | ConstInt c ->
@@ -234,7 +238,7 @@ let rec simple_app fs info gamma builder tl =
   in
   aux (get_value info fs.ls_name gamma builder) tl
 
-and print_variant_creation info gamma ~ls ~tl ~pjl builder =
+and print_variant_creation info gamma ~ls ~tl builder =
   let tl = List.map (fun x -> print_term info gamma x builder) tl in
   let v = Module.malloc_env (List.length tl) builder in
   Lists.iteri (fun i x -> Module.append_expr (sprintf "%s[%d] = %s" (Module.string_of_value v) i (Module.string_of_value x)) builder) tl;
@@ -282,7 +286,7 @@ and print_app ls info gamma builder tl =
       let tl = filter_ghost ls Mlw_expr.t_void tl in
       let pjl = get_record info ls in
       if pjl = [] then
-        print_variant_creation info gamma ~ls ~tl ~pjl builder
+        print_variant_creation info gamma ~ls ~tl builder
       else
         print_record_creation info gamma ~ls ~tl ~pjl builder
   | [] ->
@@ -311,10 +315,6 @@ and print_term info gamma t builder = match t.t_node with
       let t1 = print_term info gamma t1 builder in
       print_lbranches info gamma ~t1 ~bl builder
   | Tcase (t1, bl) ->
-      let ty = match t1.t_ty with
-        | Some ty -> ty
-        | None -> assert false
-      in
       let bl = List.map (fun x -> let (x, y) = t_open_branch x in ([x], y)) bl in
       let mk_case = t_case_close in
       let mk_let = t_let_close_simp in
@@ -407,6 +407,9 @@ and print_lbranches info gamma ~t1 ~bl builder =
   Module.build_switch t1 bl builder;
   res
 
+let print_param_decl info ls =
+  has_syntax_or_nothing info ls.ls_name
+
 let print_logic_decl info gamma builder (ls, ld) =
   if has_syntax info ls.ls_name then
     (* TODO *)
@@ -427,7 +430,7 @@ let print_logic_decl info gamma builder (ls, ld) =
             Module.create_lambda
               ~param_name:arg.vs_name.id_string
               ~raises:false
-              (fun ~raise_expr ~param builder ->
+              (fun ~raise_expr:_ ~param builder ->
                  let gamma = Mid.add arg.vs_name (Value param) gamma in
                  aux gamma builder xs
               )
@@ -450,11 +453,11 @@ let logic_decl info builder d = match d.d_node with
   | Ddata tl ->
       List.iter (print_pdata_decl info) tl;
   | Decl.Dparam ls ->
-      assert false
+      print_param_decl info ls;
   | Dlogic ll ->
       List.iter (print_logic_decl info Mid.empty builder) ll;
-  | Dind (s, il) ->
-      assert false
+  | Dind (_, il) ->
+      List.iter (print_ind_decl info) il;
   | Dprop (_pk, _pr, _) ->
       assert false
 
@@ -697,7 +700,7 @@ let rec print_expr info ~raise_expr gamma e builder =
       Lists.iteri aux fdl;
       print_expr info ~raise_expr gamma e builder
 
-and print_rec info ~env ~raise_expr builder gamma { fun_ps = ps ; fun_lambda = lam } =
+and print_rec info ~env ~raise_expr builder gamma {fun_ps = ps; fun_lambda = lam} =
   let raises = not (Sexn.is_empty ps.ps_aty.aty_spec.c_effect.eff_raises) in
   let rec aux ~raise_expr gamma builder = function
     | [] ->
@@ -785,6 +788,10 @@ and print_rec_decl info gamma builder fdl =
   List.iter aux fdl
   (*forget_tvs ()*)
 
+let lv_name = function
+  | LetV pv -> pv.pv_vs.vs_name
+  | LetA ps -> ps.ps_name
+
 let is_ghost_lv = function
   | LetV pv -> pv.pv_ghost
   | LetA ps -> ps.ps_ghost
@@ -798,6 +805,9 @@ let print_pdata_decl info (its, csl, _) =
           Module.define_record (get_its info its) (List.map get_field pjl)
     | _ ->
         ()
+
+let print_val_decl info lv =
+  has_syntax_or_ghost_or_nothing info (is_ghost_lv lv) (lv_name lv)
 
 (* TODO: Handle driver *)
 let print_exn_decl info xs =
@@ -815,7 +825,7 @@ let rec pdecl info gamma builder = function
           List.iter (print_pdata_decl info) tl;
           pdecl info gamma builder decls
       | PDval lv ->
-          (* TODO *)
+          print_val_decl info lv;
           pdecl info gamma builder decls
       | PDlet ld ->
           if not (is_ghost_lv ld.let_sym) then begin
