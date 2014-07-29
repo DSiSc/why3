@@ -74,6 +74,9 @@ val preid_name : preid -> string
 
 type ident_printer
 
+val clone_printer : ident_printer -> ident_printer
+(** Return a copy of the given printer *)
+
 val create_ident_printer :
   ?sanitizer : (string -> string) -> string list -> ident_printer
 (** start a new printer with a sanitizing function and a blacklist *)
@@ -104,4 +107,3 @@ val char_to_alnum : char -> string
 val char_to_lalnum : char -> string
 val char_to_alnumus : char -> string
 val char_to_lalnumus : char -> string
-

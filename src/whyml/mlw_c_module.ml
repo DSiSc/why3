@@ -47,7 +47,7 @@ let define_global_builder () =
 
 let create_block builder =
   { builder = []
-  ; ident = builder.ident
+  ; ident = Ident.clone_printer builder.ident
   ; indent_level = builder.indent_level + initial_indent_level
   }
 
