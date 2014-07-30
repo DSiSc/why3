@@ -65,8 +65,6 @@ let string_of_builder builder =
 
 let value_of_string x = x
 
-let string_of_value x = x
-
 let append_global ~name x =
   if not (M.mem modul name) then
     M.add modul name x
@@ -162,6 +160,7 @@ let unit_value = "why3__Tuple0__Tuple0"
 let null_value = "NULL"
 let true_value = "why3__Bool__True"
 let false_value = "why3__Bool__False"
+let env_value = "Env"
 
 let create_value value builder =
   let name = create_fresh_name builder in
@@ -188,8 +187,6 @@ let create_array size builder =
   let name = create_fresh_name builder in
   append_builder (fmt "value %s[%d] = {NULL};" name size) builder;
   name
-
-let clone_value = create_value
 
 let clone_mpz value builder =
   let name = create_fresh_name builder in
@@ -299,8 +296,23 @@ let build_if_false v f builder =
 let build_if_cmp_zero cmp signe f =
   append_block (fmt "if(%s %s 0)" cmp signe) f
 
+let build_if cmp f =
+  append_block (fmt "if(%s)" cmp) f
+
+let build_else_if cmp f =
+  append_block (fmt "else if(%s)" cmp) f
+
 let build_else f =
   append_block "else" f
+
+let build_if_else_if_else l else_case builder =
+  let aux (cond, f) = build_else_if cond f builder in
+  match l with
+  | [] -> else_case builder
+  | (cmp, f)::xs ->
+      build_if cmp f builder;
+      List.iter aux xs;
+      build_else else_case builder
 
 let build_access_field v field builder =
   create_value (fmt "%s->%s" v field) builder
@@ -340,3 +352,20 @@ let build_mpz_cmp x y builder =
 
 let build_mpz_succ value =
   append_expr (fmt "mpz_add_ui(%s, %s, 1)" value value)
+
+let const_access_field = fmt "%s->%s"
+
+let const_access_array = fmt "%s[%d]"
+
+let const_call_lambda closure param =
+  fmt "(%s->f)(%s, %s->env)" closure param closure
+
+let const_call_lambda_exn closure param exn =
+  fmt "(%s->f)(%s, %s->env, &%s)" closure param closure exn
+
+let const_tag = fmt "tag_%s"
+
+let const_equal = fmt "%s == %s"
+
+let append_global_exn name value =
+  append_global ~name:(fmt "exn_tag %s" name) ~value:(fmt "\"%s\"" value)

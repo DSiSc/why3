@@ -12,38 +12,38 @@
 type builder
 type value
 
-val append_function : string -> (builder -> unit) -> unit
-val append_global : name:string -> value:string -> unit
-val define_global : value -> unit
-val append_block : string -> (builder -> unit) -> builder -> unit
-val append_expr : string -> builder -> unit
-val append_header : string -> unit
+(*******************)
+(* General purpose *)
+(*******************)
 
-val create_global_fresh_name : unit -> value
+val define_global : value -> unit
 
 val value_of_string : string -> value
-val string_of_value : value -> string
 
 val init_builder : builder
 
 val to_string : unit -> string
 
-(************************)
-(* High-level functions *)
-(************************)
+(******************)
+(* Builtin values *)
+(******************)
 
 val unit_value : value
 val null_value : value
 val true_value : value
 val false_value : value
+val env_value : value
 
-val create_value : string -> builder -> value
+(******************)
+(* Value creation *)
+(******************)
+
+val create_value : value -> builder -> value
 val create_named_value : string -> value -> builder -> value
 val create_array : int -> builder -> value
 val create_exn : builder -> value
 val create_mpz : string -> int -> builder -> value
 
-val clone_value : value -> builder -> value
 val clone_mpz : value -> builder -> value
 
 val cast_to_closure : raises:bool -> value -> builder -> value
@@ -62,7 +62,9 @@ val create_lambda :
   (raise_expr:(value -> builder -> unit) -> param:value -> builder -> value) ->
   value
 
-val define_record : value -> string list -> unit
+(**********************)
+(* Statement creation *)
+(**********************)
 
 val build_equal : value -> value -> builder -> value
 val build_store : value -> value -> builder -> unit
@@ -74,6 +76,7 @@ val build_if_true : value -> (builder -> unit) -> builder -> unit
 val build_if_false : value -> (builder -> unit) -> builder -> unit
 val build_if_cmp_zero : value -> string -> (builder -> unit) -> builder -> unit
 val build_else : (builder -> unit) -> builder -> unit
+val build_if_else_if_else : (value * (builder -> unit)) list -> (builder -> unit) -> builder -> unit
 val build_access_field : value -> string -> builder -> value
 val build_not : value -> builder -> value
 val build_do_while : (builder -> unit) -> builder -> unit
@@ -82,3 +85,21 @@ val build_switch : value -> (int option * (builder -> unit)) list -> builder -> 
 val build_while : (builder -> unit) -> builder -> unit
 val build_mpz_cmp : value -> value -> builder -> value
 val build_mpz_succ : value -> builder -> unit
+
+(**********************)
+(* Constant statement *)
+(**********************)
+
+val const_access_field : value -> string -> value
+val const_access_array : value -> int -> value
+val const_call_lambda : value -> value -> value
+val const_call_lambda_exn : value -> value -> value -> value
+val const_tag : value -> value
+val const_equal : value -> value -> value
+
+(******************)
+(* Global objects *)
+(******************)
+
+val append_global_exn : value -> value -> unit
+val define_record : value -> string list -> unit
