@@ -527,20 +527,47 @@ let ity_of_expr = function
   | VTvalue ty -> ty
   | VTarrow _ -> assert false
 
-let is_simple_ppattern =
-  let aux (x, _) = match x.ppat_pattern.pat_node with
-    | Pwild -> true
-    | Papp (_, patterns) ->
-        let aux {pat_node; _} = match pat_node with
-          | Pwild | Pvar _ -> true
-          | Papp _ | Por _ | Pas _ -> false
-        in
-        List.for_all aux patterns
-    | Pvar _ | Por _ | Pas _ -> false
-  in
-  List.for_all aux
+let vs_from_term t = match t.t_node with
+  | Tvar vs -> vs
+  | Tconst _
+  | Tapp _
+  | Tif _
+  | Tlet _
+  | Tcase _
+  | Teps _
+  | Tquant _
+  | Tbinop _
+  | Tnot _
+  | Ttrue
+  | Tfalse -> assert false
 
-let rec print_expr info ~raise_expr gamma e builder =
+let rec print_pattern info ~raise_expr gamma builder = function
+  | PreM (t, bl) ->
+      let vs = vs_from_term t in
+      let pv =
+        try restore_pv vs with
+        | Not_found -> assert false
+      in
+      if pv.pv_ghost then begin
+        let branch = List.hd bl in
+        print_pattern info ~raise_expr gamma builder (snd branch)
+      end else begin
+        let e1 = get_value info pv.pv_vs.vs_name gamma builder in
+        print_branches info ~raise_expr gamma ~e1 ~bl builder
+      end
+  | PreL (vs, t, xs) ->
+      let id = (vs_from_term t).vs_name in
+      let value = match Mid.find_opt id gamma with
+        | Some (Value x) -> x
+        | Some (Env _) | None -> assert false
+      in
+      let value = Module.create_named_value vs.vs_name.id_string value builder in
+      let gamma = Mid.add vs.vs_name (Value value) gamma in
+      print_pattern info ~raise_expr gamma builder xs
+  | Expr e ->
+      print_expr info ~raise_expr gamma e builder
+
+and print_expr info ~raise_expr gamma e builder =
   if e.e_ghost then
     Module.unit_value
   else match e.e_node with
@@ -671,14 +698,23 @@ let rec print_expr info ~raise_expr gamma e builder =
   | Eany _ ->
       assert false
   | Ecase (e1, bl) ->
-      let ty = ity_of_expr e1.e_vty in
-      let pv = create_pvsymbol (id_fresh "res") ty in
+      let (matched_value, gamma) =
+        match e1.e_node with
+        | Evalue pv -> (t_var pv.pv_vs, gamma)
+        | Elogic ({t_node = Tvar _; _} as t) -> (t, gamma)
+        | _ ->
+            let ghost = e1.e_ghost in
+            let ty = ity_of_expr e1.e_vty in
+            let pv = create_pvsymbol (id_fresh "matched_value") ~ghost ty in
+            let e1 = print_expr info ~raise_expr gamma e1 builder in
+            let gamma = Mid.add pv.pv_vs.vs_name (Value e1) gamma in
+            (t_var pv.pv_vs, gamma)
+      in
       let bl = List.map (fun (x, y) -> ([x.ppat_pattern], Expr y)) bl in
       let mk_case t pattern = PreM (t, pattern) in
       let mk_let vs t pe = PreL (vs, t, pe) in
-      let e2 = Pattern.compile_bare ~mk_case ~mk_let [t_var pv.pv_vs] bl in
-      let e2 = assert false in
-      print_expr info ~raise_expr gamma e2 builder
+      let e2 = Pattern.compile_bare ~mk_case ~mk_let [matched_value] bl in
+      print_pattern info ~raise_expr gamma builder e2
   | Erec (fdl, e) ->
       let local_arr = Module.create_array (List.length fdl) builder in
       let gamma =
@@ -747,10 +783,10 @@ and print_branches info ~raise_expr gamma ~e1 ~bl builder =
   let bl =
     List.mapi
       (fun i (p, e) ->
-         begin match p.ppat_pattern.pat_node with
+         begin match p.pat_node with
          | Pwild ->
              let f builder =
-               let e = print_expr info ~raise_expr gamma e builder in
+               let e = print_pattern info ~raise_expr gamma builder e in
                Module.build_store res e builder;
              in
              (None, f)
@@ -760,13 +796,17 @@ and print_branches info ~raise_expr gamma ~e1 ~bl builder =
                  let aux gamma i {pat_node; _} = match pat_node with
                    | Pwild -> gamma
                    | Pvar vs ->
-                       let v = Module.create_named_value vs.vs_name.id_string (Module.value_of_string (sprintf "%s->val[%d]" (Module.string_of_value e1) i)) builder in
+(*                       let pv =
+                         try restore_pv vs with
+                         | Not_found -> assert false
+                       in*)
+                       let v = Module.create_value (sprintf "%s->val[%d]" (Module.string_of_value e1) i) builder in
                        Mid.add vs.vs_name (Value v) gamma
                    | Papp _ | Por _ | Pas _ -> assert false
                  in
                  Lists.fold_lefti aux gamma patterns
                in
-               let e = print_expr info ~raise_expr gamma e builder in
+               let e = print_pattern info ~raise_expr gamma builder e in
                Module.build_store res e builder;
              in
              (Some i, f)
