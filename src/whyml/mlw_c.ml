@@ -544,19 +544,23 @@ let vs_from_term t = match t.t_node with
   | Ttrue
   | Tfalse -> assert false
 
-let rec print_pattern info ~raise_expr gamma builder = function
+let rec print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder = function
   | PreM (t, bl) ->
       let vs = vs_from_term t in
-      let pv =
-        try restore_pv vs with
-        | Not_found -> assert false
+      let is_ghost =
+        try (restore_pv vs).pv_ghost with
+        | Not_found ->
+            match Mvs.find_opt vs map_ghost with
+            | Some is_ghost -> is_ghost
+            | None -> assert false
       in
-      if pv.pv_ghost then begin
+      let current_is_ghost = is_ghost in
+      if is_ghost then begin
         let branch = List.hd bl in
-        print_pattern info ~raise_expr gamma builder (snd branch)
+        print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder (snd branch)
       end else begin
-        let e1 = get_value info pv.pv_vs.vs_name gamma builder in
-        print_branches info ~raise_expr gamma ~e1 ~bl builder
+        let e1 = get_value info vs.vs_name gamma builder in
+        print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl builder
       end
   | PreL (vs, t, xs) ->
       let id = (vs_from_term t).vs_name in
@@ -566,7 +570,7 @@ let rec print_pattern info ~raise_expr gamma builder = function
       in
       let value = Module.create_named_value vs.vs_name.id_string value builder in
       let gamma = Mid.add vs.vs_name (Value value) gamma in
-      print_pattern info ~raise_expr gamma builder xs
+      print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder xs
   | Expr e ->
       print_expr info ~raise_expr gamma e builder
 
@@ -713,7 +717,7 @@ and print_expr info ~raise_expr gamma e builder =
       let mk_case t pattern = PreM (t, pattern) in
       let mk_let vs t pe = PreL (vs, t, pe) in
       let e2 = Pattern.compile_bare ~mk_case ~mk_let [matched_value] bl in
-      print_pattern info ~raise_expr gamma builder e2
+      print_pattern ~current_is_ghost:false info ~raise_expr gamma Mvs.empty builder e2
   | Erec (fdl, e) ->
       let local_arr = Module.create_array (List.length fdl) builder in
       let gamma =
@@ -777,41 +781,81 @@ and print_xbranch info gamma ~raise_expr ~exn ~res (xs, pv, e) =
   in
   (cond, f)
 
-and print_branches info ~raise_expr gamma ~e1 ~bl builder =
+and print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl builder =
   let e1 = Module.cast_to_variant e1 builder in
   let res = Module.create_value Module.null_value builder in
   let bl =
     List.mapi
       (fun i (p, e) ->
+         let constructors =
+           try
+             let ty = p.pat_ty in
+             let tys = match ty.ty_node with
+               | Tyvar _ -> raise Not_found
+               | Tyapp (tys, _) -> tys
+             in
+             let ity = restore_its tys in
+             Some (find_constructors info.mo_known_map ity)
+           with
+           | Not_found -> None
+         in
          begin match p.pat_node with
          | Pwild ->
              let f builder =
-               let e = print_pattern info ~raise_expr gamma builder e in
+               let e = print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder e in
                Module.build_store res e builder;
              in
              (None, f)
-         | Papp (_, patterns) ->
-             let f builder =
-               let gamma =
-                 let aux gamma i {pat_node; _} = match pat_node with
-                   | Pwild -> gamma
-                   | Pvar vs ->
-(*                       let pv =
-                         try restore_pv vs with
-                         | Not_found -> assert false
-                       in*)
-                       let v = Module.const_access_field e1 "val" in
-                       let v = Module.const_access_array v i in
-                       let v = Module.create_value v builder in
-                       Mid.add vs.vs_name (Value v) gamma
-                   | Papp _ | Por _ | Pas _ -> assert false
-                 in
-                 Lists.fold_lefti aux gamma patterns
-               in
-               let e = print_pattern info ~raise_expr gamma builder e in
-               Module.build_store res e builder;
+         | Papp (ls, patterns) ->
+             let f_var vs i builder gamma =
+               let v = Module.const_access_field e1 "val" in
+               let v = Module.const_access_array v i in
+               let v = Module.create_value v builder in
+               Mid.add vs.vs_name (Value v) gamma
              in
-             (Some i, f)
+             begin match constructors with
+             | Some constructors ->
+                 let (pls, _) =
+                   try List.find (fun (x, _) -> ls_equal x.pl_ls ls) constructors with
+                   | Not_found -> assert false
+                 in
+                 let fields = pls.pl_args in
+                 let f builder =
+                   let (gamma, map_ghost, _) =
+                     let aux (gamma, map_ghost, i) {pat_node; _} field = match pat_node with
+                       | Pwild -> (gamma, map_ghost, succ i)
+                       | Pvar vs ->
+                           let map_ghost = Mvs.add vs field.fd_ghost map_ghost in
+                           if field.fd_ghost then
+                             (gamma, map_ghost, i)
+                           else begin
+                             (f_var vs i builder gamma, map_ghost, succ i)
+                           end
+                       | Papp _ | Por _ | Pas _ -> assert false
+                     in
+                     List.fold_left2 aux (gamma, map_ghost, 0) patterns fields
+                   in
+                   let e = print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder e in
+                   Module.build_store res e builder;
+                 in
+                 (Some i, f)
+             | None ->
+                 let f builder =
+                   let (gamma, map_ghost) =
+                     let aux (gamma, map_ghost) i {pat_node; _} = match pat_node with
+                       | Pwild -> (gamma, map_ghost)
+                       | Pvar vs ->
+                           let map_ghost = Mvs.add vs false map_ghost in
+                           (f_var vs i builder gamma, map_ghost)
+                       | Papp _ | Por _ | Pas _ -> assert false
+                     in
+                     Lists.fold_lefti aux (gamma, map_ghost) patterns
+                   in
+                   let e = print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder e in
+                   Module.build_store res e builder;
+                 in
+                 (Some i, f)
+             end
          | Pvar _ | Por _ | Pas _ ->
              assert false
          end
