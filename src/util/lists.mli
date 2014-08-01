@@ -64,6 +64,12 @@ val fold_lefti : ('a -> int -> 'b -> 'a) -> 'a -> 'b list -> 'a
 (** similar to List.map, List.iter and List.fold_left,
     but with element index passed as extra argument (in 0..len-1) *)
 
+val fold_lefti2 : ('a -> int -> 'b -> 'c -> 'a) -> 'a -> 'b list -> 'c list -> 'a
+(** [List.fold_lefti2 f a [b1; ...; bn] [c1; ...; cn]] is
+   [f (... (f (f a 0 b1 c1) 1 b2 c2) ...) (n-1) bn cn].
+   Raise [Invalid_argument] if the two lists have
+   different lengths. *)
+
 val prefix : int -> 'a list -> 'a list
 (** the first n elements of a list *)
 

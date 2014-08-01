@@ -119,6 +119,14 @@ let fold_lefti f acc l =
   in
   fold_left acc 0 l
 
+let fold_lefti2 f acc l1 l2 =
+  let rec fold_left2 acc i = function
+    | [], [] -> acc
+    | x::xs, y::ys -> fold_left2 (f acc i x y) (i + 1) (xs, ys)
+    | _, _ -> invalid_arg "Util.fold_lefti2"
+  in
+  fold_left2 acc 0 (l1, l2)
+
 let rec prefix n l =
   if n = 0 then []
   else if n < 0 || l = [] then invalid_arg "Util.chop"
@@ -133,4 +141,3 @@ let rec chop_last = function
   | [] -> invalid_arg "Util.chop_last"
   | [r] -> [], r
   | x :: s -> let s, r = chop_last s in x :: s, r
-
