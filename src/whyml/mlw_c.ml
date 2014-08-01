@@ -821,19 +821,18 @@ and print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl bu
                  in
                  let fields = pls.pl_args in
                  let f builder =
-                   let (gamma, map_ghost, _) =
-                     let aux (gamma, map_ghost, i) {pat_node; _} field = match pat_node with
-                       | Pwild -> (gamma, map_ghost, succ i)
+                   let (gamma, map_ghost) =
+                     let aux (gamma, map_ghost) i {pat_node; _} field = match pat_node with
+                       | Pwild -> (gamma, map_ghost)
                        | Pvar vs ->
                            let map_ghost = Mvs.add vs field.fd_ghost map_ghost in
                            if field.fd_ghost then
-                             (gamma, map_ghost, i)
-                           else begin
-                             (f_var vs i builder gamma, map_ghost, succ i)
-                           end
+                             (gamma, map_ghost)
+                           else
+                             (f_var vs i builder gamma, map_ghost)
                        | Papp _ | Por _ | Pas _ -> assert false
                      in
-                     List.fold_left2 aux (gamma, map_ghost, 0) patterns fields
+                     Lists.fold_lefti2 aux (gamma, map_ghost) patterns fields
                    in
                    let e = print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder e in
                    Module.build_store res e builder;
