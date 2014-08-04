@@ -39,7 +39,7 @@ val env_value : value
 (******************)
 
 val create_value : value -> builder -> value
-val create_named_value : string -> value -> builder -> value
+val create_named_value : Ident.ident -> value -> builder -> value
 val create_array : int -> builder -> value
 val create_exn : builder -> value
 val create_mpz : string -> int -> builder -> value
@@ -57,7 +57,7 @@ val malloc_variant : builder -> value
 val malloc_record : value -> builder -> value
 
 val create_lambda :
-  param_name:string ->
+  param:Ident.ident ->
   raises:bool ->
   (raise_expr:(value -> builder -> unit) -> param:value -> builder -> value) ->
   value

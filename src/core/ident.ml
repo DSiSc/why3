@@ -111,13 +111,6 @@ type ident_printer = {
   blacklist : string list;
 }
 
-let clone_printer old =
-  { indices = Hstr.copy old.indices
-  ; values = Hid.copy old.values
-  ; sanitizer = old.sanitizer
-  ; blacklist = old.blacklist
-  }
-
 let find_unique indices name =
   let specname ind = name ^ string_of_int ind in
   let testname ind = Hstr.mem indices (specname ind) in

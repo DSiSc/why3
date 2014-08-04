@@ -11,25 +11,17 @@
 
 let fmt = Printf.sprintf
 
-type builder =
-  { mutable builder : string list
-  ; mutable ident : Ident.ident_printer
-  ; mutable indent_level : int
-  }
+type builder = line list ref
+
+and line =
+  | Text of string
+  | Block of (string * builder)
+
+type global =
+  | Global of string
+  | Function of (string * builder)
 
 type value = string
-
-module M = Hashtbl.Make(struct
-  type t = string
-  let equal = (=)
-  let hash = Hashtbl.hash
-end)
-
-let header = ref []
-let modul = M.create 64
-let ident = ref 0
-
-let initial_indent_level = 2
 
 let c_keywords =
   [ "auto"; "break"; "case"; "char"; "const"; "continue"; "default"; "do"
@@ -39,115 +31,100 @@ let c_keywords =
   ; "while"
   ]
 
-let define_global_builder () =
-  { builder = []
-  ; ident = Ident.create_ident_printer c_keywords
-  ; indent_level = initial_indent_level
-  }
+let header = ref []
+let modul = Hashtbl.create 64
+let printer = Ident.create_ident_printer c_keywords
 
-let create_block builder =
-  { builder = []
-  ; ident = Ident.clone_printer builder.ident
-  ; indent_level = builder.indent_level + initial_indent_level
-  }
-
-let create_global_fresh_name () =
-  let name = fmt "Lambda%d" !ident in
-  incr ident;
-  name
-
-let create_fresh_name ?(name = "X") builder =
-  Ident.string_unique builder.ident name
-
-let string_of_builder builder =
-  let builder = List.rev builder.builder in
-  String.concat "\n" builder
+let id_unique = function
+  | Some id -> Ident.id_unique printer id
+  | None -> Ident.string_unique printer "X__"
 
 let value_of_string x = x
 
 let append_global ~name x =
-  if not (M.mem modul name) then
-    M.add modul name x
+  if not (Hashtbl.mem modul name) then
+    Hashtbl.add modul name x
 
 let append_function name g =
-  let builder = define_global_builder () in
+  let builder = ref [] in
   g builder;
-  let x = name ^ "\n" in
-  let x = x ^ "{\n" in
-  let x = x ^ string_of_builder builder ^ "\n" in
-  let x = x ^ "}" in
-  append_global ~name x
+  append_global ~name (Function (name, builder))
 
 let append_global ~name ~value =
-  append_global ~name (fmt "%s = %s;" name value)
-
-let append_builder x builder =
-  let indent = String.make builder.indent_level ' ' in
-  builder.builder <- (indent ^ x) :: builder.builder
+  append_global ~name (Global (fmt "%s = %s" name value))
 
 let append_expr x builder =
-  append_builder (x ^ ";") builder
+  builder := Text x :: !builder
 
 let append_header str =
   header := str :: !header
 
 let define_global name =
-  append_header ("value " ^ name ^ ";")
+  append_header ("value " ^ name)
 
 let define_local_var ty name value builder =
-  append_builder (fmt "%s %s = %s;" ty name value) builder
+  append_expr (fmt "%s %s = %s" ty name value) builder
 
 let append_block x g builder =
-  let builder' = create_block builder in
+  let builder' = ref [] in
   g builder';
-  append_builder x builder;
-  append_builder "{" builder;
-  builder.builder <- (string_of_builder builder') :: builder.builder;
-  append_builder "}" builder
+  builder := Block (x, builder') :: !builder
 
-let init_builder =
-  define_global_builder ()
+let init_builder = ref []
+
+let dump_builder buf builder =
+  let indent_level = 2 in
+  let add_string indent str =
+    Buffer.add_string buf (String.make indent ' ');
+    Buffer.add_string buf str;
+  in
+  let rec aux indent = function
+    | Text s ->
+        add_string indent s;
+        Buffer.add_string buf ";\n";
+    | Block (s, builder) ->
+        add_string indent s;
+        Buffer.add_char buf '\n';
+        add_string indent "{\n";
+        let builder = List.rev !builder in
+        List.iter (aux (indent + indent_level)) builder;
+        add_string indent "}\n";
+  in
+  let builder = List.rev !builder in
+  List.iter (aux indent_level) builder
+
+let dump_global buf = function
+  | Global s ->
+      Buffer.add_char buf '\n';
+      Buffer.add_string buf s;
+      Buffer.add_string buf ";\n";
+  | Function (s, builder) ->
+      Buffer.add_char buf '\n';
+      Buffer.add_string buf s;
+      Buffer.add_string buf "\n{\n";
+      dump_builder buf builder;
+      Buffer.add_string buf "}\n"
 
 let to_string () =
-  let buf = Buffer.create 64 in
+  let buf = Buffer.create 4096 in
   let aux x =
     Buffer.add_char buf '\n';
     Buffer.add_string buf x;
-    Buffer.add_char buf '\n';
+    Buffer.add_char buf ';';
   in
   let header = List.rev !header in
-  List.iter (fun x -> Buffer.add_string buf x; Buffer.add_string buf "\n") header;
-  M.iter (fun x _ -> aux (x ^ ";")) modul;
+  Buffer.add_string buf "#include \"why3.c\"\n";
+  List.iter aux header;
   Buffer.add_char buf '\n';
-  M.iter (fun _ -> aux) modul;
+  Hashtbl.iter (fun x _ -> aux x) modul;
+  Buffer.add_char buf '\n';
+  Hashtbl.iter (fun _ -> dump_global buf) modul;
   Buffer.add_char buf '\n';
   Buffer.add_string buf "void Init()\n";
   Buffer.add_string buf "{\n";
-  Buffer.add_string buf (string_of_builder init_builder ^ "\n");
+  dump_builder buf init_builder;
   Buffer.add_string buf "}\n";
   Buffer.contents buf
-
-let () = begin
-  append_header "#include <stdlib.h>";
-  append_header "#include <stdbool.h>";
-  append_header "#include <gc.h>";
-  append_header "#include <gmp.h>";
-  append_header "";
-  append_header "typedef void* value;";
-  append_header "typedef char const * exn_tag;";
-  append_header "struct variant {int key; value* val;};";
-  append_header "struct exn {exn_tag key; value val;};";
-  append_header "struct closure {value (*f)(value, value*); value* env;};";
-  append_header "struct closure_with_exn {value (*f)(value, value*, struct exn **); value* env;};";
-  append_header "";
-  append_header "struct variant ___False = {0, NULL};";
-  append_header "value why3__Bool__False = &___False;";
-  append_header "struct variant ___True = {1, NULL};";
-  append_header "value why3__Bool__True = &___True;";
-  append_header "struct variant ___Tuple0 = {0, NULL};";
-  append_header "value why3__Tuple0__Tuple0 = &___Tuple0;";
-  append_header "\n";
-end
 
 (************************)
 (* High-level functions *)
@@ -163,61 +140,61 @@ let false_value = "why3__Bool__False"
 let env_value = "Env"
 
 let create_value value builder =
-  let name = create_fresh_name builder in
+  let name = id_unique None in
   define_local_var "value" name value builder;
   name
 
-let create_named_value name value builder =
-  let name = create_fresh_name ~name builder in
+let create_named_value id value builder =
+  let name = id_unique (Some id) in
   define_local_var "value" name value builder;
   name
 
 let create_exn builder =
-  let name = create_fresh_name builder in
+  let name = id_unique None in
   define_local_var "struct exn*" name null_value builder;
   name
 
 let create_mpz str base builder =
-  let name = create_fresh_name builder in
+  let name = id_unique None in
   append_expr (fmt "mpz_t %s" name) builder;
   append_expr (fmt "mpz_init_set_str(%s, %S, %d)" name str base) builder;
   name
 
 let create_array size builder =
-  let name = create_fresh_name builder in
-  append_builder (fmt "value %s[%d] = {NULL};" name size) builder;
+  let name = id_unique None in
+  append_expr (fmt "value %s[%d] = {NULL}" name size) builder;
   name
 
 let clone_mpz value builder =
-  let name = create_fresh_name builder in
+  let name = id_unique None in
   append_expr (fmt "mpz_t %s" name) builder;
   append_expr (fmt "mpz_init_set(%s, %s)" name value) builder;
   name
 
 let cast_to_closure ~raises value builder =
-  let name = create_fresh_name builder in
+  let name = id_unique None in
   let closure = get_closure_name raises in
   define_local_var (fmt "struct %s*" closure) name value builder;
   name
 
 let cast_to_record ~st value builder =
-  let name = create_fresh_name builder in
+  let name = id_unique None in
   define_local_var (fmt "struct %s*" st) name value builder;
   name
 
 let cast_to_variant value builder =
-  let name = create_fresh_name builder in
+  let name = id_unique None in
   define_local_var "struct variant*" name value builder;
   name
 
 let malloc_closure ~raises builder =
-  let name = create_fresh_name builder in
+  let name = id_unique None in
   let closure = get_closure_name raises in
   define_local_var (fmt "struct %s*" closure) name (fmt "GC_malloc(sizeof(struct %s))" closure) builder;
   name
 
 let malloc_exn builder =
-  let name = create_fresh_name builder in
+  let name = id_unique None in
   define_local_var "struct exn*" name "GC_malloc(sizeof(struct exn))" builder;
   name
 
@@ -225,30 +202,25 @@ let malloc_env size builder = match size with
   | 0 ->
       null_value
   | size ->
-      let name = create_fresh_name builder in
+      let name = id_unique None in
       define_local_var "value*" name (fmt "GC_malloc(sizeof(value) * %d)" size) builder;
       name
 
 let malloc_variant builder =
-  let name = create_fresh_name builder in
+  let name = id_unique None in
   define_local_var "struct variant*" name "GC_malloc(sizeof(struct variant))" builder;
   name
 
 let malloc_record st builder =
-  let name = create_fresh_name builder in
+  let name = id_unique None in
   define_local_var (fmt "struct %s*" st) name (fmt "GC_malloc(sizeof(struct %s))" st) builder;
   name
 
-let create_lambda ~param_name ~raises f =
-  let name = create_global_fresh_name () in
+let create_lambda ~param ~raises f =
+  let name = id_unique None in
+  let param = id_unique (Some param) in
   let exn = if raises then ", struct exn **Exn" else "" in
   let f builder =
-    if Ident.string_unique builder.ident param_name <> param_name then
-      assert false;
-    if Ident.string_unique builder.ident "Env" <> "Env" then
-      assert false;
-    if Ident.string_unique builder.ident "Exn" <> "Exn" then
-      assert false;
     let raise_expr value builder =
       if raises then begin
         append_expr (fmt "*Exn = %s" value) builder;
@@ -256,18 +228,18 @@ let create_lambda ~param_name ~raises f =
         append_expr "abort()" builder;
       end
     in
-    let v = f ~raise_expr ~param:param_name builder in
+    let v = f ~raise_expr ~param builder in
     append_expr (fmt "return %s" v) builder
   in
-  append_function (fmt "value %s(value %s, value* Env%s)" name param_name exn) f;
+  append_function (fmt "value %s(value %s, value* Env%s)" name param exn) f;
   name
 
 let define_record name fields =
   let fields =
-    let aux = fmt "%s  value %s;\n" in
+    let aux = fmt "%s value %s;\n" in
     List.fold_left aux "" fields
   in
-  append_header (fmt "struct %s {\n%s};" name fields)
+  append_header (fmt "struct %s {\n%s}" name fields)
 
 let build_equal x y builder =
   create_value (fmt "%s == %s" x y) builder
@@ -346,7 +318,7 @@ let build_while f =
   append_block "while(true)" f
 
 let build_mpz_cmp x y builder =
-  let name = create_fresh_name builder in
+  let name = id_unique None in
   define_local_var "int" name (fmt "mpz_cmp(%s, %s)" x y) builder;
   name
 

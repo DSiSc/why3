@@ -309,7 +309,7 @@ and print_term info gamma t builder = match t.t_node with
   | Tlet (t1,tb) ->
       let v,t2 = t_open_bound tb in
       let t1 = print_term info gamma t1 builder in
-      let t1 = Module.create_named_value v.vs_name.id_string t1 builder in
+      let t1 = Module.create_named_value v.vs_name t1 builder in
       let gamma = Mid.add v.vs_name (Value t1) gamma in
       print_term info gamma t2 builder
   | Tcase (t1, bl) when is_simple_pattern bl ->
@@ -391,7 +391,7 @@ and print_lbranches info gamma ~t1 ~bl builder =
                    | Pvar vs ->
                        let v = Module.const_access_field t1 "val" in
                        let v = Module.const_access_array v i in
-                       let v = Module.create_named_value vs.vs_name.id_string v builder in
+                       let v = Module.create_named_value vs.vs_name v builder in
                        Mid.add vs.vs_name (Value v) gamma
                    | Papp _ | Por _ | Pas _ -> assert false
                  in
@@ -431,7 +431,7 @@ let print_logic_decl info gamma builder (ls, ld) =
           let gamma = fold_env env gamma builder in
           let lambda =
             Module.create_lambda
-              ~param_name:arg.vs_name.id_string
+              ~param:arg.vs_name
               ~raises:false
               (fun ~raise_expr:_ ~param builder ->
                  let gamma = Mid.add arg.vs_name (Value param) gamma in
@@ -568,7 +568,7 @@ let rec print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder
         | Some (Value x) -> x
         | Some (Env _) | None -> assert false
       in
-      let value = Module.create_named_value vs.vs_name.id_string value builder in
+      let value = Module.create_named_value vs.vs_name value builder in
       let gamma = Mid.add vs.vs_name (Value value) gamma in
       print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder xs
   | Expr e ->
@@ -602,7 +602,7 @@ and print_expr info ~raise_expr gamma e builder =
   | Elet ({ let_sym = lv ; let_expr = e1 }, e2) ->
       let id = get_id_from_let lv in
       let v = print_expr info ~raise_expr gamma e1 builder in
-      let v = Module.create_named_value id.id_string v builder in
+      let v = Module.create_named_value id v builder in
       let gamma = Mid.add id (Value v) gamma in
       print_expr info ~raise_expr gamma e2 builder
   | Eif (e0,e1,e2) ->
@@ -749,7 +749,7 @@ and print_rec info ~raise_expr builder gamma {fun_ps = ps; fun_lambda = lam} =
         let gamma = fold_env env gamma builder in
         let lambda =
           Module.create_lambda
-            ~param_name:arg.pv_vs.vs_name.id_string
+            ~param:arg.pv_vs.vs_name
             ~raises
             (fun ~raise_expr ~param builder ->
                let gamma = Mid.add arg.pv_vs.vs_name (Value param) gamma in
