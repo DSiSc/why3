@@ -758,8 +758,6 @@ and print_rec info ~raise_expr builder gamma {fun_ps = ps; fun_lambda = lam} =
   in
   aux ~raise_expr gamma builder lam.l_args
 
-(* TODO: Handle xs_exit *)
-
 and print_xbranch info gamma ~raise_expr ~exn ~res (xs, pv, e) =
   let tag = Module.const_tag (get_xs info xs) in
   let key = Module.const_access_field exn "key" in
