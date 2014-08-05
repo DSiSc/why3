@@ -739,6 +739,7 @@ and print_rec info ~raise_expr builder gamma {fun_ps = ps; fun_lambda = lam} =
     | [] ->
         print_expr info ~raise_expr gamma lam.l_expr builder
     | arg::xs ->
+        let raises = if xs = [] then raises else false in
         let closure = Module.malloc_closure ~raises builder in
         let gamma = Mid.add arg.pv_vs.vs_name (Value closure) gamma in
         let env = Module.malloc_env (Mid.cardinal gamma) builder in
