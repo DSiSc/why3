@@ -31,7 +31,7 @@ let c_keywords =
   ; "while"
   ]
 
-let header = ref []
+let header = ref ["#include \"why3.c\""]
 let modul = Hashtbl.create 64
 let printer = Ident.create_ident_printer c_keywords
 
@@ -60,7 +60,7 @@ let append_header str =
   header := str :: !header
 
 let define_global name =
-  append_header ("value " ^ name)
+  append_header (fmt "value %s;" name)
 
 let define_local_var ty name value builder =
   append_expr (fmt "%s %s = %s" ty name value) builder
@@ -72,19 +72,19 @@ let append_block x g builder =
 
 let init_builder = ref []
 
-let dump_builder buf builder =
+let dump_builder fmt builder =
   let indent_level = 2 in
   let add_string indent str =
-    Buffer.add_string buf (String.make indent ' ');
-    Buffer.add_string buf str;
+    Format.pp_print_string fmt (String.make indent ' ');
+    Format.pp_print_string fmt str;
   in
   let rec aux indent = function
     | Text s ->
         add_string indent s;
-        Buffer.add_string buf ";\n";
+        Format.fprintf fmt ";\n";
     | Block (s, builder) ->
         add_string indent s;
-        Buffer.add_char buf '\n';
+        Format.fprintf fmt "\n";
         add_string indent "{\n";
         let builder = List.rev !builder in
         List.iter (aux (indent + indent_level)) builder;
@@ -93,38 +93,43 @@ let dump_builder buf builder =
   let builder = List.rev !builder in
   List.iter (aux indent_level) builder
 
-let dump_global buf = function
+let dump_global fmt = function
   | Global s ->
-      Buffer.add_char buf '\n';
-      Buffer.add_string buf s;
-      Buffer.add_string buf ";\n";
+      Format.fprintf fmt "%s;\n\n" s;
   | Function (s, builder) ->
-      Buffer.add_char buf '\n';
-      Buffer.add_string buf s;
-      Buffer.add_string buf "\n{\n";
-      dump_builder buf builder;
-      Buffer.add_string buf "}\n"
+      Format.pp_print_string fmt s;
+      Format.fprintf fmt "\n{\n";
+      dump_builder fmt builder;
+      Format.fprintf fmt "}\n\n"
 
-let to_string () =
-  let buf = Buffer.create 4096 in
-  let aux x =
-    Buffer.add_char buf '\n';
-    Buffer.add_string buf x;
-    Buffer.add_char buf ';';
+let dump fmt =
+  let dump_header () =
+    let h = List.rev !header in
+    List.iter (Format.fprintf fmt "%s\n") h;
+    Format.fprintf fmt "\n";
+    header := [];
   in
-  let header = List.rev !header in
-  Buffer.add_string buf "#include \"why3.c\"\n";
-  List.iter aux header;
-  Buffer.add_char buf '\n';
-  Hashtbl.iter (fun x _ -> aux x) modul;
-  Buffer.add_char buf '\n';
-  Hashtbl.iter (fun _ -> dump_global buf) modul;
-  Buffer.add_char buf '\n';
-  Buffer.add_string buf "void Init()\n";
-  Buffer.add_string buf "{\n";
-  dump_builder buf init_builder;
-  Buffer.add_string buf "}\n";
-  Buffer.contents buf
+  let dump_module () =
+    Hashtbl.iter (fun x _ -> Format.fprintf fmt "%s;\n" x) modul;
+    Format.fprintf fmt "\n";
+    Hashtbl.iter (fun _ -> dump_global fmt) modul;
+    Format.fprintf fmt "\n";
+    Hashtbl.clear modul;
+  in
+  begin match !header with
+  | [] -> ()
+  | _::_ -> dump_header ()
+  end;
+  if Hashtbl.length modul > 0 then begin
+    dump_module ();
+  end
+
+let finalize fmt =
+  Format.fprintf fmt "void Init()\n";
+  Format.fprintf fmt "{\n";
+  dump_builder fmt init_builder;
+  Format.fprintf fmt "}\n";
+  init_builder := []
 
 (************************)
 (* High-level functions *)
@@ -239,7 +244,7 @@ let define_record name fields =
     let aux = fmt "%s value %s;\n" in
     List.fold_left aux "" fields
   in
-  append_header (fmt "struct %s {\n%s}" name fields)
+  append_header (fmt "struct %s {\n%s};" name fields)
 
 let build_equal x y builder =
   create_value (fmt "%s == %s" x y) builder

@@ -22,7 +22,8 @@ val value_of_string : string -> value
 
 val init_builder : builder
 
-val to_string : unit -> string
+val dump : Format.formatter -> unit
+val finalize : Format.formatter -> unit
 
 (******************)
 (* Builtin values *)

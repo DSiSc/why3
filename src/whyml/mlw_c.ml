@@ -29,7 +29,6 @@
     * We'll use the Boehm GC
 *)
 
-open Format
 open Pp
 
 open Number
@@ -41,9 +40,6 @@ open Theory
 open Printer
 
 module Module = Mlw_c_module
-
-(* TODO: Remove this hack *)
-let hack_fmt = ref None
 
 let clean_fname fname =
   let fname = Filename.basename fname in
@@ -480,7 +476,6 @@ let logic_decl info builder td = match td.td_node with
 (** Theories *)
 
 let extract_theory drv ?fname fmt th =
-  hack_fmt := Some fmt;
   let info = {
     info_syn = drv.Mlw_driver.drv_syntax;
     converters = drv.Mlw_driver.drv_converter;
@@ -490,7 +485,8 @@ let extract_theory drv ?fname fmt th =
     mo_known_map = Mid.empty;
     fname = Opt.map clean_fname fname; } in
   let builder = Module.init_builder in
-  List.iter (logic_decl info builder) th.th_decls
+  List.iter (logic_decl info builder) th.th_decls;
+  Module.dump fmt
 
 (** Programs *)
 
@@ -935,7 +931,6 @@ let rec pdecl info gamma builder = function
 (** Modules *)
 
 let extract_module drv ?fname fmt m =
-  hack_fmt := Some fmt;
   let th = m.mod_theory in
   let info = {
     info_syn = drv.Mlw_driver.drv_syntax;
@@ -946,11 +941,5 @@ let extract_module drv ?fname fmt m =
     mo_known_map = m.mod_known;
     fname = Opt.map clean_fname fname; } in
   let builder = Module.init_builder in
-  pdecl info Mid.empty builder m.mod_decls
-
-let finalize () =
-  match !hack_fmt with
-  | None ->
-      ()
-  | Some fmt ->
-      fprintf fmt "%s" (Module.to_string ())
+  pdecl info Mid.empty builder m.mod_decls;
+  Module.dump fmt

@@ -613,8 +613,8 @@ let extract_to ?fname th extract =
       Some (open_in backup)
     end else None in
   let cout = open_out file in
-  extract file ?old (formatter_of_out_channel cout);
-  close_out cout
+  let fmt = formatter_of_out_channel cout in
+  extract file ?old fmt cout
 
 let extract_to =
   let visited = Ident.Hid.create 17 in
@@ -634,11 +634,19 @@ let extract_to_c ~fname th =
       Some (open_in backup)
     end else None in
   let cout = open_out file in
-  let fcout = formatter_of_out_channel cout in
+  let fmt = formatter_of_out_channel cout in
   fun ?fname:_ _ extract ->
-    extract file ?old fcout
-(*    close_out cout *)
-(* TODO *)
+    extract file ?old fmt cout
+
+let extract_to_c =
+  let visited = Ident.Hid.create 17 in
+  fun ~fname th ->
+    let extract_to = extract_to_c ~fname th in
+    fun ?fname th extract ->
+      if not (Ident.Hid.mem visited th.th_name) then begin
+        Ident.Hid.add visited th.th_name ();
+        extract_to ?fname th extract;
+      end
 
 let use_iter f th =
   List.iter (fun d -> match d.td_node with Use t -> f t | _ -> ()) th.th_decls
@@ -648,10 +656,10 @@ let rec do_extract_theory ~extract_to edrv ?fname th =
     let fname = if th'.th_path = [] then fname else None in
     do_extract_theory ~extract_to edrv ?fname th' in
   use_iter extract_use th;
-  let extract file ?old fmt = ignore (old);
+  let extract file ?old fmt cout =
     let tname = th.th_name.Ident.id_string in
     Debug.dprintf Mlw_backends.debug "extract theory %s to file %s@." tname file;
-    Mlw_backends.extract_theory edrv ?old ?fname fmt th
+    Mlw_backends.extract_theory edrv ?old ?fname fmt cout th
   in
   extract_to ?fname th extract
 
@@ -664,10 +672,10 @@ let rec do_extract_module ~extract_to edrv ?fname m =
       | Some m' -> do_extract_module ~extract_to edrv ?fname m'
       | None    -> do_extract_theory ~extract_to edrv ?fname th' in
   use_iter extract_use m.Mlw_module.mod_theory;
-  let extract file ?old fmt = ignore (old);
+  let extract file ?old fmt cout =
     let tname = m.Mlw_module.mod_theory.th_name.Ident.id_string in
     Debug.dprintf Mlw_backends.debug "extract module %s to file %s@." tname file;
-    Mlw_backends.extract_module edrv ?old ?fname fmt m
+    Mlw_backends.extract_module edrv ?old ?fname fmt cout m
   in
   extract_to ?fname m.Mlw_module.mod_theory extract
 
@@ -677,7 +685,8 @@ let do_extract_theory edrv ?fname th =
     | Mlw_backends.Switch.C -> extract_to_c ~fname th
     | Mlw_backends.Switch.OCaml -> extract_to
   in
-  do_extract_theory ~extract_to edrv ?fname th
+  do_extract_theory ~extract_to edrv ?fname th;
+  Mlw_backends.finalize ()
 
 let do_extract_module edrv ?fname m =
   let extract_to =
@@ -685,7 +694,8 @@ let do_extract_module edrv ?fname m =
     | Mlw_backends.Switch.C -> extract_to_c ~fname m.Mlw_module.mod_theory
     | Mlw_backends.Switch.OCaml -> extract_to
   in
-  do_extract_module ~extract_to edrv ?fname m
+  do_extract_module ~extract_to edrv ?fname m;
+  Mlw_backends.finalize ()
 
 let do_global_extract edrv (tname,p,t,_,_) =
   let lib = edrv.Mlw_driver.drv_lib in
@@ -733,7 +743,6 @@ let do_local_extract edrv fname cin tlist =
       Mstr.iter (fun _ th -> do_extract_theory edrv ~fname th) thm
     end else
       Queue.iter (do_extract_module_from edrv fname mm thm) tlist;
-    Mlw_backends.finalize ();
   end else begin
     let env = Env.env_of_library lib in
     let m = Env.read_channel ?format:!opt_parser env fname cin in
