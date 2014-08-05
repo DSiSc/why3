@@ -23,12 +23,20 @@ type global =
 
 type value = string
 
+let unit_value = "why3__Tuple0__Tuple0"
+let null_value = "NULL"
+let true_value = "why3__Bool__True"
+let false_value = "why3__Bool__False"
+let env_value = "Env"
+let exn_value = "Exn"
+
 let c_keywords =
   [ "auto"; "break"; "case"; "char"; "const"; "continue"; "default"; "do"
   ; "double"; "else"; "enum"; "extern"; "float"; "for"; "goto"; "if"; "int"
   ; "long"; "register"; "return"; "short"; "signed"; "sizeof"; "static"
   ; "struct"; "switch"; "typedef"; "union"; "unsigned"; "void"; "volatile"
-  ; "while"
+  ; "while"; unit_value; null_value; true_value; false_value; env_value
+  ; exn_value
   ]
 
 let header = ref ["#include \"why3.c\""]
@@ -137,12 +145,6 @@ let finalize fmt =
 
 let get_closure_name raises =
   if raises then "closure_with_exn" else "closure"
-
-let unit_value = "why3__Tuple0__Tuple0"
-let null_value = "NULL"
-let true_value = "why3__Bool__True"
-let false_value = "why3__Bool__False"
-let env_value = "Env"
 
 let create_value value builder =
   let name = id_unique None in
