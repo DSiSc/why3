@@ -299,7 +299,13 @@ and print_term info gamma t builder = match t.t_node with
   | Tconst c ->
       print_const builder c
   | Tapp (fs, tl) ->
-      print_app fs info gamma builder tl
+      begin match query_syntax info.info_syn fs.ls_name with
+      | Some s ->
+          let tl = List.map (fun t -> print_term info gamma t builder) tl in
+          Module.syntax_arguments s tl builder
+      | None ->
+          print_app fs info gamma builder tl
+      end
   | Tif (e, t1, t2) ->
       print_if (print_term info gamma) builder (e, t1, t2)
   | Tlet (t1,tb) ->

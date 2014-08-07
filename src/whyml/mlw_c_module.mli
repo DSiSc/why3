@@ -104,3 +104,9 @@ val const_equal : value -> value -> value
 
 val append_global_exn : value -> value -> unit
 val define_record : value -> string list -> unit
+
+(*******************)
+(* Syntax handling *)
+(*******************)
+
+val syntax_arguments : string -> value list -> builder -> value

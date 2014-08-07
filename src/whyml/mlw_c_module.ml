@@ -348,3 +348,10 @@ let const_equal = fmt "%s == %s"
 
 let append_global_exn name value =
   append_global ~name:(fmt "exn_tag %s" name) ~value:(fmt "\"%s\"" value)
+
+let syntax_arguments x tl builder =
+  let buf = Buffer.create 32 in
+  let fmt = Format.formatter_of_buffer buf in
+  Printer.syntax_arguments x (fun fmt -> Format.fprintf fmt "%s") fmt tl;
+  Format.pp_print_flush fmt ();
+  create_value (Buffer.contents buf) builder
