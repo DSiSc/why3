@@ -7,8 +7,7 @@ typedef void* value;
 typedef char const * exn_tag;
 struct variant {int key; value* val;};
 struct exn {exn_tag key; value val;};
-struct closure {value (*f)(value, value*); value* env;};
-struct closure_with_exn {value (*f)(value, value*, struct exn **); value* env;};
+struct closure {value f; value* env;};
 
 struct variant ___False = {0, NULL};
 value why3__Bool__False = &___False;

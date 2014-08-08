@@ -141,3 +141,24 @@ let rec chop_last = function
   | [] -> invalid_arg "Util.chop_last"
   | [r] -> [], r
   | x :: s -> let s, r = chop_last s in x :: s, r
+
+let split_at n l =
+  let rec aux n acc = function
+    | l when n = 0 -> (acc, l)
+    | [] -> invalid_arg "Util.split_at"
+    | x::xs -> aux (pred n) (x :: acc) xs
+  in
+  if n < 0 then
+    invalid_arg "Util.split_at"
+  else
+    aux n [] l
+
+let make n x =
+  let rec aux acc = function
+    | 0 -> acc
+    | n -> aux (x :: acc) (pred n)
+  in
+  if n < 0 then
+    invalid_arg "Util.make"
+  else
+    aux [] n

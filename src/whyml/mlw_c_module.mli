@@ -47,20 +47,20 @@ val create_mpz : string -> int -> builder -> value
 
 val clone_mpz : value -> builder -> value
 
-val cast_to_closure : raises:bool -> value -> builder -> value
+val cast_to_closure : value -> builder -> value
 val cast_to_record : st:value -> value -> builder -> value
 val cast_to_variant : value -> builder -> value
 
-val malloc_closure : raises:bool -> builder -> value
+val malloc_closure : builder -> value
 val malloc_exn : builder -> value
 val malloc_env : int -> builder -> value
 val malloc_variant : builder -> value
 val malloc_record : value -> builder -> value
 
-val create_lambda :
-  param:Ident.ident ->
+val create_function :
+  params:Ident.ident list ->
   raises:bool ->
-  (raise_expr:(value -> builder -> unit) -> param:value -> builder -> value) ->
+  (raise_expr:(value -> builder -> unit) -> params:value list -> builder -> value) ->
   value
 
 (**********************)
@@ -86,6 +86,7 @@ val build_switch : value -> (int option * (builder -> unit)) list -> builder -> 
 val build_while : (builder -> unit) -> builder -> unit
 val build_mpz_cmp : value -> value -> builder -> value
 val build_mpz_succ : value -> builder -> unit
+val build_call : value -> value list -> ?exn:value -> builder -> value
 
 (**********************)
 (* Constant statement *)
@@ -93,8 +94,6 @@ val build_mpz_succ : value -> builder -> unit
 
 val const_access_field : value -> string -> value
 val const_access_array : value -> int -> value
-val const_call_lambda : value -> value -> value
-val const_call_lambda_exn : value -> value -> value -> value
 val const_tag : value -> value
 val const_equal : value -> value -> value
 

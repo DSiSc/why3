@@ -143,9 +143,6 @@ let finalize fmt =
 (* High-level functions *)
 (************************)
 
-let get_closure_name raises =
-  if raises then "closure_with_exn" else "closure"
-
 let create_value value builder =
   let name = id_unique None in
   define_local_var "value" name value builder;
@@ -178,10 +175,9 @@ let clone_mpz value builder =
   append_expr (fmt "mpz_init_set(%s, %s)" name value) builder;
   name
 
-let cast_to_closure ~raises value builder =
+let cast_to_closure value builder =
   let name = id_unique None in
-  let closure = get_closure_name raises in
-  define_local_var (fmt "struct %s*" closure) name value builder;
+  define_local_var "struct closure*" name value builder;
   name
 
 let cast_to_record ~st value builder =
@@ -194,10 +190,18 @@ let cast_to_variant value builder =
   define_local_var "struct variant*" name value builder;
   name
 
-let malloc_closure ~raises builder =
+let cast_to_function ~raises params_nbr value builder =
   let name = id_unique None in
-  let closure = get_closure_name raises in
-  define_local_var (fmt "struct %s*" closure) name (fmt "GC_malloc(sizeof(struct %s))" closure) builder;
+  let params = Lists.make params_nbr "value" in
+  let params = String.concat ", " params in
+  let params = params ^ ", value*" in
+  let params = if raises then params ^ ", struct exn**" else params in
+  append_expr (fmt "value (*%s)(%s) = %s" name params value) builder;
+  name
+
+let malloc_closure builder =
+  let name = id_unique None in
+  define_local_var "struct closure*" name "GC_malloc(sizeof(struct closure))" builder;
   name
 
 let malloc_exn builder =
@@ -223,9 +227,9 @@ let malloc_record st builder =
   define_local_var (fmt "struct %s*" st) name (fmt "GC_malloc(sizeof(struct %s))" st) builder;
   name
 
-let create_lambda ~param ~raises f =
+let create_function ~params ~raises f =
   let name = id_unique None in
-  let param = id_unique (Some param) in
+  let params = List.map (fun x -> id_unique (Some x)) params in
   let exn = if raises then ", struct exn **Exn" else "" in
   let f builder =
     let raise_expr value builder =
@@ -235,10 +239,11 @@ let create_lambda ~param ~raises f =
         append_expr "abort()" builder;
       end
     in
-    let v = f ~raise_expr ~param builder in
+    let v = f ~raise_expr ~params builder in
     append_expr (fmt "return %s" v) builder
   in
-  append_function (fmt "value %s(value %s, value* Env%s)" name param exn) f;
+  let params = String.concat ", value " params in
+  append_function (fmt "value %s(value %s, value* Env%s)" name params exn) f;
   name
 
 let define_record name fields =
@@ -332,15 +337,20 @@ let build_mpz_cmp x y builder =
 let build_mpz_succ value =
   append_expr (fmt "mpz_add_ui(%s, %s, 1)" value value)
 
+let build_call closure params ?exn builder =
+  let f = build_access_field closure "f" builder in
+  let raises = exn <> None in
+  let f = cast_to_function ~raises (List.length params) f builder in
+  let params = String.concat ", " params in
+  match exn with
+  | None ->
+      create_value (fmt "%s(%s, %s->env)" f params closure) builder
+  | Some exn ->
+      create_value (fmt "%s(%s, %s->env, &%s)" f params closure exn) builder
+
 let const_access_field = fmt "%s->%s"
 
 let const_access_array = fmt "%s[%d]"
-
-let const_call_lambda closure param =
-  fmt "(%s->f)(%s, %s->env)" closure param closure
-
-let const_call_lambda_exn closure param exn =
-  fmt "(%s->f)(%s, %s->env, &%s)" closure param closure exn
 
 let const_tag = fmt "tag_%s"
 

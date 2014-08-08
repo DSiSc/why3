@@ -222,20 +222,7 @@ let is_simple_pattern =
   in
   List.for_all aux
 
-let rec simple_app fs info gamma builder tl =
-  let rec aux f = function
-    | [] ->
-        f
-    | x::xs ->
-        let closure = Module.cast_to_closure ~raises:false f builder in
-        let v = print_term info gamma x builder in
-        let f = Module.create_value (Module.const_call_lambda closure v) builder in
-        aux f xs
-  in
-  aux (get_value info fs.ls_name gamma builder) tl
-
-and print_variant_creation info gamma ~ls ~tl builder =
-  let tl = List.map (fun x -> print_term info gamma x builder) tl in
+let rec print_variant_creation info ~ls ~tl builder =
   let v = Module.malloc_env (List.length tl) builder in
   Lists.iteri (fun i x -> Module.build_store (Module.const_access_array v i) x builder) tl;
   let variant = Module.malloc_variant builder in
@@ -252,8 +239,7 @@ and print_variant_creation info gamma ~ls ~tl builder =
   Module.build_store_field variant "val" v builder;
   variant
 
-and print_record_creation info gamma ~ls ~tl ~pjl builder =
-  let tl = List.map (fun x -> print_term info gamma x builder) tl in
+and print_record_creation info ~ls ~tl ~pjl builder =
   let v = Module.malloc_record (get_record_name info ls.ls_value) builder in
   let aux (ls, t) =
     Module.build_store_field v ls.ls_name.id_string t builder;
@@ -261,8 +247,7 @@ and print_record_creation info gamma ~ls ~tl ~pjl builder =
   List.iter aux (List.combine pjl tl);
   v
 
-and print_record_access info gamma ~t1 ~ls builder =
-  let t1 = print_term info gamma t1 builder in
+and print_record_access info ~t1 ~ls builder =
   let t1 = Module.cast_to_record ~st:(get_record_name info (singleton_opt ls.ls_args)) t1 builder in
   Module.build_access_field t1 ls.ls_name.id_string builder
 
@@ -279,18 +264,19 @@ and print_app ls info gamma builder tl =
   in
   match tl with
   | tl when isconstr ->
-      let tl = filter_ghost ls Mlw_expr.t_void tl in
       let pjl = get_record info ls in
       if pjl = [] then
-        print_variant_creation info gamma ~ls ~tl builder
+        print_variant_creation info ~ls ~tl builder
       else
-        print_record_creation info gamma ~ls ~tl ~pjl builder
+        print_record_creation info ~ls ~tl ~pjl builder
   | [] ->
       get_value info ls.ls_name gamma builder
   | [t1] when isfield ->
-      print_record_access info gamma ~t1 ~ls builder
+      print_record_access info ~t1 ~ls builder
   | tl ->
-      simple_app ls info gamma builder tl
+      let f = get_value info ls.ls_name gamma builder in
+      let closure = Module.cast_to_closure f builder in
+      Module.build_call closure tl builder
 
 and print_term info gamma t builder = match t.t_node with
   | Tvar v ->
@@ -298,9 +284,10 @@ and print_term info gamma t builder = match t.t_node with
   | Tconst c ->
       print_const builder c
   | Tapp (fs, tl) ->
-      begin match query_syntax info.info_syn fs.ls_name with
+      let tl = filter_ghost fs Mlw_expr.t_void tl in
+      let tl = List.map (fun t -> print_term info gamma t builder) tl in
+      begin match Printer.query_syntax info.info_syn fs.ls_name with
       | Some s ->
-          let tl = List.map (fun t -> print_term info gamma t builder) tl in
           Module.syntax_arguments s tl builder
       | None ->
           print_app fs info gamma builder tl
@@ -422,29 +409,26 @@ let print_logic_decl info gamma builder (ls, ld) =
     let vl,e = open_ls_defn ld in
     let store = get_ls info ls in
     Module.define_global store;
-    let rec aux gamma builder = function
-      | [] ->
-          print_term info gamma e builder
-      | arg::xs ->
-          let closure = Module.malloc_closure ~raises:false builder in
-          let gamma = Mid.add ls.ls_name (Value closure) gamma in
-          let env = Module.malloc_env (Mid.cardinal gamma) builder in
-          let gamma = fold_env env gamma builder in
-          let lambda =
-            Module.create_lambda
-              ~param:arg.vs_name
-              ~raises:false
-              (fun ~raise_expr:_ ~param builder ->
-                 let gamma = Mid.add arg.vs_name (Value param) gamma in
-                 aux gamma builder xs
-              )
-          in
-          Module.build_store_field closure "f" lambda builder;
-          Module.build_store_field closure "env" env builder;
-          closure
+    let raises = false in
+    let closure = Module.malloc_closure builder in
+    let gamma = Mid.add ls.ls_name (Value closure) gamma in
+    let env = Module.malloc_env (Mid.cardinal gamma) builder in
+    let gamma = fold_env env gamma builder in
+    let func =
+      Module.create_function
+        ~params:(List.map (fun x -> x.vs_name) vl)
+        ~raises
+        (fun ~raise_expr:_ ~params builder ->
+           let gamma =
+             let aux gamma x y = Mid.add x.vs_name (Value y) gamma in
+             List.fold_left2 aux gamma vl params
+           in
+           print_term info gamma e builder
+        )
     in
-    let v = aux gamma builder vl in
-   Module.build_store store v builder;
+    Module.build_store_field closure "f" func builder;
+    Module.build_store_field closure "env" env builder;
+    Module.build_store store closure builder;
   end
 
 (** Logic Declarations *)
@@ -545,6 +529,29 @@ let vs_from_term t = match t.t_node with
   | Ttrue
   | Tfalse -> assert false
 
+let apply f ~raise_expr params builder =
+  let (params, spec) =
+    let rec aux acc = function
+      | [(v, spec)] ->
+          (List.rev (v :: acc), spec)
+      | (v, spec)::xs when eff_is_empty spec.c_effect ->
+          aux (v :: acc) xs
+      | [] | _::_ ->
+          assert false
+    in
+    aux [] params
+  in
+  let raises = not (Sexn.is_empty spec.c_effect.eff_raises) in
+  let closure = Module.cast_to_closure f builder in
+  if raises then begin
+    let exn = Module.create_exn builder in
+    let res = Module.build_call closure params ~exn builder in
+    Module.build_if_not_null exn (raise_expr exn) builder;
+    res
+  end else begin
+    Module.build_call closure params builder
+  end
+
 let rec print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder = function
   | PreM (t, bl) ->
       let vs = vs_from_term t in
@@ -575,6 +582,47 @@ let rec print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder
   | Expr e ->
       print_expr info ~raise_expr gamma e builder
 
+and print_app info ~raise_expr gamma builder params e = match e.e_node with
+  | Earrow ps ->
+      let f = get_value info ps.ps_name gamma builder in
+      let rec aux f params a =
+        let params_nbr = List.length a.aty_args in
+        match a.aty_result with
+        | VTvalue _ ->
+            if params_nbr = List.length params then begin
+              apply f ~raise_expr params builder
+            end else begin
+              (* TODO: Lambda *)
+              assert false
+            end
+        | VTarrow a ->
+            let (params, rem) = Lists.split_at params_nbr params in
+            let f = apply f ~raise_expr params builder in
+            aux f rem a
+      in
+      aux f params ps.ps_aty
+  | Eapp (e, v, spec) ->
+      let v = get_value info v.pv_vs.vs_name gamma builder in
+      print_app info ~raise_expr gamma builder ((v, spec) :: params) e
+  | Elogic _
+  | Evalue _
+  | Elet _
+  | Eif _
+  | Eassign _
+  | Eloop _
+  | Efor _
+  | Eraise _
+  | Etry _
+  | Eabstr _
+  | Eabsurd
+  | Eassert _
+  | Eghost _
+  | Eany _
+  | Ecase _
+  | Erec _ ->
+      (* TODO *)
+      assert false
+
 and print_expr info ~raise_expr gamma e builder =
   if e.e_ghost then
     Module.unit_value
@@ -585,19 +633,8 @@ and print_expr info ~raise_expr gamma e builder =
       get_value info v.pv_vs.vs_name gamma builder
   | Earrow a ->
       get_value info a.ps_name gamma builder
-  | Eapp (e,v,spec) ->
-      let e = print_expr info ~raise_expr gamma e builder in
-      let v = get_value info v.pv_vs.vs_name gamma builder in
-      let raises = not (Sexn.is_empty spec.c_effect.eff_raises) in
-      let closure = Module.cast_to_closure ~raises e builder in
-      if raises then begin
-        let exn = Module.create_exn builder in
-        let res = Module.create_value (Module.const_call_lambda_exn closure v exn) builder in
-        Module.build_if_not_null exn (raise_expr exn) builder;
-        res
-      end else begin
-        Module.create_value (Module.const_call_lambda closure v) builder
-      end
+  | Eapp _ ->
+      print_app info ~raise_expr gamma builder [] e
   | Elet ({ let_expr = e1 }, e2) when e1.e_ghost ->
       print_expr info ~raise_expr gamma e2 builder
   | Elet ({ let_sym = lv ; let_expr = e1 }, e2) ->
@@ -731,38 +768,33 @@ and print_expr info ~raise_expr gamma e builder =
       let aux index fd =
         let store = Module.const_access_array local_arr index in
         if not fd.fun_ps.ps_ghost then begin
-          let v = print_rec info ~raise_expr builder gamma fd in
+          let v = print_rec info builder gamma fd in
           Module.build_store store v builder;
         end
       in
       Lists.iteri aux fdl;
       print_expr info ~raise_expr gamma e builder
 
-and print_rec info ~raise_expr builder gamma {fun_ps = ps; fun_lambda = lam} =
+and print_rec info builder gamma {fun_ps = ps; fun_lambda = lam} =
   let raises = not (Sexn.is_empty ps.ps_aty.aty_spec.c_effect.eff_raises) in
-  let rec aux ~raise_expr gamma builder = function
-    | [] ->
-        print_expr info ~raise_expr gamma lam.l_expr builder
-    | arg::xs ->
-        let raises = if xs = [] then raises else false in
-        let closure = Module.malloc_closure ~raises builder in
-        let gamma = Mid.add arg.pv_vs.vs_name (Value closure) gamma in
-        let env = Module.malloc_env (Mid.cardinal gamma) builder in
-        let gamma = fold_env env gamma builder in
-        let lambda =
-          Module.create_lambda
-            ~param:arg.pv_vs.vs_name
-            ~raises
-            (fun ~raise_expr ~param builder ->
-               let gamma = Mid.add arg.pv_vs.vs_name (Value param) gamma in
-               aux ~raise_expr gamma builder xs
-            )
-        in
-        Module.build_store_field closure "f" lambda builder;
-        Module.build_store_field closure "env" env builder;
-        closure
+  let closure = Module.malloc_closure builder in
+  let env = Module.malloc_env (Mid.cardinal gamma) builder in
+  let gamma = fold_env env gamma builder in
+  let func =
+    Module.create_function
+      ~params:(List.map (fun x -> x.pv_vs.vs_name) lam.l_args)
+      ~raises
+      (fun ~raise_expr ~params builder ->
+         let gamma =
+           let aux gamma x y = Mid.add x.pv_vs.vs_name (Value y) gamma in
+           List.fold_left2 aux gamma lam.l_args params
+         in
+         print_expr info ~raise_expr gamma lam.l_expr builder
+      )
   in
-  aux ~raise_expr gamma builder lam.l_args
+  Module.build_store_field closure "f" func builder;
+  Module.build_store_field closure "env" env builder;
+  closure
 
 and print_xbranch info gamma ~raise_expr ~exn ~res (xs, pv, e) =
   let tag = Module.const_tag (get_xs info xs) in
@@ -869,7 +901,7 @@ and print_rec_decl info gamma builder fdl =
     let store = get_ps info fd.fun_ps in
     Module.define_global store;
     if not fd.fun_ps.ps_ghost then begin
-      let v = print_rec info ~raise_expr:(fun _ _ -> assert false) builder gamma fd in
+      let v = print_rec info builder gamma fd in
       Module.build_store store v builder;
     end
   in

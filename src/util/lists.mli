@@ -79,3 +79,11 @@ val chop : int -> 'a list -> 'a list
 
 val chop_last : 'a list -> 'a list * 'a
 (** removes (and returns) the last element of a list *)
+
+val split_at : int -> 'a list -> 'a list * 'a list
+(** [split_at n l] returns two lists l1 and l2,
+    l1 containing the first n elements of l and l2 this others.
+    @raises Invalid_argument if the list is not long enough *)
+
+val make : int -> 'a -> 'a list
+(** [make n x] returns a list containing n elements x *)
