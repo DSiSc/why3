@@ -37,7 +37,6 @@ open Ty
 open Term
 open Decl
 open Theory
-open Printer
 
 module Module = Mlw_c_module
 
@@ -57,8 +56,8 @@ let extract_filename ?fname th =
   (modulename ?fname th.th_path th.th_name.Ident.id_string) ^ ".c"
 
 type info = {
-  info_syn: syntax_map;
-  converters: syntax_map;
+  info_syn: Printer.syntax_map;
+  converters: Printer.syntax_map;
   current_theory: Theory.theory;
   current_module: Mlw_module.modul option;
   th_known_map: Decl.known_map;
