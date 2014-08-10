@@ -529,19 +529,7 @@ let vs_from_term t = match t.t_node with
   | Ttrue
   | Tfalse -> assert false
 
-let apply f ~raise_expr params builder =
-  let (params, spec) =
-    let rec aux acc = function
-      | [(v, spec)] ->
-          (List.rev (v :: acc), spec)
-      | (v, spec)::xs when eff_is_empty spec.c_effect ->
-          aux (v :: acc) xs
-      | [] | _::_ ->
-          assert false
-    in
-    aux [] params
-  in
-  let raises = not (Sexn.is_empty spec.c_effect.eff_raises) in
+let apply f ~raises ~raise_expr params builder =
   let closure = Module.cast_to_closure f builder in
   if raises then begin
     let exn = Module.create_exn builder in
@@ -585,22 +573,64 @@ let rec print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder
 and print_app info ~raise_expr gamma builder params e = match e.e_node with
   | Earrow ps ->
       let f = get_value info ps.ps_name gamma builder in
-      let rec aux f params a =
-        let params_nbr = List.length a.aty_args in
-        match a.aty_result with
-        | VTvalue _ ->
-            if params_nbr = List.length params then begin
-              apply f ~raise_expr params builder
+      let rec aux f a = function
+        | [] ->
+            f
+        | params ->
+            let spec =
+              let rec aux = function
+                | [(_, spec)] -> spec
+                | (_, spec)::xs when eff_is_empty spec.c_effect -> aux xs
+                | [] | _::_ -> assert false
+              in
+              aux params
+            in
+            let raises = not (Sexn.is_empty spec.c_effect.eff_raises) in
+            let params_nbr = List.length a.aty_args in
+            let given_params_nbr = List.length params in
+            let remaining_params = params_nbr - given_params_nbr in
+            if remaining_params <= 0 then begin
+              let (params, rem) = Lists.split_at params_nbr params in
+              let params = List.map fst params in
+              let f = apply f ~raises ~raise_expr params builder in
+              begin match a.aty_result with
+              | VTvalue _ when rem = [] -> f
+              | VTvalue _ -> assert false
+              | VTarrow a ->
+                  aux f a rem
+              end
             end else begin
-              (* TODO: Lambda *)
-              assert false
+              let closure = Module.malloc_closure builder in
+              let env = Module.malloc_env (Mid.cardinal gamma) builder in
+              Lists.iteri (fun i (x, _) -> Module.build_store (Module.const_access_array env i) x builder) params;
+              let params = Lists.chop given_params_nbr a.aty_args in
+              let params = List.map (fun x -> x.pv_vs.vs_name) params in
+              let func =
+                Module.create_function
+                  ~params
+                  ~raises
+                  (fun ~raise_expr ~params builder ->
+                     let params =
+                       let rec aux acc = function
+                         | 0 -> acc
+                         | i ->
+                             let i = pred i in
+                             let x =
+                               Module.const_access_array Module.env_value i
+                             in
+                             aux (x :: acc) i
+                       in
+                       aux params given_params_nbr
+                     in
+                     apply f ~raises ~raise_expr params builder
+                  )
+              in
+              Module.build_store_field closure "f" func builder;
+              Module.build_store_field closure "env" env builder;
+              closure
             end
-        | VTarrow a ->
-            let (params, rem) = Lists.split_at params_nbr params in
-            let f = apply f ~raise_expr params builder in
-            aux f rem a
       in
-      aux f params ps.ps_aty
+      aux f ps.ps_aty params
   | Eapp (e, v, spec) ->
       let v = get_value info v.pv_vs.vs_name gamma builder in
       print_app info ~raise_expr gamma builder ((v, spec) :: params) e
@@ -631,8 +661,7 @@ and print_expr info ~raise_expr gamma e builder =
       print_term info gamma t builder
   | Evalue v ->
       get_value info v.pv_vs.vs_name gamma builder
-  | Earrow a ->
-      get_value info a.ps_name gamma builder
+  | Earrow _
   | Eapp _ ->
       print_app info ~raise_expr gamma builder [] e
   | Elet ({ let_expr = e1 }, e2) when e1.e_ghost ->
