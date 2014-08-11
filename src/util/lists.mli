@@ -55,6 +55,9 @@ val find_nth : ('a -> bool) -> 'a list -> int
     satifies the predicate [p]. [raise Not_found] if no element of [l]
     verify the predicate *)
 
+val find_with_nth : ('a -> bool) -> 'a list -> ('a * int)
+(** [find_with_nth p l] is the composition of [find p l] and [find_nth p l] *)
+
 val first_nth : ('a -> 'b option) -> 'a list -> int * 'b
 (** The combinaison of {!list_first} and {!list_find_nth}. *)
 

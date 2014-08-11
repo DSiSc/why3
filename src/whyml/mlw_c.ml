@@ -361,8 +361,8 @@ and print_lbranches info gamma ~t1 ~bl builder =
   let t1 = Module.cast_to_variant t1 builder in
   let res = Module.create_value Module.null_value builder in
   let bl =
-    List.mapi
-      (fun i p ->
+    List.map
+      (fun p ->
          let (p, t) = t_open_branch p in
          begin match p.pat_node with
          | Pwild ->
@@ -371,7 +371,13 @@ and print_lbranches info gamma ~t1 ~bl builder =
                Module.build_store res t builder;
              in
              (None, f)
-         | Papp (_, patterns) ->
+         | Papp (ls, patterns) ->
+             let tys = match p.pat_ty.ty_node with
+               | Tyvar _ -> assert false
+               | Tyapp (tys, _) -> tys
+             in
+             let constructors = Decl.find_constructors info.th_known_map tys in
+             let i = Lists.find_nth (fun (x, _) -> ls_equal x ls) constructors in
              let f builder =
                let gamma =
                  let aux gamma i {pat_node; _} = match pat_node with
@@ -846,20 +852,8 @@ and print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl bu
   let e1 = Module.cast_to_variant e1 builder in
   let res = Module.create_value Module.null_value builder in
   let bl =
-    List.mapi
-      (fun i (p, e) ->
-         let constructors =
-           try
-             let ty = p.pat_ty in
-             let tys = match ty.ty_node with
-               | Tyvar _ -> raise Not_found
-               | Tyapp (tys, _) -> tys
-             in
-             let ity = restore_its tys in
-             Some (find_constructors info.mo_known_map ity)
-           with
-           | Not_found -> None
-         in
+    List.map
+      (fun (p, e) ->
          begin match p.pat_node with
          | Pwild ->
              let f builder =
@@ -874,10 +868,15 @@ and print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl bu
                let v = Module.create_value v builder in
                Mid.add vs.vs_name (Value v) gamma
              in
-             begin match constructors with
-             | Some constructors ->
-                 let (pls, _) =
-                   try List.find (fun (x, _) -> ls_equal x.pl_ls ls) constructors with
+             let tys = match p.pat_ty.ty_node with
+               | Tyvar _ -> assert false
+               | Tyapp (tys, _) -> tys
+             in
+             begin match try Some (restore_its tys) with Not_found -> None with
+             | Some ity ->
+                 let constructors = find_constructors info.mo_known_map ity in
+                 let ((pls, _), i) =
+                   try Lists.find_with_nth (fun (x, _) -> ls_equal x.pl_ls ls) constructors with
                    | Not_found -> assert false
                  in
                  let fields = pls.pl_args in
@@ -900,6 +899,8 @@ and print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl bu
                  in
                  (Some i, f)
              | None ->
+                 let constructors = Decl.find_constructors info.th_known_map tys in
+                 let i = Lists.find_nth (fun (x, _) -> ls_equal x ls) constructors in
                  let f builder =
                    let (gamma, map_ghost) =
                      let aux (gamma, map_ghost) i {pat_node; _} = match pat_node with

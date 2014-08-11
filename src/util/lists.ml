@@ -89,6 +89,12 @@ let find_nth p l =
     | a::l -> if p a then n else aux p (n+1) l in
   aux p 0 l
 
+let find_with_nth p l =
+  let rec aux n = function
+    | [] -> raise Not_found
+    | a::l -> if p a then (a, n) else aux (succ n) l
+  in
+  aux 0 l
 
 let first_nth f l =
   let rec aux f n = function
