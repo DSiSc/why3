@@ -16,9 +16,23 @@ type value
 (* General purpose *)
 (*******************)
 
-val define_global : value -> unit
+type info = {
+  info_syn: Printer.syntax_map;
+  converters: Printer.syntax_map;
+  current_theory: Theory.theory;
+  current_module: Mlw_module.modul option;
+  th_known_map: Decl.known_map;
+  mo_known_map: Mlw_decl.known_map;
+  fname: string option;
+}
 
-val value_of_string : string -> value
+val clean_fname : string -> string
+
+val modulename : ?separator:string -> ?fname:string -> string list -> string -> string
+
+val get_ident : ?separator:string -> info -> Ident.ident -> value
+
+val define_global : value -> unit
 
 val init_builder : builder
 
@@ -40,7 +54,7 @@ val env_value : value
 (******************)
 
 val create_value : value -> builder -> value
-val create_named_value : Ident.ident -> value -> builder -> value
+val create_named_value : info -> Ident.ident -> value -> builder -> value
 val create_array : int -> builder -> value
 val create_exn : builder -> value
 val create_mpz : string -> int -> builder -> value
@@ -58,9 +72,17 @@ val malloc_variant : builder -> value
 val malloc_record : value -> builder -> value
 
 val create_function :
+  info ->
   params:Ident.ident list ->
   raises:bool ->
   (raise_expr:(value -> builder -> unit) -> params:value list -> builder -> value) ->
+  value
+
+val create_pure_function :
+  info ->
+  name:Ident.ident ->
+  params:Ident.ident list ->
+  (params:value list -> builder -> value) ->
   value
 
 (**********************)
@@ -87,6 +109,7 @@ val build_while : (builder -> unit) -> builder -> unit
 val build_mpz_cmp : value -> value -> builder -> value
 val build_mpz_succ : value -> builder -> unit
 val build_call : value -> value list -> ?exn:value -> builder -> value
+val build_pure_call : value -> value list -> builder -> value
 
 (**********************)
 (* Constant statement *)
@@ -94,7 +117,6 @@ val build_call : value -> value list -> ?exn:value -> builder -> value
 
 val const_access_field : value -> string -> value
 val const_access_array : value -> int -> value
-val const_tag : value -> value
 val const_equal : value -> value -> value
 
 (******************)

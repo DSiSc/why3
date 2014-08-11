@@ -29,8 +29,6 @@
     * We'll use the Boehm GC
 *)
 
-open Pp
-
 open Number
 open Ident
 open Ty
@@ -40,22 +38,10 @@ open Theory
 
 module Module = Mlw_c_module
 
-let clean_fname fname =
-  let fname = Filename.basename fname in
-  (try Filename.chop_extension fname with _ -> fname)
-
-let modulename ?(separator="__") ?fname path t =
-  let fname = match fname, path with
-    | Some fname, _ -> clean_fname fname
-    | None, [] -> "why3"
-    | None, _ -> String.concat separator path
-  in
-  fname ^ separator ^ t
-
 let extract_filename ?fname th =
-  (modulename ?fname th.th_path th.th_name.Ident.id_string) ^ ".c"
+  (Module.modulename ?fname th.th_path th.th_name.Ident.id_string) ^ ".c"
 
-type info = {
+type info = Module.info = {
   info_syn: Printer.syntax_map;
   converters: Printer.syntax_map;
   current_theory: Theory.theory;
@@ -68,6 +54,8 @@ type info = {
 type value =
   | Value of Module.value
   | Env of int
+
+let get_ts info ts = Module.get_ident info ts.ts_name
 
 let is_constructor info ls =
   (* eprintf "is_constructor: ls=%s@." ls.ls_name.id_string; *)
@@ -89,28 +77,6 @@ let get_record info ls =
         lookup dl
     | Some _ | None ->
         []
-
-let c_keywords = []
-
-let iprinter =
-  let isanitize = sanitizer char_to_alpha char_to_alnumus in
-  create_ident_printer c_keywords ~sanitizer:isanitize
-
-let get_qident ?(separator="__") info id =
-  try
-    let lp, t, p =
-      try Mlw_module.restore_path id
-      with Not_found -> Theory.restore_path id in
-    let s = String.concat separator p in
-    let s = Ident.sanitizer char_to_alpha char_to_alnumus s in
-    let fname = if lp = [] then info.fname else None in
-    let m = modulename ~separator ?fname lp t in
-    Module.value_of_string (sprintf "%s%s%s" m separator s)
-  with Not_found ->
-    Module.value_of_string (id_unique iprinter id)
-
-let get_ls info ls = get_qident info ls.ls_name
-let get_ts info ts = get_qident info ts.ts_name
 
 let has_syntax info id = Mid.mem id info.info_syn
 
@@ -175,7 +141,7 @@ let print_if f builder (e,t1,t2) =
 let get_value info id gamma builder =
   match Mid.find_opt id gamma with
   | None ->
-      get_qident info id
+      Module.get_ident info id
   | Some v ->
       begin match v with
       | Value v ->
@@ -183,18 +149,6 @@ let get_value info id gamma builder =
       | Env i ->
           Module.create_value (Module.const_access_array Module.env_value i) builder
       end
-
-let fold_env env gamma builder =
-  let aux id x (index, gamma) = match x with
-    | Value v ->
-        Module.build_store (Module.const_access_array env index) v builder;
-        (succ index, Mid.add id (Env index) gamma)
-    | Env i ->
-        let old = Module.const_access_array Module.env_value i in
-        Module.build_store (Module.const_access_array env index) old builder;
-        (succ index, Mid.add id (Env index) gamma)
-  in
-  snd (Mid.fold aux gamma (0, Mid.empty))
 
 let singleton_opt = function
   | [x] -> Some x
@@ -275,8 +229,7 @@ and print_app ls info gamma builder tl =
       print_record_access info ~t1 ~ls builder
   | tl ->
       let f = get_value info ls.ls_name gamma builder in
-      let closure = Module.cast_to_closure f builder in
-      Module.build_call closure tl builder
+      Module.build_pure_call f tl builder
 
 and print_term info gamma t builder = match t.t_node with
   | Tvar v ->
@@ -287,17 +240,15 @@ and print_term info gamma t builder = match t.t_node with
       let tl = filter_ghost fs Mlw_expr.t_void tl in
       let tl = List.map (fun t -> print_term info gamma t builder) tl in
       begin match Printer.query_syntax info.info_syn fs.ls_name with
-      | Some s ->
-          Module.syntax_arguments s tl builder
-      | None ->
-          print_app fs info gamma builder tl
+      | Some s -> Module.syntax_arguments s tl builder
+      | None -> print_app fs info gamma builder tl
       end
   | Tif (e, t1, t2) ->
       print_if (print_term info gamma) builder (e, t1, t2)
   | Tlet (t1,tb) ->
       let v,t2 = t_open_bound tb in
       let t1 = print_term info gamma t1 builder in
-      let t1 = Module.create_named_value v.vs_name t1 builder in
+      let t1 = Module.create_named_value info v.vs_name t1 builder in
       let gamma = Mid.add v.vs_name (Value t1) gamma in
       print_term info gamma t2 builder
   | Tcase (t1, bl) when is_simple_pattern bl ->
@@ -385,7 +336,7 @@ and print_lbranches info gamma ~t1 ~bl builder =
                    | Pvar vs ->
                        let v = Module.const_access_field t1 "val" in
                        let v = Module.const_access_array v i in
-                       let v = Module.create_named_value vs.vs_name v builder in
+                       let v = Module.create_named_value info vs.vs_name v builder in
                        Mid.add vs.vs_name (Value v) gamma
                    | Papp _ | Por _ | Pas _ -> assert false
                  in
@@ -407,24 +358,18 @@ and print_lbranches info gamma ~t1 ~bl builder =
 let print_param_decl info ls =
   has_syntax_or_nothing info ls.ls_name
 
-let print_logic_decl info gamma builder (ls, ld) =
+let print_logic_decl info gamma (ls, ld) =
   if has_syntax info ls.ls_name then
     (* TODO *)
     ()
   else begin
     let vl,e = open_ls_defn ld in
-    let store = get_ls info ls in
-    Module.define_global store;
-    let raises = false in
-    let closure = Module.malloc_closure builder in
-    let gamma = Mid.add ls.ls_name (Value closure) gamma in
-    let env = Module.malloc_env (Mid.cardinal gamma) builder in
-    let gamma = fold_env env gamma builder in
     let func =
-      Module.create_function
+      Module.create_pure_function
+        info
+        ~name:ls.ls_name
         ~params:(List.map (fun x -> x.vs_name) vl)
-        ~raises
-        (fun ~raise_expr:_ ~params builder ->
+        (fun ~params builder ->
            let gamma =
              let aux gamma x y = Mid.add x.vs_name (Value y) gamma in
              List.fold_left2 aux gamma vl params
@@ -432,16 +377,14 @@ let print_logic_decl info gamma builder (ls, ld) =
            print_term info gamma e builder
         )
     in
-    Module.build_store_field closure "f" func builder;
-    Module.build_store_field closure "env" env builder;
-    Module.build_store store closure builder;
+    ignore func;
   end
 
 (** Logic Declarations *)
 
 (* TODO: Think that logical functions are shadowed by program functions *)
 
-let logic_decl info builder d = match d.d_node with
+let logic_decl info d = match d.d_node with
   | Dtype _ ->
       ()
   | Ddata tl ->
@@ -449,19 +392,19 @@ let logic_decl info builder d = match d.d_node with
   | Decl.Dparam ls ->
       print_param_decl info ls;
   | Dlogic ll ->
-      List.iter (print_logic_decl info Mid.empty builder) ll;
+      List.iter (print_logic_decl info Mid.empty) ll;
   | Dind (_, il) ->
       List.iter (print_ind_decl info) il;
   | Dprop (_pk, _pr, _) ->
       assert false
 
-let logic_decl info builder td = match td.td_node with
+let logic_decl info td = match td.td_node with
   | Decl d ->
       begin match Mlw_extract.get_exec_decl info.info_syn d with
       | Some d ->
           let union = Sid.union d.d_syms d.d_news in
           let inter = Mid.set_inter union info.mo_known_map in
-          if Sid.is_empty inter then logic_decl info builder d
+          if Sid.is_empty inter then logic_decl info d
       | None ->
           ()
       end
@@ -478,9 +421,8 @@ let extract_theory drv ?fname fmt th =
     current_module = None;
     th_known_map = th.th_known;
     mo_known_map = Mid.empty;
-    fname = Opt.map clean_fname fname; } in
-  let builder = Module.init_builder in
-  List.iter (logic_decl info builder) th.th_decls;
+    fname = Opt.map Module.clean_fname fname; } in
+  List.iter (logic_decl info) th.th_decls;
   Module.dump fmt
 
 (** Programs *)
@@ -491,31 +433,53 @@ open Mlw_expr
 open Mlw_decl
 open Mlw_module
 
-type pre_expr =
-  | PreM of (term * (pattern * pre_expr) list)
-  | PreL of (vsymbol * term * pre_expr)
-  | Expr of expr
-
 let get_its info ts = get_ts info ts.its_ts
+
 let get_pv info pv =
   if pv.pv_ghost then
     Module.unit_value
   else
-    get_qident info pv.pv_vs.vs_name
+    Module.get_ident info pv.pv_vs.vs_name
+
 let get_ps info ps =
   if ps.ps_ghost then
     Module.unit_value
   else
-    get_qident info ps.ps_name
+    Module.get_ident info ps.ps_name
+
 let get_lv info = function
   | LetV pv -> get_pv info pv
   | LetA ps -> get_ps info ps
+
+let get_xs ?separator info xs = Module.get_ident ?separator info xs.xs_name
 
 let get_id_from_let = function
   | LetV pv -> pv.pv_vs.vs_name
   | LetA ps -> ps.ps_name
 
-let get_xs ?separator info xs = get_qident ?separator info xs.xs_name
+type pre_expr =
+  | PreM of (term * (pattern * pre_expr) list)
+  | PreL of (vsymbol * term * pre_expr)
+  | Expr of expr
+
+let create_env syms gamma builder =
+  let is_used id =
+    Spv.exists (fun x -> id_equal x.pv_vs.vs_name id) syms.syms_pv
+    || Sps.exists (fun x -> id_equal x.ps_name id) syms.syms_ps
+  in
+  let gamma = Mid.filter (fun id _ -> is_used id) gamma in
+  let env = Module.malloc_env (Mid.cardinal gamma) builder in
+  let fold_env id x (index, gamma) = match x with
+    | Value v ->
+        Module.build_store (Module.const_access_array env index) v builder;
+        (succ index, Mid.add id (Env index) gamma)
+    | Env i ->
+        let old = Module.const_access_array Module.env_value i in
+        Module.build_store (Module.const_access_array env index) old builder;
+        (succ index, Mid.add id (Env index) gamma)
+  in
+  let gamma = snd (Mid.fold fold_env gamma (0, Mid.empty)) in
+  (env, gamma)
 
 let ity_of_expr = function
   | VTvalue ty -> ty
@@ -570,7 +534,7 @@ let rec print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder
         | Some (Value x) -> x
         | Some (Env _) | None -> assert false
       in
-      let value = Module.create_named_value vs.vs_name value builder in
+      let value = Module.create_named_value info vs.vs_name value builder in
       let gamma = Mid.add vs.vs_name (Value value) gamma in
       print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder xs
   | Expr e ->
@@ -613,6 +577,7 @@ and print_app info ~raise_expr gamma builder params e = match e.e_node with
               let params = List.map (fun x -> x.pv_vs.vs_name) params in
               let func =
                 Module.create_function
+                  info
                   ~params
                   ~raises
                   (fun ~raise_expr ~params builder ->
@@ -675,7 +640,7 @@ and print_expr info ~raise_expr gamma e builder =
   | Elet ({ let_sym = lv ; let_expr = e1 }, e2) ->
       let id = get_id_from_let lv in
       let v = print_expr info ~raise_expr gamma e1 builder in
-      let v = Module.create_named_value id v builder in
+      let v = Module.create_named_value info id v builder in
       let gamma = Mid.add id (Value v) gamma in
       print_expr info ~raise_expr gamma e2 builder
   | Eif (e0,e1,e2) ->
@@ -683,7 +648,7 @@ and print_expr info ~raise_expr gamma e builder =
   | Eassign (pl,e,_,pv) ->
       let ty = match e.e_vty with
         | VTvalue {ity_node = Ityapp ({its_ts; _}, _, _)} ->
-            get_qident info its_ts.ts_name
+            get_ts info its_ts
         | VTvalue {ity_node = Ityvar _}
         | VTvalue {ity_node = Itypur _}
         | VTarrow _ ->
@@ -737,7 +702,7 @@ and print_expr info ~raise_expr gamma e builder =
   | Eraise (xs,e) ->
       let e = print_expr info ~raise_expr gamma e builder in
       let value = Module.malloc_exn builder in
-      Module.build_store (Module.const_access_field value "key") (Module.const_tag (get_xs info xs)) builder;
+      Module.build_store (Module.const_access_field value "key") (get_xs info xs) builder;
       Module.build_store_field value "val" e builder;
       raise_expr value builder;
       Module.null_value
@@ -813,10 +778,10 @@ and print_expr info ~raise_expr gamma e builder =
 and print_rec info builder gamma {fun_ps = ps; fun_lambda = lam} =
   let raises = not (Sexn.is_empty ps.ps_aty.aty_spec.c_effect.eff_raises) in
   let closure = Module.malloc_closure builder in
-  let env = Module.malloc_env (Mid.cardinal gamma) builder in
-  let gamma = fold_env env gamma builder in
+  let (env, gamma) = create_env lam.l_expr.e_syms gamma builder in
   let func =
     Module.create_function
+      info
       ~params:(List.map (fun x -> x.pv_vs.vs_name) lam.l_args)
       ~raises
       (fun ~raise_expr ~params builder ->
@@ -832,7 +797,7 @@ and print_rec info builder gamma {fun_ps = ps; fun_lambda = lam} =
   closure
 
 and print_xbranch info gamma ~raise_expr ~exn ~res (xs, pv, e) =
-  let tag = Module.const_tag (get_xs info xs) in
+  let tag = get_xs info xs in
   let key = Module.const_access_field exn "key" in
   let cond = Module.const_equal key tag in
   let f builder =
@@ -961,7 +926,7 @@ let print_val_decl info lv =
 (* TODO: Handle driver *)
 let print_exn_decl info xs =
   Module.append_global_exn
-    (Module.const_tag (get_xs info xs))
+    (get_xs info xs)
     (get_xs ~separator:"." info xs)
 
 let rec pdecl info gamma builder = function
@@ -1005,7 +970,7 @@ let extract_module drv ?fname fmt m =
     current_module = Some m;
     th_known_map = th.th_known;
     mo_known_map = m.mod_known;
-    fname = Opt.map clean_fname fname; } in
+    fname = Opt.map Module.clean_fname fname; } in
   let builder = Module.init_builder in
   pdecl info Mid.empty builder m.mod_decls;
   Module.dump fmt

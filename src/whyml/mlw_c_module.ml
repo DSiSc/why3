@@ -41,13 +41,48 @@ let c_keywords =
 
 let header = ref ["#include \"why3.c\""]
 let modul = Hashtbl.create 64
-let printer = Ident.create_ident_printer c_keywords
+let sanitizer = Ident.sanitizer Ident.char_to_alpha Ident.char_to_alnumus
+let printer =
+  Ident.create_ident_printer c_keywords ~sanitizer
 
-let id_unique = function
-  | Some id -> Ident.id_unique printer id
-  | None -> Ident.string_unique printer "X__"
+let clean_fname fname =
+  let fname = Filename.basename fname in
+  (try Filename.chop_extension fname with _ -> fname)
 
-let value_of_string x = x
+let modulename ?(separator="__") ?fname path t =
+  let fname = match fname, path with
+    | Some fname, _ -> clean_fname fname
+    | None, [] -> "why3"
+    | None, _ -> String.concat separator path
+  in
+  fname ^ separator ^ t
+
+type info = {
+  info_syn: Printer.syntax_map;
+  converters: Printer.syntax_map;
+  current_theory: Theory.theory;
+  current_module: Mlw_module.modul option;
+  th_known_map: Decl.known_map;
+  mo_known_map: Mlw_decl.known_map;
+  fname: string option;
+}
+
+let get_ident ?(separator="__") info id =
+  try
+    let lp, t, p =
+      try Mlw_module.restore_path id
+      with Not_found -> Theory.restore_path id
+    in
+    let s = String.concat separator p in
+    let s = sanitizer s in
+    let fname = if lp = [] then info.fname else None in
+    let m = modulename ~separator ?fname lp t in
+    fmt "%s%s%s" m separator s
+  with Not_found ->
+    Ident.id_unique printer id
+
+let unamed_id () =
+  Ident.string_unique printer "X__"
 
 let append_global ~name x =
   if not (Hashtbl.mem modul name) then
@@ -144,54 +179,54 @@ let finalize fmt =
 (************************)
 
 let create_value value builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   define_local_var "value" name value builder;
   name
 
-let create_named_value id value builder =
-  let name = id_unique (Some id) in
+let create_named_value info id value builder =
+  let name = get_ident info id in
   define_local_var "value" name value builder;
   name
 
 let create_exn builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   define_local_var "struct exn*" name null_value builder;
   name
 
 let create_mpz str base builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   append_expr (fmt "mpz_t %s" name) builder;
   append_expr (fmt "mpz_init_set_str(%s, %S, %d)" name str base) builder;
   name
 
 let create_array size builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   append_expr (fmt "value %s[%d] = {NULL}" name size) builder;
   name
 
 let clone_mpz value builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   append_expr (fmt "mpz_t %s" name) builder;
   append_expr (fmt "mpz_init_set(%s, %s)" name value) builder;
   name
 
 let cast_to_closure value builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   define_local_var "struct closure*" name value builder;
   name
 
 let cast_to_record ~st value builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   define_local_var (fmt "struct %s*" st) name value builder;
   name
 
 let cast_to_variant value builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   define_local_var "struct variant*" name value builder;
   name
 
 let cast_to_function ~raises params_nbr value builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   let params = Lists.make params_nbr "value" in
   let params = String.concat ", " params in
   let params = params ^ ", value*" in
@@ -200,12 +235,12 @@ let cast_to_function ~raises params_nbr value builder =
   name
 
 let malloc_closure builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   define_local_var "struct closure*" name "GC_malloc(sizeof(struct closure))" builder;
   name
 
 let malloc_exn builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   define_local_var "struct exn*" name "GC_malloc(sizeof(struct exn))" builder;
   name
 
@@ -213,23 +248,23 @@ let malloc_env size builder = match size with
   | 0 ->
       null_value
   | size ->
-      let name = id_unique None in
+      let name = unamed_id () in
       define_local_var "value*" name (fmt "GC_malloc(sizeof(value) * %d)" size) builder;
       name
 
 let malloc_variant builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   define_local_var "struct variant*" name "GC_malloc(sizeof(struct variant))" builder;
   name
 
 let malloc_record st builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   define_local_var (fmt "struct %s*" st) name (fmt "GC_malloc(sizeof(struct %s))" st) builder;
   name
 
-let create_function ~params ~raises f =
-  let name = id_unique None in
-  let params = List.map (fun x -> id_unique (Some x)) params in
+let create_function info ~params ~raises f =
+  let name = unamed_id () in
+  let params = List.map (fun x -> get_ident info x) params in
   let exn = if raises then ", struct exn **Exn" else "" in
   let f builder =
     let raise_expr value builder =
@@ -244,6 +279,17 @@ let create_function ~params ~raises f =
   in
   let params = String.concat ", value " params in
   append_function (fmt "value %s(value %s, value* Env%s)" name params exn) f;
+  name
+
+let create_pure_function info ~name ~params f =
+  let name = get_ident info name in
+  let params = List.map (fun x -> get_ident info x) params in
+  let f builder =
+    let v = f ~params builder in
+    append_expr (fmt "return %s" v) builder
+  in
+  let params = String.concat ", value " params in
+  append_function (fmt "value %s(value %s)" name params) f;
   name
 
 let define_record name fields =
@@ -330,7 +376,7 @@ let build_while f =
   append_block "while(true)" f
 
 let build_mpz_cmp x y builder =
-  let name = id_unique None in
+  let name = unamed_id () in
   define_local_var "int" name (fmt "mpz_cmp(%s, %s)" x y) builder;
   name
 
@@ -348,11 +394,13 @@ let build_call closure params ?exn builder =
   | Some exn ->
       create_value (fmt "%s(%s, %s->env, &%s)" f params closure exn) builder
 
+let build_pure_call f params builder =
+  let params = String.concat ", " params in
+  create_value (fmt "%s(%s)" f params) builder
+
 let const_access_field = fmt "%s->%s"
 
 let const_access_array = fmt "%s[%d]"
-
-let const_tag = fmt "tag_%s"
 
 let const_equal = fmt "%s == %s"
 
