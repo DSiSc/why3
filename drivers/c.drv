@@ -1,0 +1,12 @@
+theory BuiltIn
+  syntax predicate (=) "int_cmp(%1, %2)"
+end
+
+theory int.Int
+  syntax constant zero "miaou"
+  syntax constant one "miaou"
+
+  syntax function (+) "int_add(%1, %2)"
+  syntax function (-) "int_sub(%1, %2)"
+  syntax function ( * ) "int_mul(%1, %2)"
+end
