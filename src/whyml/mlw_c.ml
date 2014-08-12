@@ -147,7 +147,7 @@ let get_value info id gamma builder =
       | Value v ->
           v
       | Env i ->
-          Module.create_value (Module.const_access_array Module.env_value i) builder
+          Module.build_access_array Module.env_value i builder
       end
 
 let singleton_opt = function
@@ -178,7 +178,7 @@ let is_simple_pattern =
 
 let rec print_variant_creation info ~ls ~tl builder =
   let v = Module.malloc_env (List.length tl) builder in
-  Lists.iteri (fun i x -> Module.build_store (Module.const_access_array v i) x builder) tl;
+  Lists.iteri (fun i x -> Module.build_store_array v i x builder) tl;
   let variant = Module.malloc_variant builder in
   let index =
     let ty = match ls.ls_value with
@@ -310,6 +310,7 @@ and print_term info gamma t builder = match t.t_node with
 
 and print_lbranches info gamma ~t1 ~bl builder =
   let t1 = Module.cast_to_variant t1 builder in
+  let v = Module.build_access_field ~ty:Module.TyValuePtr t1 "val" builder in
   let res = Module.create_value Module.null_value builder in
   let bl =
     List.map
@@ -334,7 +335,6 @@ and print_lbranches info gamma ~t1 ~bl builder =
                  let aux gamma i {pat_node; _} = match pat_node with
                    | Pwild -> gamma
                    | Pvar vs ->
-                       let v = Module.const_access_field t1 "val" in
                        let v = Module.const_access_array v i in
                        let v = Module.create_named_value info vs.vs_name v builder in
                        Mid.add vs.vs_name (Value v) gamma
@@ -471,11 +471,10 @@ let create_env syms gamma builder =
   let env = Module.malloc_env (Mid.cardinal gamma) builder in
   let fold_env id x (index, gamma) = match x with
     | Value v ->
-        Module.build_store (Module.const_access_array env index) v builder;
+        Module.build_store_array env index v builder;
         (succ index, Mid.add id (Env index) gamma)
     | Env i ->
-        let old = Module.const_access_array Module.env_value i in
-        Module.build_store (Module.const_access_array env index) old builder;
+        Module.build_store_array_from_array env index Module.env_value i builder;
         (succ index, Mid.add id (Env index) gamma)
   in
   let gamma = snd (Mid.fold fold_env gamma (0, Mid.empty)) in
@@ -572,7 +571,7 @@ and print_app info ~raise_expr gamma builder params e = match e.e_node with
             end else begin
               let closure = Module.malloc_closure builder in
               let env = Module.malloc_env (Mid.cardinal gamma) builder in
-              Lists.iteri (fun i (x, _) -> Module.build_store (Module.const_access_array env i) x builder) params;
+              Lists.iteri (fun i (x, _) -> Module.build_store_array env i x builder) params;
               let params = Lists.chop given_params_nbr a.aty_args in
               let params = List.map (fun x -> x.pv_vs.vs_name) params in
               let func =
@@ -702,7 +701,7 @@ and print_expr info ~raise_expr gamma e builder =
   | Eraise (xs,e) ->
       let e = print_expr info ~raise_expr gamma e builder in
       let value = Module.malloc_exn builder in
-      Module.build_store (Module.const_access_field value "key") (get_xs info xs) builder;
+      Module.build_store_field value "key" (get_xs info xs) builder;
       Module.build_store_field value "val" e builder;
       raise_expr value builder;
       Module.null_value
@@ -722,7 +721,7 @@ and print_expr info ~raise_expr gamma e builder =
       Module.build_if_not_null
         exn
         (Module.build_if_else_if_else
-           (List.map (print_xbranch info gamma ~raise_expr ~exn ~res) bl)
+           (List.map (print_xbranch info gamma ~raise_expr ~exn ~res builder) bl)
            (raise_expr exn)
         )
         builder;
@@ -766,10 +765,9 @@ and print_expr info ~raise_expr gamma e builder =
         Lists.fold_lefti aux gamma fdl
       in
       let aux index fd =
-        let store = Module.const_access_array local_arr index in
         if not fd.fun_ps.ps_ghost then begin
           let v = print_rec info builder gamma fd in
-          Module.build_store store v builder;
+          Module.build_store_array local_arr index v builder;
         end
       in
       Lists.iteri aux fdl;
@@ -796,9 +794,9 @@ and print_rec info builder gamma {fun_ps = ps; fun_lambda = lam} =
   Module.build_store_field closure "env" env builder;
   closure
 
-and print_xbranch info gamma ~raise_expr ~exn ~res (xs, pv, e) =
+and print_xbranch info gamma ~raise_expr ~exn ~res builder (xs, pv, e) =
   let tag = get_xs info xs in
-  let key = Module.const_access_field exn "key" in
+  let key = Module.build_access_field ~ty:Module.TyExnTag exn "key" builder in
   let cond = Module.const_equal key tag in
   let f builder =
     let gamma =
@@ -815,6 +813,7 @@ and print_xbranch info gamma ~raise_expr ~exn ~res (xs, pv, e) =
 
 and print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl builder =
   let e1 = Module.cast_to_variant e1 builder in
+  let v = Module.build_access_field ~ty:Module.TyValuePtr e1 "val" builder in
   let res = Module.create_value Module.null_value builder in
   let bl =
     List.map
@@ -828,9 +827,8 @@ and print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl bu
              (None, f)
          | Papp (ls, patterns) ->
              let f_var vs i builder gamma =
-               let v = Module.const_access_field e1 "val" in
                let v = Module.const_access_array v i in
-               let v = Module.create_value v builder in
+               let v = Module.create_named_value info vs.vs_name v builder in
                Mid.add vs.vs_name (Value v) gamma
              in
              let tys = match p.pat_ty.ty_node with

@@ -12,6 +12,11 @@
 type builder
 type value
 
+type ty =
+  | TyValue
+  | TyValuePtr
+  | TyExnTag
+
 (*******************)
 (* General purpose *)
 (*******************)
@@ -53,7 +58,7 @@ val env_value : value
 (* Value creation *)
 (******************)
 
-val create_value : value -> builder -> value
+val create_value : ?ty:ty -> value -> builder -> value
 val create_named_value : info -> Ident.ident -> value -> builder -> value
 val create_array : int -> builder -> value
 val create_exn : builder -> value
@@ -91,6 +96,8 @@ val create_pure_function :
 
 val build_equal : value -> value -> builder -> value
 val build_store : value -> value -> builder -> unit
+val build_store_array : value -> int -> value -> builder -> unit
+val build_store_array_from_array : value -> int -> value -> int -> builder -> unit
 val build_store_field : value -> string -> value -> builder -> unit
 val build_store_field_int : value -> string -> int -> builder -> unit
 val build_break : builder -> unit
@@ -100,7 +107,8 @@ val build_if_false : value -> (builder -> unit) -> builder -> unit
 val build_if_cmp_zero : value -> string -> (builder -> unit) -> builder -> unit
 val build_else : (builder -> unit) -> builder -> unit
 val build_if_else_if_else : (value * (builder -> unit)) list -> (builder -> unit) -> builder -> unit
-val build_access_field : value -> string -> builder -> value
+val build_access_array : value -> int -> builder -> value
+val build_access_field : ?ty:ty -> value -> string -> builder -> value
 val build_not : value -> builder -> value
 val build_do_while : (builder -> unit) -> builder -> unit
 val build_abort : builder -> unit
@@ -115,7 +123,6 @@ val build_pure_call : value -> value list -> builder -> value
 (* Constant statement *)
 (**********************)
 
-val const_access_field : value -> string -> value
 val const_access_array : value -> int -> value
 val const_equal : value -> value -> value
 

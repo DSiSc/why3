@@ -23,6 +23,11 @@ type global =
 
 type value = string
 
+type ty =
+  | TyValue
+  | TyValuePtr
+  | TyExnTag
+
 let unit_value = "why3__Tuple0__Tuple0"
 let null_value = "NULL"
 let true_value = "why3__Bool__True"
@@ -178,9 +183,14 @@ let finalize fmt =
 (* High-level functions *)
 (************************)
 
-let create_value value builder =
+let string_of_ty = function
+  | TyValue -> "value"
+  | TyValuePtr -> "value*"
+  | TyExnTag -> "exn_tag"
+
+let create_value ?(ty=TyValue) value builder =
   let name = unamed_id () in
-  define_local_var "value" name value builder;
+  define_local_var (string_of_ty ty) name value builder;
   name
 
 let create_named_value info id value builder =
@@ -305,6 +315,12 @@ let build_equal x y builder =
 let build_store x y builder =
   append_expr (fmt "%s = %s" x y) builder
 
+let build_store_array x i y builder =
+  append_expr (fmt "%s[%d] = %s" x i y) builder
+
+let build_store_array_from_array x i y j builder =
+  append_expr (fmt "%s[%d] = %s[%d]" x i y j) builder
+
 let build_store_field x field y builder =
   append_expr (fmt "%s->%s = %s" x field y) builder
 
@@ -344,8 +360,11 @@ let build_if_else_if_else l else_case builder =
       List.iter aux xs;
       build_else else_case builder
 
-let build_access_field v field builder =
-  create_value (fmt "%s->%s" v field) builder
+let build_access_array v i builder =
+  create_value (fmt "%s[%d]" v i) builder
+
+let build_access_field ?ty v field builder =
+  create_value ?ty (fmt "%s->%s" v field) builder
 
 let build_not v builder =
   create_value
@@ -397,8 +416,6 @@ let build_call closure params ?exn builder =
 let build_pure_call f params builder =
   let params = String.concat ", " params in
   create_value (fmt "%s(%s)" f params) builder
-
-let const_access_field = fmt "%s->%s"
 
 let const_access_array = fmt "%s[%d]"
 
