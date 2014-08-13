@@ -78,6 +78,7 @@ val malloc_record : value -> builder -> value
 
 val create_function :
   info ->
+  ?name:Ident.ident ->
   params:Ident.ident list ->
   raises:bool ->
   (raise_expr:(value -> builder -> unit) -> params:value list -> builder -> value) ->

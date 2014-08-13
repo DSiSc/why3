@@ -782,6 +782,7 @@ and print_rec info builder gamma {fun_ps = ps; fun_lambda = lam} =
   let func =
     Module.create_function
       info
+      ~name:ps.ps_name
       ~params:(List.map (fun x -> x.pv_vs.vs_name) lam.l_args)
       ~raises
       (fun ~raise_expr ~params builder ->

@@ -272,8 +272,11 @@ let malloc_record st builder =
   define_local_var (fmt "struct %s*" st) name (fmt "GC_malloc(sizeof(struct %s))" st) builder;
   name
 
-let create_function info ~params ~raises f =
-  let name = unamed_id () in
+let create_function info ?name ~params ~raises f =
+  let name = match name with
+    | Some name -> "F_" ^ get_ident info name
+    | None -> unamed_id ()
+  in
   let params = List.map (fun x -> get_ident info x) params in
   let exn = if raises then ", struct exn **Exn" else "" in
   let f builder =
