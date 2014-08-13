@@ -280,6 +280,7 @@ let create_function info ~params ~raises f =
     let raise_expr value builder =
       if raises then begin
         append_expr (fmt "*Exn = %s" value) builder;
+        append_expr "return NULL" builder;
       end else begin
         append_expr "abort()" builder;
       end

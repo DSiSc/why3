@@ -720,9 +720,11 @@ and print_expr info ~raise_expr gamma e builder =
         builder;
       Module.build_if_not_null
         exn
-        (Module.build_if_else_if_else
-           (List.map (print_xbranch info gamma ~raise_expr ~exn ~res builder) bl)
-           (raise_expr exn)
+        (fun builder ->
+           Module.build_if_else_if_else
+             (List.map (print_xbranch info gamma ~raise_expr ~exn ~res builder) bl)
+             (raise_expr exn)
+             builder
         )
         builder;
       res
