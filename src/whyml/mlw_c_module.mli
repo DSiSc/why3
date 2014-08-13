@@ -37,12 +37,9 @@ val modulename : ?separator:string -> ?fname:string -> string list -> string -> 
 
 val get_ident : ?separator:string -> info -> Ident.ident -> value
 
-val define_global : value -> unit
-
-val init_builder : builder
+val define_global_closure : info -> Ident.ident -> value -> unit
 
 val dump : Format.formatter -> unit
-val finalize : Format.formatter -> unit
 
 (******************)
 (* Builtin values *)

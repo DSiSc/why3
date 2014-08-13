@@ -62,17 +62,15 @@ static _GC_free_(void *old, size_t unused) {
     GC_free(old);
 }
 
-value test__Test__fact_rec;
-void Init();
+struct closure* test__Test__fact_rec;
 
-int main() {
+int main(int argc, char** argv) {
     GC_init();
     mp_set_memory_functions(GC_malloc, _GC_realloc_, _GC_free_);
-    Init();
     struct closure* main = test__Test__fact_rec;
     value (*f)(value, value*) = main->f;
     mpz_t lol;
-    mpz_init_set_str(lol, "4", 10);
+    mpz_init_set_str(lol, argv[1], 10);
     gmp_printf("%Zd\n", f(lol, NULL));
     return 0;
 }

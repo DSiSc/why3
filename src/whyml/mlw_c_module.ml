@@ -45,7 +45,7 @@ let c_keywords =
   ]
 
 let header = ref ["#include \"why3.c\""]
-let modul = Hashtbl.create 64
+let modul = ref []
 let sanitizer = Ident.sanitizer Ident.char_to_alpha Ident.char_to_alnumus
 let printer =
   Ident.create_ident_printer c_keywords ~sanitizer
@@ -89,17 +89,13 @@ let get_ident ?(separator="__") info id =
 let unamed_id () =
   Ident.string_unique printer "X__"
 
-let append_global ~name x =
-  if not (Hashtbl.mem modul name) then
-    Hashtbl.add modul name x
+let append_global x =
+  modul := x :: !modul
 
 let append_function name g =
   let builder = ref [] in
   g builder;
-  append_global ~name (Function (name, builder))
-
-let append_global ~name ~value =
-  append_global ~name (Global (fmt "%s = %s" name value))
+  append_global (Function (name, builder))
 
 let append_expr x builder =
   builder := Text x :: !builder
@@ -107,8 +103,12 @@ let append_expr x builder =
 let append_header str =
   header := str :: !header
 
-let define_global name =
-  append_header (fmt "value %s;" name)
+let define_global_closure info name v =
+  let tmp = unamed_id () in
+  let name = get_ident info name in
+  append_header (fmt "struct closure* %s;" name);
+  append_global (Global (fmt "struct closure %s = {%s, NULL}" tmp v));
+  append_global (Global (fmt "struct closure* %s = &%s" name tmp))
 
 let define_local_var ty name value builder =
   append_expr (fmt "%s %s = %s" ty name value) builder
@@ -117,8 +117,6 @@ let append_block x g builder =
   let builder' = ref [] in
   g builder';
   builder := Block (x, builder') :: !builder
-
-let init_builder = ref []
 
 let dump_builder fmt builder =
   let indent_level = 2 in
@@ -158,26 +156,19 @@ let dump fmt =
     header := [];
   in
   let dump_module () =
-    Hashtbl.iter (fun x _ -> Format.fprintf fmt "%s;\n" x) modul;
+    let m = List.rev !modul in
+    List.iter (dump_global fmt) m;
     Format.fprintf fmt "\n";
-    Hashtbl.iter (fun _ -> dump_global fmt) modul;
-    Format.fprintf fmt "\n";
-    Hashtbl.clear modul;
+    modul := [];
   in
   begin match !header with
   | [] -> ()
   | _::_ -> dump_header ()
   end;
-  if Hashtbl.length modul > 0 then begin
-    dump_module ();
+  begin match !modul with
+  | [] -> ()
+  | _::_ -> dump_module ()
   end
-
-let finalize fmt =
-  Format.fprintf fmt "void Init()\n";
-  Format.fprintf fmt "{\n";
-  dump_builder fmt init_builder;
-  Format.fprintf fmt "}\n";
-  init_builder := []
 
 (************************)
 (* High-level functions *)
@@ -426,7 +417,8 @@ let const_access_array = fmt "%s[%d]"
 let const_equal = fmt "%s == %s"
 
 let append_global_exn name value =
-  append_global ~name:(fmt "exn_tag %s" name) ~value:(fmt "\"%s\"" value)
+  let name = fmt "exn_tag %s" name in
+  append_global (Global (fmt "%s = \"%s\"" name value))
 
 let syntax_arguments x tl builder =
   let buf = Buffer.create 32 in

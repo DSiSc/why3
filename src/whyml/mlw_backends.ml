@@ -52,6 +52,6 @@ let extract_module driver ?old ?fname formatter cout modul = match !backend with
 let finalize () = match !backend, !cout_c with
   | OCaml, _ -> ()
   | C, None -> assert false
-  | C, Some (fmt, cout) ->
-      Mlw_c_module.finalize fmt;
+  | C, Some (_fmt, cout) ->
+      (* The formatter can be usefull if we have toplevel values in the futur *)
       close_out cout

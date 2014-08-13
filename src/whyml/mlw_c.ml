@@ -435,22 +435,6 @@ open Mlw_module
 
 let get_its info ts = get_ts info ts.its_ts
 
-let get_pv info pv =
-  if pv.pv_ghost then
-    Module.unit_value
-  else
-    Module.get_ident info pv.pv_vs.vs_name
-
-let get_ps info ps =
-  if ps.ps_ghost then
-    Module.unit_value
-  else
-    Module.get_ident info ps.ps_name
-
-let get_lv info = function
-  | LetV pv -> get_pv info pv
-  | LetA ps -> get_ps info ps
-
 let get_xs ?separator info xs = Module.get_ident ?separator info xs.xs_name
 
 let get_id_from_let = function
@@ -892,13 +876,26 @@ and print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl bu
   Module.build_switch e1 bl builder;
   res
 
-and print_rec_decl info gamma builder fdl =
+and print_rec_decl info gamma fdl =
   let aux fd =
-    let store = get_ps info fd.fun_ps in
-    Module.define_global store;
     if not fd.fun_ps.ps_ghost then begin
-      let v = print_rec info builder gamma fd in
-      Module.build_store store v builder;
+      let {fun_ps = ps; fun_lambda = lam} = fd in
+      let raises = not (Sexn.is_empty ps.ps_aty.aty_spec.c_effect.eff_raises) in
+      let func =
+        Module.create_function
+          info
+          ~name:ps.ps_name
+          ~params:(List.map (fun x -> x.pv_vs.vs_name) lam.l_args)
+          ~raises
+          (fun ~raise_expr ~params builder ->
+             let gamma =
+               let aux gamma x y = Mid.add x.pv_vs.vs_name (Value y) gamma in
+               List.fold_left2 aux gamma lam.l_args params
+             in
+             print_expr info ~raise_expr gamma lam.l_expr builder
+          )
+      in
+      Module.define_global_closure info fd.fun_ps.ps_name func;
     end
   in
   List.iter aux fdl
@@ -930,32 +927,26 @@ let print_exn_decl info xs =
     (get_xs info xs)
     (get_xs ~separator:"." info xs)
 
-let rec pdecl info gamma builder = function
+let rec pdecl info gamma = function
   | pd::decls ->
       Mlw_extract.check_exec_pdecl info.info_syn pd;
       begin match pd.pd_node with
       | PDtype _ ->
-          pdecl info gamma builder decls
+          pdecl info gamma decls
       | PDdata tl ->
           List.iter (print_pdata_decl info) tl;
-          pdecl info gamma builder decls
+          pdecl info gamma decls
       | PDval lv ->
           print_val_decl info lv;
-          pdecl info gamma builder decls
-      | PDlet ld ->
-          if not (is_ghost_lv ld.let_sym) then begin
-            let store = get_lv info ld.let_sym in
-            Module.define_global store;
-            let v = print_expr info ~raise_expr:(fun _ _ -> assert false) gamma ld.let_expr builder in
-            Module.build_store store v builder;
-          end;
-          pdecl info gamma builder decls
+          pdecl info gamma decls
+      | PDlet _ ->
+          assert false
       | PDrec fdl ->
-          print_rec_decl info gamma builder fdl;
-          pdecl info gamma builder decls
+          print_rec_decl info gamma fdl;
+          pdecl info gamma decls
       | PDexn xs ->
           print_exn_decl info xs;
-          pdecl info gamma builder decls
+          pdecl info gamma decls
       end
   | [] ->
       ()
@@ -972,6 +963,5 @@ let extract_module drv ?fname fmt m =
     th_known_map = th.th_known;
     mo_known_map = m.mod_known;
     fname = Opt.map Module.clean_fname fname; } in
-  let builder = Module.init_builder in
-  pdecl info Mid.empty builder m.mod_decls;
+  pdecl info Mid.empty m.mod_decls;
   Module.dump fmt
