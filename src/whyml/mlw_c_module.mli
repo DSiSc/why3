@@ -39,6 +39,8 @@ val get_ident : ?separator:string -> info -> Ident.ident -> value
 
 val define_global_closure : info -> Ident.ident -> value -> unit
 
+val define_global_constructor : info -> Ident.ident -> int -> unit
+
 val dump : Format.formatter -> unit
 
 (******************)

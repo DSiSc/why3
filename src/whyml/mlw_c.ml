@@ -93,15 +93,22 @@ let filter_ghost ls def al =
   try List.map2 flt (Mlw_expr.restore_pl ls).Mlw_expr.pl_args al
   with Not_found -> al
 
-let print_pdata_decl info (ts, csl) =
+let print_constr info i (cs, _) = match cs.ls_args with
+  | [] -> Module.define_global_constructor info cs.ls_name i
+  | _::_ -> ()
+
+let print_data_decl info (ts, csl) =
+  let print_default () = Lists.iteri (print_constr info) csl in
   let get_field x = x.ls_name.id_string in
   match csl with
     | [cs, _] ->
         let pjl = get_record info cs in
-        if pjl <> [] then
+        if pjl = [] then
+          print_default ()
+        else
           Module.define_record (get_ts info ts) (List.map get_field pjl)
     | _ ->
-        ()
+        print_default ()
 
 (** Inductive *)
 
@@ -217,14 +224,14 @@ and print_app ls info gamma builder tl =
     | _ -> false
   in
   match tl with
+  | [] ->
+      get_value info ls.ls_name gamma builder
   | tl when isconstr ->
       let pjl = get_record info ls in
       if pjl = [] then
         print_variant_creation info ~ls ~tl builder
       else
         print_record_creation info ~ls ~tl ~pjl builder
-  | [] ->
-      get_value info ls.ls_name gamma builder
   | [t1] when isfield ->
       print_record_access info ~t1 ~ls builder
   | tl ->
@@ -388,7 +395,7 @@ let logic_decl info d = match d.d_node with
   | Dtype _ ->
       ()
   | Ddata tl ->
-      List.iter (print_pdata_decl info) tl;
+      List.iter (print_data_decl info) tl;
   | Decl.Dparam ls ->
       print_param_decl info ls;
   | Dlogic ll ->
@@ -908,15 +915,22 @@ let is_ghost_lv = function
   | LetV pv -> pv.pv_ghost
   | LetA ps -> ps.ps_ghost
 
+let print_pconstr info i (cs, _) = match cs.pl_args with
+  | [] -> Module.define_global_constructor info cs.pl_ls.ls_name i
+  | _::_ -> ()
+
 let print_pdata_decl info (its, csl, _) =
+  let print_default () = Lists.iteri (print_pconstr info) csl in
   let get_field x = x.ls_name.id_string in
   match csl with
     | [cs, _] ->
         let pjl = get_record info cs.pl_ls in
-        if pjl <> [] then
+        if pjl = [] then
+          print_default ()
+        else
           Module.define_record (get_its info its) (List.map get_field pjl)
     | _ ->
-        ()
+        print_default ()
 
 let print_val_decl info lv =
   has_syntax_or_ghost_or_nothing info (is_ghost_lv lv) (lv_name lv)
