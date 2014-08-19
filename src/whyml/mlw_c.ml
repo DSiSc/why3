@@ -927,29 +927,22 @@ let print_exn_decl info xs =
     (get_xs info xs)
     (get_xs ~separator:"." info xs)
 
-let rec pdecl info gamma = function
-  | pd::decls ->
-      Mlw_extract.check_exec_pdecl info.info_syn pd;
-      begin match pd.pd_node with
-      | PDtype _ ->
-          pdecl info gamma decls
-      | PDdata tl ->
-          List.iter (print_pdata_decl info) tl;
-          pdecl info gamma decls
-      | PDval lv ->
-          print_val_decl info lv;
-          pdecl info gamma decls
-      | PDlet _ ->
-          assert false
-      | PDrec fdl ->
-          print_rec_decl info gamma fdl;
-          pdecl info gamma decls
-      | PDexn xs ->
-          print_exn_decl info xs;
-          pdecl info gamma decls
-      end
-  | [] ->
+let pdecl info pd =
+  Mlw_extract.check_exec_pdecl info.info_syn pd;
+  begin match pd.pd_node with
+  | PDtype _ ->
       ()
+  | PDdata tl ->
+      List.iter (print_pdata_decl info) tl;
+  | PDval lv ->
+      print_val_decl info lv;
+  | PDlet _ ->
+      assert false
+  | PDrec fdl ->
+      print_rec_decl info Mid.empty fdl;
+  | PDexn xs ->
+      print_exn_decl info xs;
+  end
 
 (** Modules *)
 
@@ -963,5 +956,6 @@ let extract_module drv ?fname fmt m =
     th_known_map = th.th_known;
     mo_known_map = m.mod_known;
     fname = Opt.map Module.clean_fname fname; } in
-  pdecl info Mid.empty m.mod_decls;
+  List.iter (logic_decl info) th.th_decls;
+  List.iter (pdecl info) m.mod_decls;
   Module.dump fmt
