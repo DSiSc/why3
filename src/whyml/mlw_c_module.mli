@@ -137,4 +137,5 @@ val define_record : value -> string list -> unit
 (* Syntax handling *)
 (*******************)
 
-val syntax_arguments : string -> value list -> builder -> value
+val query_syntax : Printer.syntax_map -> Ident.ident -> value option
+val syntax_arguments : value -> value list -> builder -> value

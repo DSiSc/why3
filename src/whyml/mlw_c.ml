@@ -246,7 +246,7 @@ and print_term info gamma t builder = match t.t_node with
   | Tapp (fs, tl) ->
       let tl = filter_ghost fs Mlw_expr.t_void tl in
       let tl = List.map (fun t -> print_term info gamma t builder) tl in
-      begin match Printer.query_syntax info.info_syn fs.ls_name with
+      begin match Module.query_syntax info.info_syn fs.ls_name with
       | Some s -> Module.syntax_arguments s tl builder
       | None -> print_app fs info gamma builder tl
       end
@@ -533,9 +533,16 @@ let rec print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder
 and print_app info ~raise_expr gamma builder params e = match e.e_node with
   | Earrow ps ->
       let f = get_value info ps.ps_name gamma builder in
-      let rec aux f a = function
+      let handle_syntax = function
+        | Some ps -> Module.query_syntax info.info_syn ps.ps_name
+        | None -> None
+      in
+      let rec aux f ps a = function
         | [] ->
-            f
+            begin match handle_syntax ps with
+            | Some x -> x
+            | None -> f
+            end
         | params ->
             let spec =
               let rec aux = function
@@ -544,6 +551,12 @@ and print_app info ~raise_expr gamma builder params e = match e.e_node with
                 | [] | _::_ -> assert false
               in
               aux params
+            in
+            let apply f ~raises ~raise_expr params builder =
+              let app () = apply f ~raises ~raise_expr params builder in
+              match handle_syntax ps with
+              | Some s -> Module.syntax_arguments s params builder
+              | None -> app ()
             in
             let raises = not (Sexn.is_empty spec.c_effect.eff_raises) in
             let params_nbr = List.length a.aty_args in
@@ -557,7 +570,7 @@ and print_app info ~raise_expr gamma builder params e = match e.e_node with
               | VTvalue _ when rem = [] -> f
               | VTvalue _ -> assert false
               | VTarrow a ->
-                  aux f a rem
+                  aux f None a rem
               end
             end else begin
               let closure = Module.malloc_closure builder in
@@ -591,7 +604,7 @@ and print_app info ~raise_expr gamma builder params e = match e.e_node with
               closure
             end
       in
-      aux f ps.ps_aty params
+      aux f (Some ps) ps.ps_aty params
   | Eapp (e, v, spec) ->
       let v = get_value info v.pv_vs.vs_name gamma builder in
       print_app info ~raise_expr gamma builder ((v, spec) :: params) e

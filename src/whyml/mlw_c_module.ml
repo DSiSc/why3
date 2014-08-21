@@ -427,6 +427,8 @@ let append_global_exn name value =
   let name = fmt "exn_tag %s" name in
   append_global (Global (fmt "%s = \"%s\"" name value))
 
+let query_syntax = Printer.query_syntax
+
 let syntax_arguments x tl builder =
   let buf = Buffer.create 32 in
   let fmt = Format.formatter_of_buffer buf in
