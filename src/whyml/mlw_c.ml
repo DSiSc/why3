@@ -389,8 +389,6 @@ let print_logic_decl info gamma (ls, ld) =
 
 (** Logic Declarations *)
 
-(* TODO: Think that logical functions are shadowed by program functions *)
-
 let logic_decl info d = match d.d_node with
   | Dtype _ ->
       ()

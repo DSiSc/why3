@@ -28,10 +28,10 @@ type ty =
   | TyValuePtr
   | TyExnTag
 
-let unit_value = "why3__Tuple0__Tuple0"
+let unit_value = "T_why3__Tuple0__Tuple0"
 let null_value = "NULL"
-let true_value = "why3__Bool__True"
-let false_value = "why3__Bool__False"
+let true_value = "T_why3__Bool__True"
+let false_value = "T_why3__Bool__False"
 let env_value = "Env"
 let exn_value = "Exn"
 
@@ -40,8 +40,7 @@ let c_keywords =
   ; "double"; "else"; "enum"; "extern"; "float"; "for"; "goto"; "if"; "int"
   ; "long"; "register"; "return"; "short"; "signed"; "sizeof"; "static"
   ; "struct"; "switch"; "typedef"; "union"; "unsigned"; "void"; "volatile"
-  ; "while"; unit_value; null_value; true_value; false_value; env_value
-  ; exn_value
+  ; "while"; null_value; env_value; exn_value
   ]
 
 let header = ref ["#include \"why3.c\""]
@@ -74,15 +73,15 @@ type info = {
 
 let get_ident ?(separator="__") info id =
   try
-    let lp, t, p =
-      try Mlw_module.restore_path id
-      with Not_found -> Theory.restore_path id
+    let ((lp, t, p), prefix) =
+      try (Theory.restore_path id, "T")
+      with Not_found -> (Mlw_module.restore_path id, "M")
     in
     let s = String.concat separator p in
     let s = sanitizer s in
     let fname = if lp = [] then info.fname else None in
     let m = modulename ~separator ?fname lp t in
-    fmt "%s%s%s" m separator s
+    fmt "%s_%s%s%s" prefix m separator s
   with Not_found ->
     Ident.id_unique printer id
 
