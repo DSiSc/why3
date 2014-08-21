@@ -366,10 +366,7 @@ let print_param_decl info ls =
   has_syntax_or_nothing info ls.ls_name
 
 let print_logic_decl info gamma (ls, ld) =
-  if has_syntax info ls.ls_name then
-    (* TODO *)
-    ()
-  else begin
+  if not (has_syntax info ls.ls_name) then begin
     let vl,e = open_ls_defn ld in
     let func =
       Module.create_pure_function
