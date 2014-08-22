@@ -604,7 +604,7 @@ let do_exec env fname cin exec =
 
 let extract_to ?fname th extract =
   let dir = Opt.get !opt_output in
-  let file = Filename.concat dir (Mlw_backends.extract_filename ?fname th) in
+  let file = Filename.concat dir (Mlw_ocaml.extract_filename ?fname th) in
   let old =
     if Sys.file_exists file then begin
       let backup = file ^ ".bak" in
@@ -625,7 +625,7 @@ let extract_to =
 
 let extract_to_c ~fname th =
   let dir = Opt.get !opt_output in
-  let file = Filename.concat dir (Mlw_backends.extract_filename ?fname th) in
+  let file = Filename.concat dir (Mlw_c.extract_filename ?fname th) in
   let old =
     if Sys.file_exists file then begin
       let backup = file ^ ".bak" in

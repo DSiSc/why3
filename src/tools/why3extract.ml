@@ -55,6 +55,9 @@ let option_list = [
       " read the input file from stdin";
   "-T", Arg.String add_opt_theory,
       "<theory> select <theory> in the input file or in the library";
+  "--backend-c", Arg.Unit (fun () -> Mlw_backends.Switch.(set C)),
+      " enables the C backend. WhyML will preduce a C program instead \
+       of an OCaml one";
   "--theory", Arg.String add_opt_theory,
       " same as -T";
   "-F", Arg.String (fun s -> opt_parser := Some s),
@@ -116,36 +119,77 @@ let extract_to =
       extract_to ?fname th extract
     end
 
+let extract_to_c ~fname th =
+  let file = Filename.concat opt_output (Mlw_c.extract_filename ?fname th) in
+  let old =
+    if Sys.file_exists file then begin
+      let backup = file ^ ".bak" in
+      Sys.rename file backup;
+      Some (open_in backup)
+    end else None in
+  let cout = open_out file in
+  let fmt = formatter_of_out_channel cout in
+  fun ?fname:_ _ extract ->
+    extract file ?old fmt cout
+
+let extract_to_c =
+  let visited = Ident.Hid.create 17 in
+  fun ~fname th ->
+    let extract_to = extract_to_c ~fname th in
+    fun ?fname th extract ->
+      if not (Ident.Hid.mem visited th.th_name) then begin
+        Ident.Hid.add visited th.th_name ();
+        extract_to ?fname th extract;
+      end
+
 let use_iter f th =
   List.iter (fun d -> match d.td_node with Use t -> f t | _ -> ()) th.th_decls
 
-let rec do_extract_theory ?fname th =
-  let extract file ?old fmt = ignore (old);
-    let tname = th.th_name.Ident.id_string in
-    Debug.dprintf Mlw_ocaml.debug "extract theory %s to file %s@." tname file;
-    Mlw_ocaml.extract_theory opt_driver ?old ?fname fmt th
-  in
-  extract_to ?fname th extract;
+let rec do_extract_theory ~extract_to ?fname th =
   let extract_use th' =
     let fname = if th'.th_path = [] then fname else None in
-    do_extract_theory ?fname th' in
-  use_iter extract_use th
-
-let rec do_extract_module ?fname m =
-  let extract file ?old fmt = ignore (old);
-    let tname = m.Mlw_module.mod_theory.th_name.Ident.id_string in
-    Debug.dprintf Mlw_ocaml.debug "extract module %s to file %s@." tname file;
-    Mlw_ocaml.extract_module opt_driver ?old ?fname fmt m
+    do_extract_theory ~extract_to ?fname th' in
+  use_iter extract_use th;
+  let extract file ?old fmt cout =
+    let tname = th.th_name.Ident.id_string in
+    Debug.dprintf Mlw_backends.debug "extract theory %s to file %s@." tname file;
+    Mlw_backends.extract_theory opt_driver ?old ?fname fmt cout th
   in
-  extract_to ?fname m.Mlw_module.mod_theory extract;
+  extract_to ?fname th extract
+
+let rec do_extract_module ~extract_to ?fname m =
   let extract_use th' =
     let fname = if th'.th_path = [] then fname else None in
     match
       try Some (Mlw_module.restore_module th') with Not_found -> None
     with
-      | Some m' -> do_extract_module ?fname m'
-      | None    -> do_extract_theory ?fname th' in
-  use_iter extract_use m.Mlw_module.mod_theory
+      | Some m' -> do_extract_module ~extract_to ?fname m'
+      | None    -> do_extract_theory ~extract_to ?fname th' in
+  use_iter extract_use m.Mlw_module.mod_theory;
+  let extract file ?old fmt cout =
+    let tname = m.Mlw_module.mod_theory.th_name.Ident.id_string in
+    Debug.dprintf Mlw_backends.debug "extract module %s to file %s@." tname file;
+    Mlw_backends.extract_module opt_driver ?old ?fname fmt cout m
+  in
+  extract_to ?fname m.Mlw_module.mod_theory extract
+
+let do_extract_theory ?fname th =
+  let extract_to =
+    match Mlw_backends.Switch.get () with
+    | Mlw_backends.Switch.C -> extract_to_c ~fname th
+    | Mlw_backends.Switch.OCaml -> extract_to
+  in
+  do_extract_theory ~extract_to ?fname th;
+  Mlw_backends.finalize ()
+
+let do_extract_module ?fname m =
+  let extract_to =
+    match Mlw_backends.Switch.get () with
+    | Mlw_backends.Switch.C -> extract_to_c ~fname m.Mlw_module.mod_theory
+    | Mlw_backends.Switch.OCaml -> extract_to
+  in
+  do_extract_module ~extract_to ?fname m;
+  Mlw_backends.finalize ()
 
 let do_global_extract (tname,p,t) =
   let lib = opt_driver.Mlw_driver.drv_lib in

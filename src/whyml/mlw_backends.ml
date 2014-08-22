@@ -33,10 +33,6 @@ let debug =
   Debug.register_info_flag "extraction"
     ~desc:"Print@ details@ of@ program@ extraction."
 
-let extract_filename ?fname theory = match !backend with
-  | OCaml -> Mlw_ocaml.extract_filename ?fname theory
-  | C -> Mlw_c.extract_filename ?fname theory
-
 let extract_theory driver ?old ?fname formatter cout theory = match !backend with
   | OCaml -> Mlw_ocaml.extract_theory driver ?old ?fname formatter theory
   | C ->
