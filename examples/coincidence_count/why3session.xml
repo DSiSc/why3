@@ -1,569 +1,97 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE why3session PUBLIC "-//Why3//proof session v2//EN" "http://why3.lri.fr/why3session.dtd">
+<!DOCTYPE why3session PUBLIC "-//Why3//proof session v5//EN"
+"http://why3.lri.fr/why3session.dtd">
 <why3session shape_version="4">
- <prover
-  id="0"
-  name="Alt-Ergo"
-  version="0.95.2"/>
- <prover
-  id="1"
-  name="Z3"
-  version="4.3.1"/>
- <file
-  name="../coincidence_count.mlw"
-  verified="true"
-  expanded="true">
-  <theory
-   name="CoincidenceCount"
-   locfile="../coincidence_count.mlw"
-   loclnum="12" loccnumb="7" loccnume="23"
-   verified="true"
-   expanded="true">
-   <goal
-    name="drop_left"
-    locfile="../coincidence_count.mlw"
-    loclnum="25" loccnumb="8" loccnume="17"
-    sum="947f1fd38b3cd7bd22f5650dad201924"
-    proved="true"
-    expanded="true"
-    shape="ainfix ==adropV0V1aaddamixfix []V0V1adropV0ainfix +V1c1Iainfix &lt;V1alengthV0Aainfix &lt;=c0V1F">
-    <proof
-     prover="0"
-     timelimit="6"
-     memlimit="1000"
-     obsolete="false"
-     archived="false">
-     <result status="valid" time="0.68"/>
-    </proof>
+<prover id="0" name="Z3" version="4.3.1" timelimit="10" memlimit="1000"/>
+<prover id="1" name="Alt-Ergo" version="0.95.2" timelimit="6" memlimit="1000"/>
+<file name="../coincidence_count.mlw" expanded="true">
+<theory name="CoincidenceCount" expanded="true">
+ <goal name="drop_left" sum="74f5a9c14564d6ee28a416f1c6d8007b" expanded="true">
+ <proof prover="1"><result status="valid" time="0.31"/></proof>
+ </goal>
+ <goal name="not_mem_inter_r" sum="0e6784670d982c3e5a9c8a6cf3fbfc58" expanded="true">
+ <proof prover="1"><result status="valid" time="2.28"/></proof>
+ </goal>
+ <goal name="not_mem_inter_l" sum="05a962b5d3f6606f258686d52c16a5c9" expanded="true">
+ <proof prover="1"><result status="valid" time="2.19"/></proof>
+ </goal>
+ <goal name="WP_parameter coincidence_count" expl="VC for coincidence_count" sum="42f5420bc0fc6359cce245e6abaf93a6" expanded="true">
+ <transf name="split_goal_wp" expanded="true">
+  <goal name="WP_parameter coincidence_count.1" expl="1. loop invariant init" sum="5678f9b7da83ae7662aad5fcb8cfb4f9" expanded="true">
+  <proof prover="1"><result status="valid" time="0.01"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.2" expl="2. loop invariant init" sum="564f3b275b996b396e7285db8fe1eb6b" expanded="true">
+  <proof prover="1"><result status="valid" time="0.02"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.3" expl="3. loop invariant init" sum="73093484c268f42e1cf5d43e5db697fd" expanded="true">
+  <proof prover="1"><result status="valid" time="0.01"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.4" expl="4. index in array bounds" sum="e6c75f85788f5d05d1b374dd1f9add3a" expanded="true">
+  <proof prover="1"><result status="valid" time="0.01"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.5" expl="5. index in array bounds" sum="69ebe5d60f0330110f8835dbf8adec6d" expanded="true">
+  <proof prover="1"><result status="valid" time="0.02"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.6" expl="6. loop invariant preservation" sum="f88202ddf7a01b564ea702c1c5ee09ba" expanded="true">
+  <proof prover="1"><result status="valid" time="0.01"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.7" expl="7. loop invariant preservation" sum="3d2774581ab734e4d69210f8404fb1c2" expanded="true">
+  <proof prover="1"><result status="valid" time="0.02"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.8" expl="8. loop invariant preservation" sum="6551fcc611fd3e52399709d50e6e5c99" expanded="true">
+  <proof prover="1"><result status="valid" time="1.45"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.9" expl="9. loop variant decrease" sum="f15ce68078844c7652a530893081041d" expanded="true">
+  <proof prover="1"><result status="valid" time="0.01"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.10" expl="10. index in array bounds" sum="272f220a82d34237cf21b22c6f255891" expanded="true">
+  <proof prover="1"><result status="valid" time="0.01"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.11" expl="11. index in array bounds" sum="43fc786d6048943d191e91a81d4f611f" expanded="true">
+  <proof prover="1"><result status="valid" time="0.02"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.12" expl="12. loop invariant preservation" sum="1d88bb10f1f66175160b5da27204d547" expanded="true">
+  <proof prover="1"><result status="valid" time="0.02"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.13" expl="13. loop invariant preservation" sum="451e2e0e1111fe2cfd0c4a9241bef5d2" expanded="true">
+  <proof prover="1"><result status="valid" time="0.01"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.14" expl="14. loop invariant preservation" sum="76e79683f52411576eed872c41c0a9be" expanded="true">
+  <proof prover="1"><result status="valid" time="1.56"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.15" expl="15. loop variant decrease" sum="de59832d974cb31ac24e4b018c001b9a" expanded="true">
+  <proof prover="1"><result status="valid" time="0.02"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.16" expl="16. assertion" sum="d46414fb2998365ed58b94872451b200" expanded="true">
+  <proof prover="0"><result status="valid" time="2.23"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.17" expl="17. assertion" sum="08164dc609c00b01b1ae3ce24dae8365" expanded="true">
+  <transf name="inline_goal" expanded="true">
+   <goal name="WP_parameter coincidence_count.17.1" expl="1. assertion" sum="d5465348d371c35ce96856aff39d04be" expanded="true">
+   <proof prover="1"><result status="valid" time="0.69"/></proof>
    </goal>
-   <goal
-    name="not_mem_inter_r"
-    locfile="../coincidence_count.mlw"
-    loclnum="35" loccnumb="8" loccnume="23"
-    sum="dc19fd48ae4ce68e7bad26078bcd6a56"
-    proved="true"
-    expanded="true"
-    shape="ainfix ==ainteradropV0V1V2ainteradropV0ainfix +V1c1V2INamemamixfix []V0V1V2Iainfix &lt;V1alengthV0Aainfix &lt;=c0V1F">
-    <proof
-     prover="0"
-     timelimit="6"
-     memlimit="1000"
-     obsolete="false"
-     archived="false">
-     <result status="valid" time="0.45"/>
-    </proof>
-   </goal>
-   <goal
-    name="not_mem_inter_l"
-    locfile="../coincidence_count.mlw"
-    loclnum="39" loccnumb="8" loccnume="23"
-    sum="10a42b375327465b0ae5a4f70dbc8047"
-    proved="true"
-    expanded="true"
-    shape="ainfix ==ainterV2adropV0V1ainterV2adropV0ainfix +V1c1INamemamixfix []V0V1V2Iainfix &lt;V1alengthV0Aainfix &lt;=c0V1F">
-    <proof
-     prover="0"
-     timelimit="6"
-     memlimit="1000"
-     obsolete="false"
-     archived="false">
-     <result status="valid" time="0.56"/>
-    </proof>
-   </goal>
-   <goal
-    name="WP_parameter coincidence_count"
-    locfile="../coincidence_count.mlw"
-    loclnum="43" loccnumb="6" loccnume="23"
-    expl="VC for coincidence_count"
-    sum="355b495ec5f1dd5167e31c0403ba6846"
-    proved="true"
-    expanded="true"
-    shape="iainfix =V6acardinalainterasetofV5asetofV4iainfix =V6acardinalainterasetofV5asetofV4iiainfix &lt;ainfix -ainfix -ainfix +V0V2V9V10ainfix -ainfix -ainfix +V0V2V8V7Aainfix &lt;=c0ainfix -ainfix -ainfix +V0V2V8V7Aainfix =ainfix +V11acardinalainteradropV5V9adropV4V10acardinalainterasetofV5asetofV4Aainfix &lt;=V10V2Aainfix &lt;=c0V10Aainfix &lt;=V9V0Aainfix &lt;=c0V9Iainfix =V11ainfix +V6c1FIainfix =V10ainfix +V7c1FIainfix =V9ainfix +V8c1FANamemagetV1V8adropV5ainfix +V8c1Aainfix ==ainteradropV5V8adropV4V7aaddagetV1V8ainteradropV5ainfix +V8c1adropV4ainfix +V7c1ainfix &lt;ainfix -ainfix -ainfix +V0V2V8V12ainfix -ainfix -ainfix +V0V2V8V7Aainfix &lt;=c0ainfix -ainfix -ainfix +V0V2V8V7Aainfix =ainfix +V6acardinalainteradropV5V8adropV4V12acardinalainterasetofV5asetofV4Aainfix &lt;=V12V2Aainfix &lt;=c0V12Aainfix &lt;=V8V0Aainfix &lt;=c0V8Iainfix =V12ainfix +V7c1Fainfix &gt;agetV1V8agetV3V7Aainfix &lt;V8V0Aainfix &lt;=c0V8Aainfix &lt;V7V2Aainfix &lt;=c0V7ainfix &lt;ainfix -ainfix -ainfix +V0V2V13V7ainfix -ainfix -ainfix +V0V2V8V7Aainfix &lt;=c0ainfix -ainfix -ainfix +V0V2V8V7Aainfix =ainfix +V6acardinalainteradropV5V13adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V13V0Aainfix &lt;=c0V13Iainfix =V13ainfix +V8c1Fainfix &lt;agetV1V8agetV3V7Aainfix &lt;V8V0Aainfix &lt;=c0V8Aainfix &lt;V7V2Aainfix &lt;=c0V7ainfix &lt;V7V2ainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FAainfix =ainfix +c0acardinalainteradropV5c0adropV4c0acardinalainterasetofV5asetofV4Aainfix &lt;=c0V2Aainfix &lt;=c0c0Aainfix &lt;=c0V0Aainfix &lt;=c0c0IaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-    <label
-     name="expl:VC for coincidence_count"/>
-    <transf
-     name="split_goal_wp"
-     proved="true"
-     expanded="true">
-     <goal
-      name="WP_parameter coincidence_count.1"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="1. loop invariant init"
-      sum="7f4ea419dbd18a4af27f8fc001edfec6"
-      proved="true"
-      expanded="true"
-      shape="loop invariant initainfix &lt;=c0V0Aainfix &lt;=c0c0IaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.01"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.2"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="2. loop invariant init"
-      sum="baa0a07255457ae2f5d895c39b019ca9"
-      proved="true"
-      expanded="true"
-      shape="loop invariant initainfix &lt;=c0V2Aainfix &lt;=c0c0IaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.02"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.3"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="3. loop invariant init"
-      sum="9e63732e399f30b56603fb3473ca1115"
-      proved="true"
-      expanded="true"
-      shape="loop invariant initainfix =ainfix +c0acardinalainteradropV5c0adropV4c0acardinalainterasetofV5asetofV4IaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.01"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.4"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="4. index in array bounds"
-      sum="f8e6132dbb8955969ea3c8aab611b784"
-      proved="true"
-      expanded="true"
-      shape="index in array boundsainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.01"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.5"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="5. index in array bounds"
-      sum="c02be7e2c29cd808eba26993f5405061"
-      proved="true"
-      expanded="true"
-      shape="index in array boundsainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.02"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.6"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="6. loop invariant preservation"
-      sum="20d9e1b12e96ea7a1b1ff9d3242654ef"
-      proved="true"
-      expanded="true"
-      shape="loop invariant preservationainfix &lt;=V9V0Aainfix &lt;=c0V9Iainfix =V9ainfix +V8c1FIainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.01"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.7"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="7. loop invariant preservation"
-      sum="60f2472e8f35a8260e6dc267c36ad149"
-      proved="true"
-      expanded="true"
-      shape="loop invariant preservationainfix &lt;=V7V2Aainfix &lt;=c0V7Iainfix =V9ainfix +V8c1FIainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.02"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.8"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="8. loop invariant preservation"
-      sum="6311b20659619a5677b8bd2d44f1b212"
-      proved="true"
-      expanded="true"
-      shape="loop invariant preservationainfix =ainfix +V6acardinalainteradropV5V9adropV4V7acardinalainterasetofV5asetofV4Iainfix =V9ainfix +V8c1FIainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="1.45"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.9"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="9. loop variant decrease"
-      sum="90802ad5116fc6324916596b0933b4cc"
-      proved="true"
-      expanded="true"
-      shape="loop variant decreaseainfix &lt;ainfix -ainfix -ainfix +V0V2V9V7ainfix -ainfix -ainfix +V0V2V8V7Aainfix &lt;=c0ainfix -ainfix -ainfix +V0V2V8V7Iainfix =V9ainfix +V8c1FIainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.01"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.10"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="10. index in array bounds"
-      sum="c664a315c724eb66213452ebcacf13ae"
-      proved="true"
-      expanded="true"
-      shape="index in array boundsainfix &lt;V7V2Aainfix &lt;=c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.01"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.11"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="11. index in array bounds"
-      sum="d9f9ab59d63da2b5873bc13745ce831a"
-      proved="true"
-      expanded="true"
-      shape="index in array boundsainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.02"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.12"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="12. loop invariant preservation"
-      sum="5f103d252f9b73c2641957336d12a14f"
-      proved="true"
-      expanded="true"
-      shape="loop invariant preservationainfix &lt;=V8V0Aainfix &lt;=c0V8Iainfix =V9ainfix +V7c1FIainfix &gt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.02"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.13"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="13. loop invariant preservation"
-      sum="a9fc1ded89de9cf711d66f927f588c8d"
-      proved="true"
-      expanded="true"
-      shape="loop invariant preservationainfix &lt;=V9V2Aainfix &lt;=c0V9Iainfix =V9ainfix +V7c1FIainfix &gt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.01"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.14"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="14. loop invariant preservation"
-      sum="4bc40ccdac454c95b0243113d90e0c54"
-      proved="true"
-      expanded="true"
-      shape="loop invariant preservationainfix =ainfix +V6acardinalainteradropV5V8adropV4V9acardinalainterasetofV5asetofV4Iainfix =V9ainfix +V7c1FIainfix &gt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="1.56"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.15"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="15. loop variant decrease"
-      sum="32c30fbf2af252551e0715656d24a69f"
-      proved="true"
-      expanded="true"
-      shape="loop variant decreaseainfix &lt;ainfix -ainfix -ainfix +V0V2V8V9ainfix -ainfix -ainfix +V0V2V8V7Aainfix &lt;=c0ainfix -ainfix -ainfix +V0V2V8V7Iainfix =V9ainfix +V7c1FIainfix &gt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.02"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.16"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="16. assertion"
-      sum="f207fe4f8e45c02cd0d3abea1485aeea"
-      proved="true"
-      expanded="true"
-      shape="assertionainfix ==ainteradropV5V8adropV4V7aaddagetV1V8ainteradropV5ainfix +V8c1adropV4ainfix +V7c1INainfix &gt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="1"
-       timelimit="10"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="6.79"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.17"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="17. assertion"
-      sum="27d09228b5f011396f1eca506cd72dcd"
-      proved="true"
-      expanded="true"
-      shape="assertionNamemagetV1V8adropV5ainfix +V8c1Iainfix ==ainteradropV5V8adropV4V7aaddagetV1V8ainteradropV5ainfix +V8c1adropV4ainfix +V7c1INainfix &gt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <transf
-       name="inline_goal"
-       proved="true"
-       expanded="true">
-       <goal
-        name="WP_parameter coincidence_count.17.1"
-        locfile="../coincidence_count.mlw"
-        loclnum="43" loccnumb="6" loccnume="23"
-        expl="1. assertion"
-        sum="ff68a37556f392bd7c6761a0d6bb82e0"
-        proved="true"
-        expanded="true"
-        shape="assertionNamemagetV1V8adropV5ainfix +V8c1IamemV9aaddagetV1V8ainteradropV5ainfix +V8c1adropV4ainfix +V7c1qamemV9ainteradropV5V8adropV4V7FINainfix &lt;agetV3V7agetV1V8Iainfix &lt;V8V0Aainfix =c0V8Oainfix &lt;c0V8Iainfix &lt;V7V2Aainfix =c0V7Oainfix &lt;c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix =c0V8Oainfix &lt;c0V8Iainfix &lt;V7V2Aainfix =c0V7Oainfix &lt;c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix =V7V2Oainfix &lt;V7V2Aainfix =c0V7Oainfix &lt;c0V7Aainfix =V8V0Oainfix &lt;V8V0Aainfix =c0V8Oainfix &lt;c0V8FIainfix &lt;amixfix []V4V10amixfix []V4V11Iainfix &lt;V11alengthV4Aainfix &lt;V10V11Aainfix &lt;=c0V10FAainfix &lt;amixfix []V5V12amixfix []V5V13Iainfix &lt;V13alengthV5Aainfix &lt;V12V13Aainfix &lt;=c0V12FAainfix =c0V2Oainfix &lt;c0V2Aainfix =c0V0Oainfix &lt;c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-        <label
-         name="expl:VC for coincidence_count"/>
-        <proof
-         prover="0"
-         timelimit="6"
-         memlimit="1000"
-         obsolete="false"
-         archived="false">
-         <result status="valid" time="0.69"/>
-        </proof>
-       </goal>
-      </transf>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.18"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="18. loop invariant preservation"
-      sum="6dd7d386073cc3eff1ea2ba7e58724cb"
-      proved="true"
-      expanded="true"
-      shape="loop invariant preservationainfix &lt;=V9V0Aainfix &lt;=c0V9Iainfix =V11ainfix +V6c1FIainfix =V10ainfix +V7c1FIainfix =V9ainfix +V8c1FINamemagetV1V8adropV5ainfix +V8c1Iainfix ==ainteradropV5V8adropV4V7aaddagetV1V8ainteradropV5ainfix +V8c1adropV4ainfix +V7c1INainfix &gt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.01"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.19"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="19. loop invariant preservation"
-      sum="02b7cca46ac84c570a3825a52233dbb0"
-      proved="true"
-      expanded="true"
-      shape="loop invariant preservationainfix &lt;=V10V2Aainfix &lt;=c0V10Iainfix =V11ainfix +V6c1FIainfix =V10ainfix +V7c1FIainfix =V9ainfix +V8c1FINamemagetV1V8adropV5ainfix +V8c1Iainfix ==ainteradropV5V8adropV4V7aaddagetV1V8ainteradropV5ainfix +V8c1adropV4ainfix +V7c1INainfix &gt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.02"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.20"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="20. loop invariant preservation"
-      sum="c4ed6e8595d6e91b81216f1133551eb4"
-      proved="true"
-      expanded="true"
-      shape="loop invariant preservationainfix =ainfix +V11acardinalainteradropV5V9adropV4V10acardinalainterasetofV5asetofV4Iainfix =V11ainfix +V6c1FIainfix =V10ainfix +V7c1FIainfix =V9ainfix +V8c1FINamemagetV1V8adropV5ainfix +V8c1Iainfix ==ainteradropV5V8adropV4V7aaddagetV1V8ainteradropV5ainfix +V8c1adropV4ainfix +V7c1INainfix &gt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="1.12"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.21"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="21. loop variant decrease"
-      sum="f67830e3db24eb2610781fd1b8afe77c"
-      proved="true"
-      expanded="true"
-      shape="loop variant decreaseainfix &lt;ainfix -ainfix -ainfix +V0V2V9V10ainfix -ainfix -ainfix +V0V2V8V7Aainfix &lt;=c0ainfix -ainfix -ainfix +V0V2V8V7Iainfix =V11ainfix +V6c1FIainfix =V10ainfix +V7c1FIainfix =V9ainfix +V8c1FINamemagetV1V8adropV5ainfix +V8c1Iainfix ==ainteradropV5V8adropV4V7aaddagetV1V8ainteradropV5ainfix +V8c1adropV4ainfix +V7c1INainfix &gt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7INainfix &lt;agetV1V8agetV3V7Iainfix &lt;V8V0Aainfix &lt;=c0V8Iainfix &lt;V7V2Aainfix &lt;=c0V7Iainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.01"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.22"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="22. postcondition"
-      sum="e56dc3b35d0863337741f7098c489e14"
-      proved="true"
-      expanded="true"
-      shape="postconditionainfix =V6acardinalainterasetofV5asetofV4INainfix &lt;V7V2Iainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.24"/>
-      </proof>
-     </goal>
-     <goal
-      name="WP_parameter coincidence_count.23"
-      locfile="../coincidence_count.mlw"
-      loclnum="43" loccnumb="6" loccnume="23"
-      expl="23. postcondition"
-      sum="39882e9ebb615de35b8050b865673c33"
-      proved="true"
-      expanded="true"
-      shape="postconditionainfix =V6acardinalainterasetofV5asetofV4INainfix &lt;V8V0Iainfix =ainfix +V6acardinalainteradropV5V8adropV4V7acardinalainterasetofV5asetofV4Aainfix &lt;=V7V2Aainfix &lt;=c0V7Aainfix &lt;=V8V0Aainfix &lt;=c0V8FIaincreasingV4AaincreasingV5Aainfix &lt;=c0V2Aainfix &lt;=c0V0Lamk arrayV0V1Lamk arrayV2V3F">
-      <label
-       name="expl:VC for coincidence_count"/>
-      <proof
-       prover="0"
-       timelimit="6"
-       memlimit="1000"
-       obsolete="false"
-       archived="false">
-       <result status="valid" time="0.22"/>
-      </proof>
-     </goal>
-    </transf>
-   </goal>
-  </theory>
- </file>
+  </transf>
+  </goal>
+  <goal name="WP_parameter coincidence_count.18" expl="18. loop invariant preservation" sum="a5f40db5d0a52c698a44d2fbfc866dfe" expanded="true">
+  <proof prover="1"><result status="valid" time="0.01"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.19" expl="19. loop invariant preservation" sum="d5bc1cd70a3ca3b83ce4fc1be3f4d7fa" expanded="true">
+  <proof prover="1"><result status="valid" time="0.02"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.20" expl="20. loop invariant preservation" sum="2a484a647df174e75e55ce11414f8315" expanded="true">
+  <proof prover="1"><result status="valid" time="0.70"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.21" expl="21. loop variant decrease" sum="2f71f0dd609a9dbfd2fe7709d6fc0117" expanded="true">
+  <proof prover="1"><result status="valid" time="0.01"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.22" expl="22. postcondition" sum="067cd4c4d2371c03f9a35796dc800890" expanded="true">
+  <proof prover="1"><result status="valid" time="0.08"/></proof>
+  </goal>
+  <goal name="WP_parameter coincidence_count.23" expl="23. postcondition" sum="9c8e6497e7f5b560bb7a4c7fd81c44fa" expanded="true">
+  <proof prover="1"><result status="valid" time="0.08"/></proof>
+  </goal>
+ </transf>
+ </goal>
+</theory>
+</file>
 </why3session>

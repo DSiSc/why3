@@ -68,25 +68,17 @@ section {* Minimum and Maximum *}
 
 why3_open "int/MinMax.xml"
 
-why3_vc Max_x using assms by simp
+why3_vc Max_r using assms by simp
 
-why3_vc Max_y using assms by simp
+why3_vc Max_comm by simp
 
-why3_vc Max_sym by simp
+why3_vc Max_assoc by simp
 
-why3_vc Max_is_ge by simp_all
+why3_vc Min_l using assms by simp
 
-why3_vc Max_is_some by auto
+why3_vc Min_comm by simp
 
-why3_vc Min_x using assms by simp
-
-why3_vc Min_y using assms by simp
-
-why3_vc Min_sym by simp
-
-why3_vc Min_is_le by simp_all
-
-why3_vc Min_is_some by auto
+why3_vc Min_assoc by simp
 
 why3_end
 
@@ -296,6 +288,10 @@ why3_vc Power_sum using assms by (simp add: nat_add_distrib power_add)
 why3_vc Power_mult using assms by (simp add: nat_mult_distrib power_mult)
 
 why3_vc Power_mult2 by (simp add: power_mult_distrib)
+
+why3_vc Power_non_neg using assms by simp
+
+why3_vc Power_monotonic using assms by (simp add: power_increasing)
 
 why3_end
 
