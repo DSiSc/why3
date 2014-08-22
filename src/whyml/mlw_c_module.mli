@@ -37,6 +37,8 @@ val modulename : ?separator:string -> ?fname:string -> string list -> string -> 
 
 val get_ident : ?separator:string -> info -> Ident.ident -> value
 
+val forget_id : Ident.ident -> unit
+
 val define_global_closure : info -> Ident.ident -> value -> unit
 
 val define_global_constructor : info -> Ident.ident -> int -> unit
@@ -118,6 +120,7 @@ val build_mpz_cmp : value -> value -> builder -> value
 val build_mpz_succ : value -> builder -> unit
 val build_call : value -> value list -> ?exn:value -> builder -> value
 val build_pure_call : value -> value list -> builder -> value
+val build_block : (builder -> unit) -> builder -> unit
 
 (**********************)
 (* Constant statement *)

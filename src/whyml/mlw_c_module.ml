@@ -16,6 +16,7 @@ type builder = line list ref
 and line =
   | Text of string
   | Block of (string * builder)
+  | EmptyBlock of builder
 
 type global =
   | Global of string
@@ -48,6 +49,8 @@ let modul = ref []
 let sanitizer = Ident.sanitizer Ident.char_to_alpha Ident.char_to_alnumus
 let printer =
   Ident.create_ident_printer c_keywords ~sanitizer
+
+let forget_id = Ident.forget_id printer
 
 let clean_fname fname =
   let fname = Filename.basename fname in
@@ -137,6 +140,11 @@ let dump_builder fmt builder =
     | Block (s, builder) ->
         add_string indent s;
         Format.fprintf fmt "\n";
+        add_string indent "{\n";
+        let builder = List.rev !builder in
+        List.iter (aux (indent + indent_level)) builder;
+        add_string indent "}\n";
+    | EmptyBlock builder ->
         add_string indent "{\n";
         let builder = List.rev !builder in
         List.iter (aux (indent + indent_level)) builder;
@@ -274,6 +282,7 @@ let create_function info ?name ~params ~raises f =
     | Some name -> "F_" ^ get_ident info name
     | None -> unamed_id ()
   in
+  let params' = params in
   let params = List.map (fun x -> get_ident info x) params in
   let exn = if raises then ", struct exn **Exn" else "" in
   let f builder =
@@ -286,6 +295,7 @@ let create_function info ?name ~params ~raises f =
       end
     in
     let v = f ~raise_expr ~params builder in
+    List.iter (Ident.forget_id printer) params';
     append_expr (fmt "return %s" v) builder
   in
   let params = String.concat ", value " params in
@@ -294,9 +304,11 @@ let create_function info ?name ~params ~raises f =
 
 let create_pure_function info ~name ~params f =
   let name = get_ident info name in
-  let params = List.map (fun x -> get_ident info x) params in
+  let params' = params in
+  let params = List.map (get_ident info) params in
   let f builder =
     let v = f ~params builder in
+    List.iter (Ident.forget_id printer) params';
     append_expr (fmt "return %s" v) builder
   in
   let params = String.concat ", value " params in
@@ -417,6 +429,11 @@ let build_call closure params ?exn builder =
 let build_pure_call f params builder =
   let params = String.concat ", " params in
   create_value (fmt "%s(%s)" f params) builder
+
+let build_block f builder =
+  let builder' = ref [] in
+  f builder';
+  builder := EmptyBlock builder' :: !builder
 
 let const_access_array = fmt "%s[%d]"
 
