@@ -108,14 +108,14 @@ let append_header str =
 let define_global_closure info name v =
   let tmp = unamed_id () in
   let name = get_ident info name in
-  append_header (fmt "struct closure* %s;" name);
+  append_header (fmt "extern struct closure* %s;" name);
   append_global (Global (fmt "struct closure %s = {%s, NULL}" tmp v));
   append_global (Global (fmt "struct closure* %s = &%s" name tmp))
 
 let define_global_constructor info name index =
   let tmp = unamed_id () in
   let name = get_ident info name in
-  append_header (fmt "struct variant* %s;" name);
+  append_header (fmt "extern struct variant* %s;" name);
   append_global (Global (fmt "struct variant %s = {%d, NULL}" tmp index));
   append_global (Global (fmt "struct variant* %s = &%s" name tmp))
 
