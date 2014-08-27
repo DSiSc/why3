@@ -9,8 +9,8 @@ struct variant {int key; value* val;};
 struct exn {exn_tag key; value val;};
 struct closure {value f; value* env;};
 
-struct variant* why3__Bool__False;
-struct variant* why3__Bool__True;
+extern struct variant* T_why3__Bool__False;
+extern struct variant* T_why3__Bool__True;
 
 value int_add(value x, value y)
 {
@@ -45,25 +45,25 @@ value int_mul(value x, value y)
 value int_cmp(value x, value y)
 {
     if (mpz_cmp(x, y) == 0)
-        return why3__Bool__True;
+        return T_why3__Bool__True;
     else
-        return why3__Bool__False;
+        return T_why3__Bool__False;
 }
 
-static _GC_realloc_(void *old, size_t unused, size_t new_size) {
-    GC_realloc(old, new_size);
+static void *_GC_realloc_(void *old, size_t unused, size_t new_size) {
+    return GC_realloc(old, new_size);
 }
 
-static _GC_free_(void *old, size_t unused) {
+static void _GC_free_(void *old, size_t unused) {
     GC_free(old);
 }
 
-struct closure* test__Test__fact_rec;
+extern struct closure* M_test__Test__fact_rec;
 
 int main(int argc, char** argv) {
     GC_init();
     mp_set_memory_functions(GC_malloc, _GC_realloc_, _GC_free_);
-    struct closure* main = test__Test__fact_rec;
+    struct closure* main = M_test__Test__fact_rec;
     value (*f)(value, value*) = main->f;
     mpz_t lol;
     mpz_init_set_str(lol, argv[1], 10);
