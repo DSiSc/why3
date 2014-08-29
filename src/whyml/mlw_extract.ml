@@ -88,9 +88,11 @@ let get_exec_decl syn d =
         None
     | Dlogic ll ->
         let aux (ls, ld) =
-          let res = is_exec_logic ld in
-          if not res then
-            mark_lsymbol syn ls;
+          if not (has_syntax syn ls.ls_name) then begin
+            let res = is_exec_logic ld in
+            if not res then
+              mark_lsymbol syn ls;
+          end
         in
         fix aux ll;
         begin match List.filter (fun (ls, _) -> is_exec_lsymbol ls) ll with
@@ -165,7 +167,15 @@ let check_exec_pdecl syn pd = match pd.pd_node with
       if not (has_syntax syn name) then
         Loc.errorm ?loc:name.id_loc "Value '%s' not defined" name.id_string;
   | PDlet ld ->
-      check_exec_expr ld.let_expr
+      let id = match ld.let_sym with
+        | LetV pv -> pv.pv_vs.vs_name
+        | LetA ps -> ps.ps_name
+      in
+      if not (has_syntax syn id) then
+        check_exec_expr ld.let_expr
   | PDrec fdl ->
-      let aux f = check_exec_expr f.fun_lambda.l_expr in
+      let aux f =
+        if not (has_syntax syn f.fun_ps.ps_name) then
+          check_exec_expr f.fun_lambda.l_expr
+      in
       List.iter aux fdl
