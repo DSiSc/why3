@@ -9,45 +9,32 @@
 (*                                                                  *)
 (********************************************************************)
 
-module Switch = struct
-  type t =
-    | OCaml
-    | C
-
-  let backend = ref OCaml
-
-  let set = (:=) backend
-  let get () = !backend
-end
-
-open Switch
-
-let cout_c = ref None
-
-let set_cout_c fmt cout = match !cout_c with
-  | None -> cout_c := Some (fmt, cout)
-  | Some (fmt_c, cout_c) when fmt_c == fmt && cout_c == cout -> ()
-  | Some _ -> assert false
+type t =
+  | OCaml
+  | C
 
 let debug =
   Debug.register_info_flag "extraction"
     ~desc:"Print@ details@ of@ program@ extraction."
 
-let extract_theory driver ?old ?fname formatter cout theory = match !backend with
+let switch driver =
+  match driver.Mlw_driver.drv_printer with
+  | Some "ocaml" -> OCaml
+  | Some "c" -> C
+  | Some name -> Loc.errorm "Unknown printer '%s'" name
+  | None -> Loc.errorm "No printer name specified"
+
+let extract_filename driver ?fname th =
+  match switch driver with
+  | OCaml -> Mlw_ocaml.extract_filename ?fname th
+  | C -> Mlw_c.extract_filename ?fname th
+
+let extract_theory driver ?old ?fname formatter theory =
+  match switch driver with
   | OCaml -> Mlw_ocaml.extract_theory driver ?old ?fname formatter theory
-  | C ->
-      set_cout_c formatter cout;
-      Mlw_c.extract_theory driver ?fname formatter theory
+  | C -> Mlw_c.extract_theory driver ?fname formatter theory
 
-let extract_module driver ?old ?fname formatter cout modul = match !backend with
+let extract_module driver ?old ?fname formatter modul =
+  match switch driver with
   | OCaml -> Mlw_ocaml.extract_module driver ?old ?fname formatter modul
-  | C ->
-      set_cout_c formatter cout;
-      Mlw_c.extract_module driver ?fname formatter modul
-
-let finalize () = match !backend, !cout_c with
-  | OCaml, _ -> ()
-  | C, None -> assert false
-  | C, Some (_fmt, cout) ->
-      (* The formatter can be usefull if we have toplevel values in the futur *)
-      close_out cout
+  | C -> Mlw_c.extract_module driver ?fname formatter modul

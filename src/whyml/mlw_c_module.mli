@@ -43,7 +43,7 @@ val define_global_closure : info -> Ident.ident -> value -> unit
 
 val define_global_constructor : info -> Ident.ident -> int -> unit
 
-val dump : Format.formatter -> unit
+val dump : ?fname:string -> Format.formatter -> Theory.theory -> unit
 
 (******************)
 (* Builtin values *)
@@ -134,6 +134,7 @@ val const_equal : value -> value -> value
 (******************)
 
 val append_global_exn : value -> value -> unit
+val append_include : string -> unit
 val define_record : value -> string list -> unit
 
 (*******************)

@@ -1,3 +1,5 @@
+printer "c"
+
 theory BuiltIn
   syntax predicate (=) "int_cmp(%1, %2)"
 end

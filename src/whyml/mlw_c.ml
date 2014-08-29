@@ -39,7 +39,7 @@ open Theory
 module Module = Mlw_c_module
 
 let extract_filename ?fname th =
-  (Module.modulename ?fname th.th_path th.th_name.Ident.id_string) ^ ".c"
+  (Module.modulename ?fname th.th_path th.th_name.id_string) ^ ".c"
 
 type info = Module.info = {
   info_syn: Printer.syntax_map;
@@ -416,7 +416,7 @@ let logic_decl info d = match d.d_node with
   | Dprop (_pk, _pr, _) ->
       assert false
 
-let logic_decl info td = match td.td_node with
+let logic_decl ?fname info td = match td.td_node with
   | Decl d ->
       begin match Mlw_extract.get_exec_decl info.info_syn d with
       | Some d ->
@@ -426,7 +426,9 @@ let logic_decl info td = match td.td_node with
       | None ->
           ()
       end
-  | Use _ | Clone _ | Meta _ ->
+  | Use th ->
+      Module.append_include (extract_filename ?fname th);
+  | Clone _ | Meta _ ->
       ()
 
 (** Theories *)
@@ -440,8 +442,8 @@ let extract_theory drv ?fname fmt th =
     th_known_map = th.th_known;
     mo_known_map = Mid.empty;
     fname = Opt.map Module.clean_fname fname; } in
-  List.iter (logic_decl info) th.th_decls;
-  Module.dump fmt
+  List.iter (logic_decl ?fname info) th.th_decls;
+  Module.dump ?fname fmt th
 
 (** Programs *)
 
@@ -1008,6 +1010,6 @@ let extract_module drv ?fname fmt m =
     th_known_map = th.th_known;
     mo_known_map = m.mod_known;
     fname = Opt.map Module.clean_fname fname; } in
-  List.iter (logic_decl info) th.th_decls;
+  List.iter (logic_decl ?fname info) th.th_decls;
   List.iter (pdecl info) m.mod_decls;
-  Module.dump fmt
+  Module.dump ?fname fmt th

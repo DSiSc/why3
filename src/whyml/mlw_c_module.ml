@@ -20,6 +20,7 @@ and line =
 
 type global =
   | Global of string
+  | Include of string
   | Function of (string * builder)
 
 type value = string
@@ -44,7 +45,7 @@ let c_keywords =
   ; "while"; null_value; env_value; exn_value
   ]
 
-let header = ref ["#include \"why3.c\""]
+let header = ref []
 let modul = ref []
 let sanitizer = Ident.sanitizer Ident.char_to_alpha Ident.char_to_alnumus
 let printer =
@@ -156,13 +157,15 @@ let dump_builder fmt builder =
 let dump_global fmt = function
   | Global s ->
       Format.fprintf fmt "%s;\n\n" s;
+  | Include file ->
+      Format.fprintf fmt "#include \"%s\"\n\n" file;
   | Function (s, builder) ->
       Format.pp_print_string fmt s;
       Format.fprintf fmt "\n{\n";
       dump_builder fmt builder;
       Format.fprintf fmt "}\n\n"
 
-let dump fmt =
+let dump ?fname fmt th =
   let dump_header () =
     let h = List.rev !header in
     List.iter (Format.fprintf fmt "%s\n") h;
@@ -175,6 +178,11 @@ let dump fmt =
     Format.fprintf fmt "\n";
     modul := [];
   in
+  let module_name =
+    modulename ?fname th.Theory.th_path th.Theory.th_name.Ident.id_string
+  in
+  Format.fprintf fmt "#ifndef %s\n" module_name;
+  Format.fprintf fmt "#define %s\n\n" module_name;
   begin match !header with
   | [] -> ()
   | _::_ -> dump_header ()
@@ -182,7 +190,8 @@ let dump fmt =
   begin match !modul with
   | [] -> ()
   | _::_ -> dump_module ()
-  end
+  end;
+  Format.fprintf fmt "#endif"
 
 (************************)
 (* High-level functions *)
@@ -442,6 +451,9 @@ let const_equal = fmt "%s == %s"
 let append_global_exn name value =
   let name = fmt "exn_tag %s" name in
   append_global (Global (fmt "%s = \"%s\"" name value))
+
+let append_include file =
+  append_global (Include file)
 
 let query_syntax = Printer.query_syntax
 
