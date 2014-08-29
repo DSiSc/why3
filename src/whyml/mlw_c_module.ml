@@ -197,7 +197,7 @@ let dump drv ?fname fmt th =
   | [] -> ()
   | _::_ -> dump_module ()
   end;
-  Format.fprintf fmt "#endif"
+  Format.fprintf fmt "#endif\n"
 
 (************************)
 (* High-level functions *)
