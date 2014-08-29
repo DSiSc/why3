@@ -427,7 +427,7 @@ let logic_decl ?fname info td = match td.td_node with
           ()
       end
   | Use th ->
-      Module.append_include (extract_filename ?fname th);
+      Module.append_include (extract_filename th);
   | Clone _ | Meta _ ->
       ()
 
