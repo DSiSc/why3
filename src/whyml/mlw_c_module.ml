@@ -165,7 +165,7 @@ let dump_global fmt = function
       dump_builder fmt builder;
       Format.fprintf fmt "}\n\n"
 
-let dump ?fname fmt th =
+let dump drv ?fname fmt th =
   let dump_header () =
     let h = List.rev !header in
     List.iter (Format.fprintf fmt "%s\n") h;
@@ -183,6 +183,12 @@ let dump ?fname fmt th =
   in
   Format.fprintf fmt "#ifndef %s\n" module_name;
   Format.fprintf fmt "#define %s\n\n" module_name;
+  begin match Ident.Mid.find_opt th.Theory.th_name drv.Mlw_driver.drv_thprelude with
+  | Some prelude ->
+     List.iter (Format.fprintf fmt "%s\n") prelude;
+     Format.pp_print_newline fmt ();
+  | None -> ()
+  end;
   begin match !header with
   | [] -> ()
   | _::_ -> dump_header ()

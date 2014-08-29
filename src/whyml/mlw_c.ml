@@ -443,7 +443,7 @@ let extract_theory drv ?fname fmt th =
     mo_known_map = Mid.empty;
     fname = Opt.map Module.clean_fname fname; } in
   List.iter (logic_decl ?fname info) th.th_decls;
-  Module.dump ?fname fmt th
+  Module.dump drv ?fname fmt th
 
 (** Programs *)
 
@@ -1012,4 +1012,4 @@ let extract_module drv ?fname fmt m =
     fname = Opt.map Module.clean_fname fname; } in
   List.iter (logic_decl ?fname info) th.th_decls;
   List.iter (pdecl info) m.mod_decls;
-  Module.dump ?fname fmt th
+  Module.dump drv ?fname fmt th

@@ -43,7 +43,9 @@ val define_global_closure : info -> Ident.ident -> value -> unit
 
 val define_global_constructor : info -> Ident.ident -> int -> unit
 
-val dump : ?fname:string -> Format.formatter -> Theory.theory -> unit
+val dump :
+  Mlw_driver.driver -> ?fname:string ->
+  Format.formatter -> Theory.theory -> unit
 
 (******************)
 (* Builtin values *)
