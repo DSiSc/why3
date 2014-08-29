@@ -42,4 +42,12 @@ value int_eq(value x, value y)
         return T_why3__Bool__False;
 }
 
+value int_lt(value x, value y)
+{
+    if (mpz_cmp(x, y) < 0)
+        return T_why3__Bool__True;
+    else
+        return T_why3__Bool__False;
+}
+
 #endif
