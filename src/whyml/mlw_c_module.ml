@@ -225,8 +225,7 @@ let create_exn builder =
 
 let create_mpz str base builder =
   let name = unamed_id () in
-  append_expr (fmt "mpz_ptr %s = GC_malloc(sizeof(mpz_t))" name) builder;
-  append_expr (fmt "mpz_init_set_str(%s, %S, %d)" name str base) builder;
+  append_expr (fmt "mpz_ptr %s = int_create_from_str(%S, %d)" name str base) builder;
   name
 
 let create_array size builder =
@@ -236,8 +235,7 @@ let create_array size builder =
 
 let clone_mpz value builder =
   let name = unamed_id () in
-  append_expr (fmt "mpz_ptr %s = GC_malloc(sizeof(mpz_t))" name) builder;
-  append_expr (fmt "mpz_init_set(%s, %s)" name value) builder;
+  append_expr (fmt "mpz_ptr %s = int_clone(%s)" name value) builder;
   name
 
 let cast_to_closure value builder =
