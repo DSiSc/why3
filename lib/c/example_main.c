@@ -10,8 +10,6 @@ static void _GC_free_(void *old, size_t unused) {
     GC_free(old);
 }
 
-extern struct closure* M_demo__Demo__fact;
-
 int main(int argc, char** argv) {
     GC_init();
     mp_set_memory_functions(GC_malloc, _GC_realloc_, _GC_free_);
