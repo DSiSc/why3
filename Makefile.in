@@ -205,7 +205,7 @@ src/session/compress.ml: config.status src/session/compress_none.ml
 endif
 
 clean::
-	rm -f src/session/compress.ml
+	rm -f $(addprefix src/session/*., $(COMPILED_LIB_EXTS))
 
 # build targets
 
