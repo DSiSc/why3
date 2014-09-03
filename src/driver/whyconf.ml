@@ -556,7 +556,9 @@ let read_config conf_file =
     get_config filenamerc
   with e when not (Debug.test_flag Debug.stack_trace) ->
     let b = Buffer.create 40 in
-    Format.bprintf b "%a" Exn_printer.exn_printer e;
+    let fmt = Format.formatter_of_buffer b in
+    Format.fprintf fmt "%a" Exn_printer.exn_printer e;
+    Format.pp_print_flush fmt ();
     raise (ConfigFailure (fst filenamerc, Buffer.contents b))
 
 (** filter prover *)

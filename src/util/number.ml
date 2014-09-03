@@ -158,8 +158,9 @@ let simplify_max_int = BigInt.of_string "2147483646"
 
 let remove_minus e =
   if e.[0] = '-' then
-    (let e' = String.copy e in e'.[0] <- 'm'; e')
-  else e
+    "m" ^ String.sub e 1 (String.length e - 1)
+  else
+    e
 
 let print_dec_int support fmt i =
   let fallback i =

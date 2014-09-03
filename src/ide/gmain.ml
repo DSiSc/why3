@@ -520,7 +520,9 @@ let update_task_view a =
             | S.Done
                 ({Call_provers.pr_answer = Call_provers.HighFailure} as r) ->
               let b = Buffer.create 37 in
-              bprintf b "%a" Call_provers.print_prover_result r;
+              let fmt = Format.formatter_of_buffer b in
+              fprintf fmt "%a" Call_provers.print_prover_result r;
+              Format.pp_print_flush fmt ();
               Buffer.contents b
             | S.Done r ->
               let out = r.Call_provers.pr_output in
@@ -536,7 +538,9 @@ let update_task_view a =
             | S.Running -> "prover currently running"
             | S.InternalFailure e ->
               let b = Buffer.create 37 in
-              bprintf b "%a" Exn_printer.exn_printer e;
+              let fmt = Format.formatter_of_buffer b in
+              fprintf fmt "%a" Exn_printer.exn_printer e;
+              Format.pp_print_flush fmt ();
               Buffer.contents b
         end
     | S.Transf tr ->

@@ -176,10 +176,9 @@ let string_of ?max_boxes p x =
   Buffer.contents b
 
 let wnl fmt =
-  let out,flush,_newline,spaces =
-    pp_get_all_formatter_output_functions fmt () in
-  pp_set_all_formatter_output_functions fmt
-    ~out ~flush ~newline:(fun () -> spaces 1) ~spaces
+  let out_functions = pp_get_formatter_out_functions fmt () in
+  let out_newline () = out_functions.out_spaces 1 in
+  pp_set_formatter_out_functions fmt {out_functions with out_newline}
 
 
 let string_of_wnl p x =

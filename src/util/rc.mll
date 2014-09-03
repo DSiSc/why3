@@ -64,20 +64,18 @@ let escape_string s =
          | _ -> 1)
   done;
   if !n = String.length s then s else begin
-    let s' = String.create !n in
-    n := 0;
+    let s' = Buffer.create !n in
     for i = 0 to String.length s - 1 do
       let c = String.unsafe_get s i in
       begin match c with
         | ('"' | '\\' | '\n' | '\r' | '\t') ->
-          String.unsafe_set s' !n '\\'; incr n
+          Buffer.add_char s' '\\';
         | _ -> ()
       end;
-      String.unsafe_set s' !n
+      Buffer.add_char s'
         (match c with '\n' -> 'n' | '\r' -> 'r' | '\t' -> 't' | _ -> c);
-      incr n
     done;
-    s'
+    Buffer.contents s'
   end
 
 let print_rc_value fmt = function

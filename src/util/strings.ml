@@ -33,11 +33,10 @@ let ends_with s suf =
 let pad_right c s i =
   let sl = String.length s in
   if sl < i then
-    let p = String.create i in
-    String.blit s 0 p 0 sl;
-    String.fill p sl (i-sl) c;
-    p
+    let p = Buffer.create i in
+    Buffer.add_string p s;
+    Buffer.add_string p (String.make (i-sl) c);
+    Buffer.contents p
   else if sl > i
   then String.sub s 0 i
   else s
-

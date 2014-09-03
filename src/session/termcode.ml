@@ -256,7 +256,9 @@ let ident_shape ~push id acc =
 
 let const_shape ~push acc c =
   let b = Buffer.create 17 in
-  Format.bprintf b "%a" Pretty.print_const c;
+  let fmt = Format.formatter_of_buffer b in
+  Format.fprintf fmt "%a" Pretty.print_const c;
+  Format.pp_print_flush fmt ();
   push (Buffer.contents b) acc
 
 let rec pat_shape ~(push:string->'a->'a) c m (acc:'a) p : 'a =
@@ -430,7 +432,9 @@ module Checksum = struct
   let const =
     let buf = Buffer.create 17 in
     fun b c ->
-      Format.bprintf buf "%a" Pretty.print_const c;
+      let fmt = Format.formatter_of_buffer buf in
+      Format.fprintf fmt "%a" Pretty.print_const c;
+      Format.pp_print_flush fmt ();
       let s = Buffer.contents buf in
       Buffer.clear buf;
       string b s

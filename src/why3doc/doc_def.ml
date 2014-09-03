@@ -51,22 +51,19 @@ let tag_escape s =
   let len = String.length s in
   if len = len' then s else begin
     let hex = "0123456789ABCDEF" in
-    let t = String.create len' in
-    let j = ref 0 in
+    let t = Buffer.create len' in
     for i = 0 to len - 1 do
       let c = s.[i] in
       if tag_allowed_char c then begin
-        t.[!j] <- c;
-        incr j
+        Buffer.add_char t c;
       end else begin
         let c = Char.code c in
-        t.[!j] <- '.';
-        t.[!j + 1] <- hex.[c / 16];
-        t.[!j + 2] <- hex.[c mod 16];
-        j := !j + 3
+        Buffer.add_char t '.';
+        Buffer.add_char t hex.[c / 16];
+        Buffer.add_char t hex.[c mod 16];
       end
     done;
-    t
+    Buffer.contents t
   end
 
 let make_tag s l =

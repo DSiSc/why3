@@ -65,14 +65,14 @@ let time_start = Unix.gettimeofday ()
 
 let set_debug_formatter f =
   (** enable the usual behavior of stderr: flush at every new line *)
-  let out,flush,newline,spaces =
-    Format.pp_get_all_formatter_output_functions f () in
-  Format.pp_set_all_formatter_output_functions
+  let out_functions = Format.pp_get_formatter_out_functions f () in
+  let out_newline () =
+    out_functions.Format.out_newline ();
+    out_functions.Format.out_flush ();
+  in
+  Format.pp_set_formatter_out_functions
     f
-    ~out
-    ~flush
-    ~newline:(fun () -> newline (); flush ())
-    ~spaces;
+    {out_functions with Format.out_newline};
   formatter := f
 
 let get_debug_formatter () = !formatter
