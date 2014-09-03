@@ -53,18 +53,9 @@ why3.conf
 /bin/why3.byte
 /bin/why3.opt
 /bin/why3
-/bin/why3contraption.byte
-/bin/why3contraption.opt
-/bin/why3contraption
 /bin/why3ide.byte
 /bin/why3ide.opt
 /bin/why3ide
-/bin/why3config.byte
-/bin/why3config.opt
-/bin/why3config
-/bin/why3bench.byte
-/bin/why3bench.opt
-/bin/why3bench
 /bin/why3doc.byte
 /bin/why3doc.opt
 /bin/why3doc
@@ -80,9 +71,6 @@ why3.conf
 /bin/why3realize.byte
 /bin/why3realize.opt
 /bin/why3realize
-/bin/why3replay.byte
-/bin/why3replay.opt
-/bin/why3replay
 /bin/why3session.opt
 /bin/why3session.byte
 /bin/why3session
@@ -183,6 +171,7 @@ pvsbin/
 # /src/session
 /src/session/xml.ml
 /src/session/compress.ml
+/src/session/strategy_parser.ml
 
 # /src/tools
 /src/tools/why3wc.ml
@@ -221,9 +210,11 @@ pvsbin/
 /examples/*/*.byte
 /examples/in_progress/*/*.opt
 /examples/in_progress/*/*.byte
+/examples/*.html
 /examples/*/*.html
 /examples/*/*/*.html
 /examples/*/*/*/*.html
+/examples/style.css
 /examples/*/style.css
 /examples/*/*/style.css
 /examples/*/*/*/style.css

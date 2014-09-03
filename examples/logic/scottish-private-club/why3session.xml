@@ -10,8 +10,8 @@
 <prover id="5" name="Yices" version="1.0.38" timelimit="5" memlimit="0"/>
 <prover id="6" name="Vampire" version="0.6" timelimit="5" memlimit="0"/>
 <file name="../scottish-private-club.why">
-<theory name="ScottishClubProblem" expanded="true">
- <goal name="ThereIsNobodyInTheClub" sum="377f7cd8b9b3f2b52efb6d802ae346c1" expanded="true">
+<theory name="ScottishClubProblem" sum="941dc05511c93ea79e6778c1b2885975" expanded="true">
+ <goal name="ThereIsNobodyInTheClub" expanded="true">
  <proof prover="0"><result status="valid" time="0.01"/></proof>
  <proof prover="1"><result status="valid" time="0.00"/></proof>
  <proof prover="2"><result status="valid" time="0.00"/></proof>

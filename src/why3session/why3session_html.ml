@@ -11,7 +11,6 @@
 
 open Format
 open Why3
-open Why3session
 open Why3session_lib
 
 module Hprover = Whyconf.Hprover
@@ -72,7 +71,7 @@ type context =
 
 let run_file (context : context) print_session fname =
   let project_dir = Session.get_project_dir fname in
-  let session = Session.read_session project_dir in
+  let session,_use_shapes = Session.read_session project_dir in
   let output_dir =
     if !output_dir = "" then project_dir else !output_dir
   in

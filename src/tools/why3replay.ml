@@ -11,7 +11,6 @@
 
 open Format
 open Why3
-open Why3session
 
 (** {2 Warnings} *)
 
@@ -400,8 +399,9 @@ let () =
     Debug.dprintf debug "Opening session...@?";
     O.verbose := Debug.test_flag debug;
     let env_session,found_obs,some_merge_miss =
-      let session = S.read_session project_dir in
-      M.update_session ~allow_obsolete:true session env config
+      let session, use_shapes = S.read_session project_dir in
+      M.update_session ~allow_obsolete:true ~release:false ~use_shapes
+        session env config
     in
     Debug.dprintf debug " done.@.";
     if !opt_obsolete_only && not found_obs

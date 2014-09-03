@@ -2,58 +2,58 @@
 <!DOCTYPE why3session PUBLIC "-//Why3//proof session v5//EN"
 "http://why3.lri.fr/why3session.dtd">
 <why3session shape_version="4">
-<prover id="0" name="Coq" version="8.4pl3" timelimit="6" memlimit="1000"/>
+<prover id="0" name="Coq" version="8.4pl4" timelimit="6" memlimit="1000"/>
 <prover id="1" name="Alt-Ergo" version="0.95.2" timelimit="5" memlimit="1000"/>
 <prover id="2" name="CVC4" version="1.3" timelimit="5" memlimit="1000"/>
 <file name="../../../modules/array.mlw" expanded="true">
-<theory name="Array">
- <goal name="WP_parameter defensive_get" expl="VC for defensive_get" sum="7a13ed9ce975d02c6a99da7953b5f8ad">
+<theory name="Array" sum="b4350b4d112e815485b8f9c525f21f56">
+ <goal name="WP_parameter defensive_get" expl="VC for defensive_get">
  <proof prover="1"><result status="valid" time="0.01"/></proof>
  <proof prover="2"><result status="valid" time="0.01"/></proof>
  </goal>
- <goal name="WP_parameter defensive_set" expl="VC for defensive_set" sum="c4c143e53a37df4c34fec17c6b70b752">
+ <goal name="WP_parameter defensive_set" expl="VC for defensive_set">
  <proof prover="1"><result status="valid" time="0.02"/></proof>
  <proof prover="2"><result status="valid" time="0.01"/></proof>
  </goal>
- <goal name="WP_parameter fill" expl="VC for fill" sum="050360d72701db35f693b2d9b75d7695">
+ <goal name="WP_parameter fill" expl="VC for fill">
  <proof prover="1"><result status="valid" time="0.02"/></proof>
  <proof prover="2"><result status="valid" time="0.06"/></proof>
  </goal>
 </theory>
-<theory name="IntArraySorted" expanded="true">
+<theory name="IntArraySorted" sum="adbe9fe40946cbef30d605532781de00" expanded="true">
 </theory>
-<theory name="Sorted" expanded="true">
+<theory name="Sorted" sum="62c1716ceb15ee60a7a4a975e8093efe" expanded="true">
 </theory>
-<theory name="ArrayEq" expanded="true">
+<theory name="ArrayEq" sum="c1682248b77548eaf9bdd9c93deeee10" expanded="true">
 </theory>
-<theory name="ArrayExchange" expanded="true">
+<theory name="ArrayExchange" sum="93a13d75b52880a69c69994864c1a717" expanded="true">
 </theory>
-<theory name="ArrayPermut" expanded="true">
- <goal name="exchange_permut_sub" sum="15a6358e332a91d7a40db598c04f3364">
+<theory name="ArrayPermut" sum="78e3e8726c3861abd3d5ce9637c6467d" expanded="true">
+ <goal name="exchange_permut_sub">
  <proof prover="0" edited="array_ArrayPermut_exchange_permut_sub_1.v"><result status="valid" time="4.64"/></proof>
  </goal>
- <goal name="permut_sub_weakening" sum="875ea61b1f77300d3a162a9b3039c823">
+ <goal name="permut_sub_weakening">
  <proof prover="0" edited="array_ArrayPermut_permut_sub_weakening_2.v"><result status="valid" time="1.58"/></proof>
  </goal>
- <goal name="exchange_permut_all" sum="ba0d955110562a10351bad58d7bb7d3d" expanded="true">
+ <goal name="exchange_permut_all" expanded="true">
  <proof prover="2"><result status="valid" time="0.29"/></proof>
  </goal>
 </theory>
-<theory name="ArraySwap">
- <goal name="WP_parameter swap" expl="VC for swap" sum="f44d39e79905e10fdc532d5709b823b7">
+<theory name="ArraySwap" sum="99fa5ddadbcbef895c6cb438c5e043fd">
+ <goal name="WP_parameter swap" expl="VC for swap">
  <proof prover="1"><result status="valid" time="0.00"/></proof>
  <proof prover="2"><result status="valid" time="0.04"/></proof>
  </goal>
 </theory>
-<theory name="ArraySum" expanded="true">
+<theory name="ArraySum" sum="759d756ad1028f14a6d2ef0cbf0d053c" expanded="true">
 </theory>
-<theory name="NumOfParam" expanded="true">
+<theory name="NumOfParam" sum="23a5b427021c04321748306fb1b147d3" expanded="true">
 </theory>
-<theory name="NumOfEq" expanded="true">
+<theory name="NumOfEq" sum="b654a3e7bd8f8b303727ed21a2765888" expanded="true">
 </theory>
-<theory name="NumOf" expanded="true">
+<theory name="NumOf" sum="c19b8c3461228daf6b9d30538a98f514" expanded="true">
 </theory>
-<theory name="ToList" expanded="true">
+<theory name="ToList" sum="fdbf671f853cbb19244771a2a0b844ee" expanded="true">
 </theory>
 </file>
 </why3session>

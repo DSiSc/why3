@@ -10,10 +10,10 @@
 <prover id="5" name="Gappa" version="1.1.1" timelimit="5" memlimit="0"/>
 <prover id="6" name="Vampire" version="0.6" timelimit="5" memlimit="0"/>
 <file name="../ns_clone.why">
-<theory name="Sig" expanded="true">
+<theory name="Sig" sum="87be239b06179b061435a6c834ba7fa7" expanded="true">
 </theory>
-<theory name="Struct" expanded="true">
- <goal name="AddMem" sum="8b3fe1ccbbe65e1a34e9738f93900a65" expanded="true">
+<theory name="Struct" sum="5351aaf9ed117996f606b8a74b5f1fb8" expanded="true">
+ <goal name="AddMem" expanded="true">
  <proof prover="0"><result status="valid" time="0.00"/></proof>
  <proof prover="1"><result status="valid" time="0.00"/></proof>
  <proof prover="2"><result status="valid" time="0.01"/></proof>
@@ -23,12 +23,12 @@
  <proof prover="6"><result status="valid" time="0.00"/></proof>
  </goal>
 </theory>
-<theory name="Shared" expanded="true">
+<theory name="Shared" sum="c75f102113605d27f4cb3b7a222b94eb" expanded="true">
 </theory>
-<theory name="AbstractUser" expanded="true">
+<theory name="AbstractUser" sum="bd409165e6a775c3acc26c0c6ffb936a" expanded="true">
 </theory>
-<theory name="ConcreteUser" expanded="true">
- <goal name="AddMem" sum="a80fad7b0c0252f9e9346d3e2c5ba3e9" expanded="true">
+<theory name="ConcreteUser" sum="46408c39d47cee29688f1d5fc43d3afc" expanded="true">
+ <goal name="AddMem" expanded="true">
  <proof prover="0"><result status="valid" time="0.00"/></proof>
  <proof prover="1"><result status="valid" time="0.00"/></proof>
  <proof prover="2"><result status="valid" time="0.00"/></proof>

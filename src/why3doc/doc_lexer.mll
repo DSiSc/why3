@@ -61,20 +61,15 @@
     let len' = !len in
     let len = String.length s in
     if len = len' then s else begin
-      let t = String.create len' in
-      let j = ref 0 in
-      let app u =
-        let l = String.length u in
-        String.blit u 0 t !j l;
-        j := !j + l in
+      let t = Buffer.create len' in
       for i = 0 to len - 1 do
         match s.[i] with
-        | '<' -> app "&lt;"
-        | '>' -> app "&gt;"
-        | '&' -> app "&amp;"
-        | c -> t.[!j] <- c; incr j
+        | '<' -> Buffer.add_string t "&lt;"
+        | '>' -> Buffer.add_string t "&gt;"
+        | '&' -> Buffer.add_string t "&amp;"
+        | c -> Buffer.add_char t c
       done;
-      t
+      Buffer.contents t
     end
 
   let current_file = ref ""
@@ -227,7 +222,7 @@ and doc fmt block headings = parse
   | ' '* "*)"
            { if block then pp_print_string fmt "</p>\n" }
   | eof    { () }
-  | "\n\n" { newline lexbuf;
+  | "\n" space* "\n" { newline lexbuf;
              newline lexbuf;
              if block then pp_print_string fmt "</p>";
              pp_print_char fmt '\n';
@@ -333,4 +328,3 @@ Local Variables:
 compile-command: "unset LANG; make -C ../.. bin/why3doc.opt"
 End:
 *)
-

@@ -49,7 +49,9 @@ module Sexpr = Set.Make(ExprNode)
 let string_of_expr_node node =
   let print_in_buf printer x =
     let b = Buffer.create 42 in
-    Format.bprintf b "@[%a@]" printer x;
+    let fmt = Format.formatter_of_buffer b in
+    Format.fprintf fmt "@[%a@]" printer x;
+    Format.pp_print_flush fmt ();
     Buffer.contents b in
   let white_space = Str.regexp "[ ()]" in
   let translate x = Str.global_replace white_space "_" x in
@@ -598,4 +600,3 @@ Local Variables:
 End:
 vim:foldmethod=indent:foldnestmax=1
 *)
-

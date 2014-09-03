@@ -10,7 +10,6 @@
 (********************************************************************)
 
 open Format
-open Why3
 open Session
 
 let debug = Debug.register_info_flag "scheduler"
@@ -313,11 +312,19 @@ let rec init_any any = O.init (key_any any) any; iter init_any any
 
 let init_session session = session_iter init_any session
 
-let update_session ?release ~allow_obsolete old_session env whyconf  =
+let update_session ~allow_obsolete ~release ~use_shapes
+    old_session env whyconf  =
   O.reset ();
+  let ctxt = {
+    allow_obsolete_goals = allow_obsolete;
+    release_tasks = release;
+    use_shapes_for_pairing_sub_goals = use_shapes;
+    theory_is_fully_up_to_date = false; (* dummy initialisation *)
+    keygen = O.create;
+  }
+  in
   let (env_session,_,_) as res =
-    update_session ?release
-      ~keygen:O.create ~allow_obsolete old_session env whyconf
+    update_session ~ctxt old_session env whyconf
   in
   Debug.dprintf debug "Init_session@\n";
   init_session env_session.session;
@@ -917,100 +924,7 @@ let rec clean = function
 let convert_unknown_prover =
   Session_tools.convert_unknown_prover ~keygen:O.create
 
-
-  (** {2 User-defined strategies} *)
-
-  type instruction =
-    | Icall_prover of Whyconf.prover * int * int (** timelimit, memlimit *)
-    | Itransform of string * int (** successor state on success *)
-    | Igoto of int (** goto state *)
-
-  exception SyntaxError of string
-
-  let parse_instr env max s =
-    match Strings.split ' ' s with
-      | [] -> raise (SyntaxError "unexpected empty instruction")
-      | ["g";n] ->
-        let g =
-          try int_of_string n
-          with Failure _ ->
-            raise
-              (SyntaxError
-                 ("unable to parse goto argument '" ^ n ^ "' as an integer"))
-        in
-        if g < 0 || g > max then
-          raise
-            (SyntaxError ("goto index " ^ n ^ " is invalid"));
-        Igoto g
-      | "g" :: _ ->
-        raise (SyntaxError "'g' expects exactly one argument")
-      | ["c";p;t;m] ->
-        let p =
-          try
-            let fp = Whyconf.parse_filter_prover p in
-            Whyconf.filter_one_prover env.whyconf fp
-          with
-          | Whyconf.ProverNotFound _ ->
-             raise
-               (SyntaxError
-                  ("Prover " ^ p ^ " not installed or not configured"))
-          | Whyconf.ProverAmbiguity _ ->
-             raise
-               (SyntaxError
-                  ("Prover description " ^ p ^ " is ambiguous"))
-        in
-        let timelimit =
-          try int_of_string t
-          with Failure _ ->
-            raise
-              (SyntaxError
-                 ("unable to parse timelimit argument '" ^ t ^ "'"))
-        in
-        if timelimit <= 0 then
-          raise
-            (SyntaxError ("timelimit " ^ t ^ " is invalid"));
-        let memlimit =
-          try int_of_string m
-          with Failure _ ->
-            raise
-              (SyntaxError
-                 ("unable to parse memlimit argument '" ^ m ^ "'"))
-        in
-        if memlimit <= 0 then
-          raise
-            (SyntaxError ("memlimit " ^ m ^ " is invalid"));
-        Icall_prover(p.Whyconf.prover,timelimit,memlimit)
-      | "c" :: _ ->
-        raise (SyntaxError "'c' expects exactly three arguments")
-      | ["t";t;n] ->
-        let () =
-          try
-            let _ = Trans.lookup_transform t env.env in
-            ()
-          with Trans.UnknownTrans _ ->
-          try
-            let _ = Trans.lookup_transform_l t env.env in
-            ()
-          with Trans.UnknownTrans _->
-            raise (SyntaxError ("transformation '" ^ t ^ "' is unknown"))
-        in
-        let g =
-          try int_of_string n
-          with Failure _ ->
-            raise
-              (SyntaxError
-                 ("unable to parse argument '" ^ n ^ "' as an integer"))
-        in
-        if g < 0 || g > max then
-          raise
-            (SyntaxError ("index " ^ n ^ " is invalid"));
-        Itransform(t,g)
-      | "t" :: _ ->
-        raise (SyntaxError "'t' expects exactly one argument")
-      | s :: _ ->
-        raise (SyntaxError ("unknown instruction '" ^ s ^ "'"))
-
-  type strategy = instruction array
+  open Strategy
 
   let rec exec_strategy es sched pc strat g =
     if pc < 0 || pc >= Array.length strat then

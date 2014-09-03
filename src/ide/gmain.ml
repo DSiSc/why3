@@ -18,8 +18,6 @@ open Gconfig
 open Stdlib
 open Debug
 
-open Why3session
-
 module C = Whyconf
 
 external reset_gc : unit -> unit = "ml_reset_gc"
@@ -70,7 +68,7 @@ let gconfig = try
     exit 1
 
 let () =
-  Debug.dprintf debug "[Info] Init the GTK interface...@?";
+  Debug.dprintf debug "[GUI] Init the GTK interface...@?";
   ignore (GtkMain.Main.init ());
   Debug.dprintf debug " done.@.";
   Gconfig.init ()
@@ -311,7 +309,7 @@ let () =
   view_time_column#set_visible true
 
 let goals_model,goals_view =
-  Debug.dprintf debug "[Info] Creating tree model...@?";
+  Debug.dprintf debug "[GUI] Creating tree model...@?";
   let model = GTree.tree_store cols in
   let view = GTree.view ~model ~packing:scrollview#add () in
   let () = view#selection#set_mode (* `SINGLE *) `MULTIPLE in
@@ -490,7 +488,8 @@ let env_session () =
     | None -> assert false
     | Some e -> e
 
-let task_text t = Pp.string_of Pretty.print_task t
+let task_text t =
+  Pp.string_of ~max_boxes:42 Pretty.print_task t
 
 let split_transformation = "split_goal_wp"
 let inline_transformation = "inline_goal"
@@ -521,7 +520,9 @@ let update_task_view a =
             | S.Done
                 ({Call_provers.pr_answer = Call_provers.HighFailure} as r) ->
               let b = Buffer.create 37 in
-              bprintf b "%a" Call_provers.print_prover_result r;
+              let fmt = Format.formatter_of_buffer b in
+              fprintf fmt "%a" Call_provers.print_prover_result r;
+              Format.pp_print_flush fmt ();
               Buffer.contents b
             | S.Done r ->
               let out = r.Call_provers.pr_output in
@@ -537,7 +538,9 @@ let update_task_view a =
             | S.Running -> "prover currently running"
             | S.InternalFailure e ->
               let b = Buffer.create 37 in
-              bprintf b "%a" Exn_printer.exn_printer e;
+              let fmt = Format.formatter_of_buffer b in
+              fprintf fmt "%a" Exn_printer.exn_printer e;
+              Format.pp_print_flush fmt ();
               Buffer.contents b
         end
     | S.Transf tr ->
@@ -701,18 +704,18 @@ let project_dir =
       if Sys.is_directory fname then
         begin
           Debug.dprintf debug
-            "[Info] found directory '%s' for the project@." fname;
+            "[GUI] found directory '%s' for the project@." fname;
           fname
         end
       else
         if Queue.is_empty files then (* that was the only file *) begin
-          Debug.dprintf debug "[Info] found regular file '%s'@." fname;
+          Debug.dprintf debug "[GUI] found regular file '%s'@." fname;
           let d =
             try Filename.chop_extension fname
             with Invalid_argument _ -> fname
           in
           Debug.dprintf debug
-            "[Info] using '%s' as directory for the project@." d;
+            "[GUI] using '%s' as directory for the project@." d;
           Queue.push fname files; (** we need to open [fname] *)
           d
         end
@@ -732,7 +735,7 @@ let project_dir =
 let () =
   if not (Sys.file_exists project_dir) then
     begin
-      Debug.dprintf debug "[Info] '%s' does not exist. \
+      Debug.dprintf debug "[GUI] '%s' does not exist. \
         Creating directory of that name for the project@." project_dir;
       Unix.mkdir project_dir 0o777
     end
@@ -803,25 +806,25 @@ let () =
 
 let sched =
   try
-    Debug.dprintf debug "@[<hov 2>[Info] Opening session...@\n";
-    let session =
+    Debug.dprintf debug "@[<hov 2>[GUI session] Opening session...@\n";
+    let session,use_shapes =
       if Sys.file_exists project_dir then
         S.read_session project_dir
       else
-        S.create_session project_dir
+        S.create_session project_dir, false
     in
     let env,(_:bool),(_:bool) =
-      M.update_session ~allow_obsolete:true session gconfig.env
-        gconfig.Gconfig.config
+      M.update_session ~allow_obsolete:true ~release:false ~use_shapes
+        session gconfig.env gconfig.Gconfig.config
     in
-    Debug.dprintf debug "@]@\n[Info] Opening session: update done@.  @[<hov 2>";
+    Debug.dprintf debug "@]@\n[GUI session] Opening session: update done@.  @[<hov 2>";
     let sched = M.init (gconfig.session_nb_processes)
     in
-    Debug.dprintf debug "@]@\n[Info] Opening session: done@.";
+    Debug.dprintf debug "@]@\n[GUI session] Opening session: done@.";
     session_needs_saving := false;
     current_env_session := Some env;
     sched
-  with e ->
+  with e when not (Debug.test_flag Debug.stack_trace) ->
     eprintf "@[Error while opening session:@ %a@.@]"
       Exn_printer.exn_printer e;
     exit 1
@@ -833,12 +836,12 @@ let sched =
 
 let open_file ?(start=false) f =
   let f = Sysutil.relativize_filename project_dir f in
-  Debug.dprintf debug "Adding file '%s'@." f;
+  Debug.dprintf debug "[GUI session] Adding file '%s'@." f;
   if S.PHstr.mem (env_session()).S.session.S.session_files f then
-    Debug.dprintf debug "[Info] file %s already in database@." f
+    Debug.dprintf debug "[GUI] file %s already in database@." f
   else
     try
-      Debug.dprintf debug "[Info] adding file %s in database@." f;
+      Debug.dprintf debug "[GUI] adding file %s in database@." f;
       ignore (M.add_file (env_session()) ?format:!opt_parser f);
     with e ->
       if start
@@ -1173,7 +1176,7 @@ let (_ : GMenu.image_menu_item) =
 
 let save_session () =
   if !session_needs_saving then begin
-    Debug.dprintf debug "[Info] saving session@.";
+    Debug.dprintf debug "[GUI] saving session@.";
     S.save_session gconfig.config (env_session()).S.session;
     session_needs_saving := false;
   end
@@ -1413,10 +1416,10 @@ let () =
   add_gui_item add_item_provers
 
 let split_strategy =
-  [| M.Itransform(split_transformation,1) |]
+  [| Strategy.Itransform(split_transformation,1) |]
 
 let inline_strategy =
-  [| M.Itransform(inline_transformation,1) |]
+  [| Strategy.Itransform(inline_transformation,1) |]
 
 let test_strategy () =
   let config = gconfig.Gconfig.config in
@@ -1429,11 +1432,11 @@ let test_strategy () =
     Whyconf.filter_one_prover config fp
   in
   [|
-    M.Icall_prover(altergo.Whyconf.prover,1,1000);
-    M.Icall_prover(cvc4.Whyconf.prover,1,1000);
-    M.Itransform(split_transformation,0); (* goto 0 on success *)
-    M.Icall_prover(altergo.Whyconf.prover,10,4000);
-    M.Icall_prover(cvc4.Whyconf.prover,10,4000);
+    Strategy.Icall_prover(altergo.Whyconf.prover,1,1000);
+    Strategy.Icall_prover(cvc4.Whyconf.prover,1,1000);
+    Strategy.Itransform(split_transformation,0); (* goto 0 on success *)
+    Strategy.Icall_prover(altergo.Whyconf.prover,10,4000);
+    Strategy.Icall_prover(cvc4.Whyconf.prover,10,4000);
   |]
 
 (*
@@ -1496,13 +1499,13 @@ let strategies () =
             let name = st.Whyconf.strategy_name in
             try
               let code = st.Whyconf.strategy_code in
-              let len = Array.length code in
+              let code = Strategy_parser.parse (env_session()) code in
               let shortcut = load_shortcut st.Whyconf.strategy_shortcut in
-              let code = Array.map (M.parse_instr (env_session()) len) code in
-              Format.eprintf "Strategy '%s' loaded.@." name;
-              (name, st.Whyconf.strategy_desc,code, shortcut) :: acc
-            with M.SyntaxError msg ->
-              Format.eprintf "Loading strategy '%s' failed: %s@." name msg;
+              Format.eprintf "[GUI] Strategy '%s' loaded.@." name;
+              (name, st.Whyconf.strategy_desc, code, shortcut) :: acc
+            with Strategy_parser.SyntaxError msg ->
+              Format.eprintf
+                "[GUI warning] Loading strategy '%s' failed: %s@." name msg;
               acc)
           []
           strategies
@@ -1958,8 +1961,9 @@ let reload () =
     (** reload the session *)
     let old_session = (env_session()).S.session in
     let new_env_session,(_:bool),(_:bool) =
-      M.update_session ~allow_obsolete:true old_session gconfig.env
-        gconfig.Gconfig.config
+      (* use_shapes is true since session is in memory *)
+      M.update_session ~allow_obsolete:true ~release:false ~use_shapes:true
+        old_session gconfig.env gconfig.Gconfig.config
     in
     current_env_session := Some new_env_session
   with
