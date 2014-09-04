@@ -589,7 +589,7 @@ and print_app info ~raise_expr gamma builder params e = match e.e_node with
               end
             end else begin
               let closure = Module.malloc_closure builder in
-              let env = Module.malloc_env (Mid.cardinal gamma) builder in
+              let env = Module.malloc_env (List.length params) builder in
               Lists.iteri (fun i (x, _) -> Module.build_store_array env i x builder) params;
               let params = Lists.chop given_params_nbr a.aty_args in
               let params = List.map (fun x -> x.pv_vs.vs_name) params in
