@@ -55,8 +55,6 @@ type value =
   | Value of Module.value
   | Env of int
 
-let get_ts info ts = Module.get_ident info ts.ts_name
-
 let is_constructor info ls =
   (* eprintf "is_constructor: ls=%s@." ls.ls_name.id_string; *)
   match Mid.find_opt ls.ls_name info.th_known_map with
@@ -64,19 +62,6 @@ let is_constructor info ls =
         let constr (_,csl) = List.exists (fun (cs,_) -> ls_equal cs ls) csl in
         List.exists constr dl
     | _ -> false
-
-let get_record info ls =
-  match Mid.find_opt ls.ls_name info.th_known_map with
-    | Some { d_node = Ddata dl } ->
-        let rec lookup = function
-        | [] -> []
-        | (_, [cs, pjl]) :: _ when ls_equal cs ls ->
-          (try List.map Opt.get pjl with _ -> [])
-        | _ :: dl -> lookup dl
-        in
-        lookup dl
-    | Some _ | None ->
-        []
 
 let has_syntax info id = Mid.mem id info.info_syn
 
@@ -97,18 +82,8 @@ let print_constr info i (cs, _) = match cs.ls_args with
   | [] -> Module.define_global_constructor info cs.ls_name i
   | _::_ -> ()
 
-let print_data_decl info (ts, csl) =
-  let print_default () = Lists.iteri (print_constr info) csl in
-  let get_field x = x.ls_name.id_string in
-  match csl with
-    | [cs, _] ->
-        let pjl = get_record info cs in
-        if pjl = [] then
-          print_default ()
-        else
-          Module.define_record (get_ts info ts) (List.map get_field pjl)
-    | _ ->
-        print_default ()
+let print_data_decl info (_, csl) =
+  Lists.iteri (print_constr info) csl
 
 (** Inductive *)
 
@@ -157,18 +132,6 @@ let get_value info id gamma builder =
           Module.build_access_array Module.env_value i builder
       end
 
-let singleton_opt = function
-  | [x] -> Some x
-  | [] | _::_ -> None
-
-let get_record_name info = function
-  | Some {ty_node = Tyapp (ty, _); _} ->
-      get_ts info ty
-  | Some {ty_node = Tyvar _; _} ->
-      assert false
-  | None ->
-      assert false
-
 let is_simple_pattern =
   let aux x =
     match (fst (t_open_branch x)).pat_node with
@@ -191,6 +154,23 @@ let forget_pattern_vars =
        | Papp _ | Por _ | Pas _ -> assert false
     )
 
+let get_field info ls =
+  let is_field (_, csl) = match csl with
+    | [_, pjl] ->
+        let is_ls = function None -> false | Some ls' -> ls_equal ls ls' in
+        List.for_all ((<>) None) pjl && List.exists is_ls pjl
+    | _ -> false
+  in
+  match Mid.find_opt ls.ls_name info.th_known_map with
+  | Some { d_node = Ddata dl } ->
+      begin try
+        Some (Lists.find_nth is_field dl)
+      with
+      | Not_found -> None
+      end
+  | _ ->
+      None
+
 let rec print_variant_creation info ~ls ~tl builder =
   let v = Module.malloc_env (List.length tl) builder in
   Lists.iteri (fun i x -> Module.build_store_array v i x builder) tl;
@@ -208,41 +188,20 @@ let rec print_variant_creation info ~ls ~tl builder =
   Module.build_store_field variant "val" v builder;
   variant
 
-and print_record_creation info ~ls ~tl ~pjl builder =
-  let v = Module.malloc_record (get_record_name info ls.ls_value) builder in
-  let aux (ls, t) =
-    Module.build_store_field v ls.ls_name.id_string t builder;
-  in
-  List.iter aux (List.combine pjl tl);
-  v
-
-and print_record_access info ~t1 ~ls builder =
-  let t1 = Module.cast_to_record ~st:(get_record_name info (singleton_opt ls.ls_args)) t1 builder in
-  Module.build_access_field t1 ls.ls_name.id_string builder
+and print_record_access t1 builder =
+  let t1 = Module.cast_to_variant t1 builder in
+  Module.const_access_field t1 "val"
 
 and print_app ls info gamma builder tl =
   let isconstr = is_constructor info ls in
-  let is_field (_, csl) = match csl with
-    | [_, pjl] ->
-        let is_ls = function None -> false | Some ls' -> ls_equal ls ls' in
-        List.for_all ((<>) None) pjl && List.exists is_ls pjl
-    | _ -> false in
-  let isfield = match Mid.find_opt ls.ls_name info.th_known_map with
-    | Some { d_node = Ddata dl } -> not isconstr && List.exists is_field dl
-    | _ -> false
-  in
-  match tl with
-  | [] ->
+  match tl, get_field info ls with
+  | [], _ ->
       get_value info ls.ls_name gamma builder
-  | tl when isconstr ->
-      let pjl = get_record info ls in
-      if pjl = [] then
-        print_variant_creation info ~ls ~tl builder
-      else
-        print_record_creation info ~ls ~tl ~pjl builder
-  | [t1] when isfield ->
-      print_record_access info ~t1 ~ls builder
-  | tl ->
+  | tl, _ when isconstr ->
+      print_variant_creation info ~ls ~tl builder
+  | [t1], Some n ->
+      Module.build_access_array (print_record_access t1 builder) n builder
+  | tl, _ ->
       let f = get_value info ls.ls_name gamma builder in
       Module.build_pure_call f tl builder
 
@@ -448,12 +407,9 @@ let extract_theory drv ?fname fmt th =
 (** Programs *)
 
 open Mlw_ty
-open Mlw_ty.T
 open Mlw_expr
 open Mlw_decl
 open Mlw_module
-
-let get_its info ts = get_ts info ts.its_ts
 
 let get_xs ?separator info xs = Module.get_ident ?separator info xs.xs_name
 
@@ -671,18 +627,14 @@ and print_expr info ~raise_expr gamma e builder =
   | Eif (e0,e1,e2) ->
       print_if (print_expr info ~raise_expr gamma) builder (e0, e1, e2)
   | Eassign (pl,e,_,pv) ->
-      let ty = match e.e_vty with
-        | VTvalue {ity_node = Ityapp ({its_ts; _}, _, _)} ->
-            get_ts info its_ts
-        | VTvalue {ity_node = Ityvar _}
-        | VTvalue {ity_node = Itypur _}
-        | VTarrow _ ->
-            assert false
+      let field_number = match get_field info pl.pl_ls with
+        | Some x -> x
+        | None -> assert false
       in
       let e = print_expr info ~raise_expr gamma e builder in
-      let e = Module.cast_to_record ~st:ty e builder in
+      let e = print_record_access e builder in
       let pv = get_value info pv.pv_vs.vs_name gamma builder in
-      Module.build_store_field e pl.pl_ls.ls_name.id_string pv builder;
+      Module.build_store_array e field_number pv builder;
       Module.unit_value
   | Eloop (_,_,e) ->
       let exn = Module.create_exn builder in
@@ -959,18 +911,8 @@ let print_pconstr info i (cs, _) = match cs.pl_args with
   | [] -> Module.define_global_constructor info cs.pl_ls.ls_name i
   | _::_ -> ()
 
-let print_pdata_decl info (its, csl, _) =
-  let print_default () = Lists.iteri (print_pconstr info) csl in
-  let get_field x = x.ls_name.id_string in
-  match csl with
-    | [cs, _] ->
-        let pjl = get_record info cs.pl_ls in
-        if pjl = [] then
-          print_default ()
-        else
-          Module.define_record (get_its info its) (List.map get_field pjl)
-    | _ ->
-        print_default ()
+let print_pdata_decl info (_, csl, _) =
+  Lists.iteri (print_pconstr info) csl
 
 let print_val_decl info lv =
   has_syntax_or_ghost_or_nothing info (is_ghost_lv lv) (lv_name lv)

@@ -243,11 +243,6 @@ let cast_to_closure value builder =
   define_local_var "struct closure*" name value builder;
   name
 
-let cast_to_record ~st value builder =
-  let name = unamed_id () in
-  define_local_var (fmt "struct %s*" st) name value builder;
-  name
-
 let cast_to_variant value builder =
   let name = unamed_id () in
   define_local_var "struct variant*" name value builder;
@@ -283,11 +278,6 @@ let malloc_env size builder = match size with
 let malloc_variant builder =
   let name = unamed_id () in
   define_local_var "struct variant*" name "GC_malloc(sizeof(struct variant))" builder;
-  name
-
-let malloc_record st builder =
-  let name = unamed_id () in
-  define_local_var (fmt "struct %s*" st) name (fmt "GC_malloc(sizeof(struct %s))" st) builder;
   name
 
 let create_function info ?name ~params ~raises f =
@@ -327,13 +317,6 @@ let create_pure_function info ~name ~params f =
   let params = String.concat ", value " params in
   append_function (fmt "value %s(value %s)" name params) f;
   name
-
-let define_record name fields =
-  let fields =
-    let aux = fmt "%s value %s;\n" in
-    List.fold_left aux "" fields
-  in
-  append_header (fmt "struct %s {\n%s};" name fields)
 
 let build_equal x y builder =
   create_value (fmt "%s == %s" x y) builder
@@ -449,6 +432,8 @@ let build_block f builder =
   builder := EmptyBlock builder' :: !builder
 
 let const_access_array = fmt "%s[%d]"
+
+let const_access_field = fmt "%s->%s"
 
 let const_equal = fmt "%s == %s"
 

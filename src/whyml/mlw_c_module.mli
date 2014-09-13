@@ -70,14 +70,12 @@ val create_mpz : string -> int -> builder -> value
 val clone_mpz : value -> builder -> value
 
 val cast_to_closure : value -> builder -> value
-val cast_to_record : st:value -> value -> builder -> value
 val cast_to_variant : value -> builder -> value
 
 val malloc_closure : builder -> value
 val malloc_exn : builder -> value
 val malloc_env : int -> builder -> value
 val malloc_variant : builder -> value
-val malloc_record : value -> builder -> value
 
 val create_function :
   info ->
@@ -129,6 +127,7 @@ val build_block : (builder -> unit) -> builder -> unit
 (**********************)
 
 val const_access_array : value -> int -> value
+val const_access_field : value -> string -> value
 val const_equal : value -> value -> value
 
 (******************)
@@ -137,7 +136,6 @@ val const_equal : value -> value -> value
 
 val append_global_exn : value -> value -> unit
 val append_include : string -> unit
-val define_record : value -> string list -> unit
 
 (*******************)
 (* Syntax handling *)
