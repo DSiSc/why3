@@ -107,7 +107,9 @@ let extract_to ?fname th extract =
       Some (open_in backup)
     end else None in
   let cout = open_out file in
-  extract file ?old (formatter_of_out_channel cout);
+  let fmt = formatter_of_out_channel cout in
+  extract file ?old fmt;
+  Format.pp_print_flush fmt ();
   close_out cout
 
 let extract_to =

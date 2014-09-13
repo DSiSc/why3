@@ -1,5 +1,4 @@
 #include "why3.c"
-#include "why3__Tuple0.c"
 #include "demo__Demo.c"
 
 int main(int argc, char** argv) {

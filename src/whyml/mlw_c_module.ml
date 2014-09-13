@@ -60,8 +60,9 @@ let clean_fname fname =
 let modulename ?(separator="__") ?fname path t =
   let fname = match fname, path with
     | Some fname, _ -> clean_fname fname
-    | None, [] -> "why3"
-    | None, _ -> String.concat separator path
+    | None, []
+    | None, _::_::_ -> "why3"
+    | None, [_] -> String.concat separator path
   in
   fname ^ separator ^ t
 
