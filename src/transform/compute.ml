@@ -19,12 +19,21 @@ let meta_rewrite = Theory.register_meta "rewrite" [Theory.MTprsymbol]
   ~desc:"Declares@ the@ given@ proposition@ as@ a@ rewrite@ rule."
 
 let meta_rewrite_def = Theory.register_meta "rewrite_def" [Theory.MTlsymbol]
-  ~desc:"Declares@ the@ definition@ of@ the@ symbol@ as@ as@ rewrite@ rule."
+  ~desc:"Declares@ the@ definition@ of@ the@ symbol@ as@ a@ rewrite@ rule."
 
+let meta_compute_max_steps = Theory.register_meta_excl "compute_max_steps"
+  [Theory.MTint]
+  ~desc:"Maximal@ number@ of@ reduction@ steps@ done@ by@ compute@ \
+         transformation"
+
+let compute_max_steps = ref 1000
+
+(* not yet used
 let meta_begin_compute_context =
   Theory.register_meta "begin_compute_context" []
     ~desc:"Marks@ the@ position@ where@ computations@ are@ done@ by@ \
            transformation@ 'compute_in_context'."
+*)
 
 let collect_rule_decl prs e d =
   match d.Decl.d_node with
@@ -55,7 +64,7 @@ let normalize_goal p env (prs : Decl.Spr.t) task =
         task_known = km;
       } ->
     let engine = collect_rules p env km prs task in
-    let f = normalize engine f in
+    let f = normalize ~limit:!compute_max_steps engine f in
     begin match f.t_node with
     | Ttrue -> []
     | _ ->
@@ -65,14 +74,22 @@ let normalize_goal p env (prs : Decl.Spr.t) task =
   | _ -> assert false
 
 
-let normalize_goal_transf p env =
-  Trans.on_tagged_pr meta_rewrite
-    (fun prs -> if p.compute_defs
-      then Trans.store (normalize_goal p env prs)
-      else Trans.on_tagged_ls meta_rewrite_def
-      (fun lss -> let p = { p with compute_def_set = lss } in
-        Trans.store (normalize_goal p env prs)
-      ))
+let normalize_goal_transf p env : 'a Trans.trans =
+  let tr : 'a Trans.trans =
+    Trans.on_tagged_pr meta_rewrite
+      (fun prs -> if p.compute_defs
+        then Trans.store (normalize_goal p env prs)
+        else Trans.on_tagged_ls meta_rewrite_def
+          (fun lss -> let p = { p with compute_def_set = lss } in
+                      Trans.store (normalize_goal p env prs)
+          ))
+  in
+  Trans.on_meta_excl meta_compute_max_steps
+    (function
+      | None -> tr
+      | Some [Theory.MAint n] -> compute_max_steps := n; tr
+      | _ ->  assert false)
+
 
 let normalize_goal_transf_all env =
   let p = { compute_defs = true;
@@ -88,7 +105,7 @@ let normalize_goal_transf_few env =
           } in
   normalize_goal_transf p env
 
-let () = 
+let () =
   Trans.register_env_transform_l "compute_in_goal" normalize_goal_transf_all
   ~desc:"Performs@ possible@ computations@ in@ goal, including@ by@ \
          declared@ rewrite@ rules"

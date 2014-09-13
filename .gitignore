@@ -13,6 +13,8 @@ why3.conf
 *.cmxs
 *.cma
 *.cmxa
+*.cmt
+*.cmti
 *.annot
 *.dep
 *.vo
@@ -35,7 +37,7 @@ why3.conf
 /distrib
 /why3regtests.err
 /why3regtests.out
-/META
+/.merlin
 
 # /bench/
 /bench/programs/good/booleans/
