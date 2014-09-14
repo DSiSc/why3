@@ -532,7 +532,7 @@ and print_app info ~exn gamma builder params e = match e.e_node with
             let remaining_params = params_nbr - given_params_nbr in
             if remaining_params <= 0 then begin
               let (params, rem) = Lists.split_at params_nbr params in
-              let params = List.map fst params in
+              let params = List.rev_map fst params in
               let f = apply ~exn f params builder in
               begin match a.aty_result with
               | VTvalue _ when rem = [] -> f
