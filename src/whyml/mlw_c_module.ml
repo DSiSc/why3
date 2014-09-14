@@ -36,13 +36,14 @@ let true_value = "T_why3__Bool__True"
 let false_value = "T_why3__Bool__False"
 let env_value = "Env"
 let exn_value = "Exn"
+let exn_buf_value = "Exn_buf"
 
 let c_keywords =
   [ "auto"; "break"; "case"; "char"; "const"; "continue"; "default"; "do"
   ; "double"; "else"; "enum"; "extern"; "float"; "for"; "goto"; "if"; "int"
   ; "long"; "register"; "return"; "short"; "signed"; "sizeof"; "static"
   ; "struct"; "switch"; "typedef"; "union"; "unsigned"; "void"; "volatile"
-  ; "while"; null_value; env_value; exn_value
+  ; "while"; null_value; env_value; exn_value; exn_buf_value
   ]
 
 let header = ref []
@@ -219,14 +220,14 @@ let create_named_value info id value builder =
   define_local_var "value" name value builder;
   name
 
-let create_exn builder =
-  let name = unamed_id () in
-  define_local_var "struct exn*" name null_value builder;
-  name
-
 let create_mpz str base builder =
   let name = unamed_id () in
   append_expr (fmt "mpz_ptr %s = int_create_from_str(%S, %d)" name str base) builder;
+  name
+
+let create_exn builder =
+  let name = unamed_id () in
+  append_expr (fmt "jmp_buf %s" name) builder;
   name
 
 let create_array size builder =
@@ -254,7 +255,7 @@ let cast_to_function ~raises params_nbr value builder =
   let params = Lists.make params_nbr "value" in
   let params = String.concat ", " params in
   let params = params ^ ", value*" in
-  let params = if raises then params ^ ", struct exn**" else params in
+  let params = if raises then params ^ ", jmp_buf Exn_buf" else params in
   append_expr (fmt "value (*%s)(%s) = %s" name params value) builder;
   name
 
@@ -288,17 +289,9 @@ let create_function info ?name ~params ~raises f =
   in
   let params' = params in
   let params = List.map (fun x -> get_ident info x) params in
-  let exn = if raises then ", struct exn **Exn" else "" in
+  let exn = if raises then ", jmp_buf Exn_buf" else "" in
   let f builder =
-    let raise_expr value builder =
-      if raises then begin
-        append_expr (fmt "*Exn = %s" value) builder;
-        append_expr "return NULL" builder;
-      end else begin
-        append_expr "abort()" builder;
-      end
-    in
-    let v = f ~raise_expr ~params builder in
+    let v = f ~exn:exn_buf_value ~params builder in
     List.iter (Ident.forget_id printer) params';
     append_expr (fmt "return %s" v) builder
   in
@@ -355,6 +348,9 @@ let build_if_cmp_zero cmp signe f =
 let build_if cmp f =
   append_block (fmt "if(%s)" cmp) f
 
+let build_if_setjmp value f =
+  append_block (fmt "if(setjmp(%s) == 0)" value) f
+
 let build_else_if cmp f =
   append_block (fmt "else if(%s)" cmp) f
 
@@ -380,10 +376,6 @@ let build_not v builder =
   create_value
     (fmt "((struct variant*)(%s)->key) ? %s : %s" v false_value true_value)
     builder
-
-let build_do_while f builder =
-  append_block "do" f builder;
-  append_expr "while(false)" builder
 
 let build_abort =
   append_expr "abort()"
@@ -421,7 +413,7 @@ let build_call closure params ?exn builder =
   | None ->
       create_value (fmt "%s(%s, %s->env)" f params closure) builder
   | Some exn ->
-      create_value (fmt "%s(%s, %s->env, &%s)" f params closure exn) builder
+      create_value (fmt "%s(%s, %s->env, %s)" f params closure exn) builder
 
 let build_pure_call f params builder =
   let params = String.concat ", " params in
@@ -431,6 +423,9 @@ let build_block f builder =
   let builder' = ref [] in
   f builder';
   builder := EmptyBlock builder' :: !builder
+
+let build_call_longjmp value builder =
+  append_expr (fmt "longjmp(%s, 1)" value) builder
 
 let const_access_array = fmt "%s[%d]"
 

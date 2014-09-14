@@ -56,6 +56,7 @@ val null_value : value
 val true_value : value
 val false_value : value
 val env_value : value
+val exn_value : value
 
 (******************)
 (* Value creation *)
@@ -82,7 +83,7 @@ val create_function :
   ?name:Ident.ident ->
   params:Ident.ident list ->
   raises:bool ->
-  (raise_expr:(value -> builder -> unit) -> params:value list -> builder -> value) ->
+  (exn:value -> params:value list -> builder -> value) ->
   value
 
 val create_pure_function :
@@ -107,12 +108,12 @@ val build_if_not_null : value -> (builder -> unit) -> builder -> unit
 val build_if_true : value -> (builder -> unit) -> builder -> unit
 val build_if_false : value -> (builder -> unit) -> builder -> unit
 val build_if_cmp_zero : value -> string -> (builder -> unit) -> builder -> unit
+val build_if_setjmp : value -> (builder -> unit) -> builder -> unit
 val build_else : (builder -> unit) -> builder -> unit
 val build_if_else_if_else : (value * (builder -> unit)) list -> (builder -> unit) -> builder -> unit
 val build_access_array : value -> int -> builder -> value
 val build_access_field : ?ty:ty -> value -> string -> builder -> value
 val build_not : value -> builder -> value
-val build_do_while : (builder -> unit) -> builder -> unit
 val build_abort : builder -> unit
 val build_switch : value -> (int option * (builder -> unit)) list -> builder -> unit
 val build_while : (builder -> unit) -> builder -> unit
@@ -121,6 +122,7 @@ val build_mpz_succ : value -> builder -> unit
 val build_call : value -> value list -> ?exn:value -> builder -> value
 val build_pure_call : value -> value list -> builder -> value
 val build_block : (builder -> unit) -> builder -> unit
+val build_call_longjmp : value -> builder -> unit
 
 (**********************)
 (* Constant statement *)

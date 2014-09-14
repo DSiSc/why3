@@ -5,12 +5,15 @@
 #include <stdbool.h>
 #include <gc.h>
 #include <gmp.h>
+#include <setjmp.h>
 
 typedef void* value;
 typedef char const * exn_tag;
 struct variant {int key; value* val;};
 struct exn {exn_tag key; value val;};
 struct closure {value f; value* env;};
+
+__thread struct exn* Exn = NULL;
 
 static void _int_finalizer(void* x, void* unused)
 {

@@ -458,18 +458,15 @@ let vs_from_term t = match t.t_node with
   | Ttrue
   | Tfalse -> assert false
 
-let apply f ~raises ~raise_expr params builder =
+let apply ~raises ~exn f params builder =
   let closure = Module.cast_to_closure f builder in
   if raises then begin
-    let exn = Module.create_exn builder in
-    let res = Module.build_call closure params ~exn builder in
-    Module.build_if_not_null exn (raise_expr exn) builder;
-    res
+    Module.build_call closure params ~exn builder
   end else begin
     Module.build_call closure params builder
   end
 
-let rec print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder = function
+let rec print_pattern ~current_is_ghost info gamma map_ghost builder = function
   | PreM (t, bl) ->
       let vs = vs_from_term t in
       let is_ghost =
@@ -482,10 +479,10 @@ let rec print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder
       let current_is_ghost = is_ghost in
       if is_ghost then begin
         let branch = List.hd bl in
-        print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder (snd branch)
+        print_pattern ~current_is_ghost info gamma map_ghost builder (snd branch)
       end else begin
         let e1 = get_value info vs.vs_name gamma builder in
-        print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl builder
+        print_branches ~current_is_ghost info gamma map_ghost ~e1 ~bl builder
       end
   | PreL (vs, t, xs) ->
       let id = (vs_from_term t).vs_name in
@@ -495,13 +492,13 @@ let rec print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder
       in
       let value = Module.create_named_value info vs.vs_name value builder in
       let gamma = Mid.add vs.vs_name (Value value) gamma in
-      let res = print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder xs in
+      let res = print_pattern ~current_is_ghost info gamma map_ghost builder xs in
       Module.forget_id vs.vs_name;
       res
   | Expr e ->
-      print_expr info ~raise_expr gamma e builder
+      print_expr info gamma e builder
 
-and print_app info ~raise_expr gamma builder params e = match e.e_node with
+and print_app info ~exn gamma builder params e = match e.e_node with
   | Earrow ps ->
       let f = get_value info ps.ps_name gamma builder in
       let handle_syntax = function
@@ -523,20 +520,20 @@ and print_app info ~raise_expr gamma builder params e = match e.e_node with
               in
               aux params
             in
-            let apply f ~raises ~raise_expr params builder =
-              let app () = apply f ~raises ~raise_expr params builder in
+            let raises = not (Sexn.is_empty spec.c_effect.eff_raises) in
+            let apply ~exn f params builder =
+              let app () = apply ~raises ~exn f params builder in
               match handle_syntax ps with
               | Some s -> Module.syntax_arguments s params builder
               | None -> app ()
             in
-            let raises = not (Sexn.is_empty spec.c_effect.eff_raises) in
             let params_nbr = List.length a.aty_args in
             let given_params_nbr = List.length params in
             let remaining_params = params_nbr - given_params_nbr in
             if remaining_params <= 0 then begin
               let (params, rem) = Lists.split_at params_nbr params in
               let params = List.map fst params in
-              let f = apply f ~raises ~raise_expr params builder in
+              let f = apply ~exn f params builder in
               begin match a.aty_result with
               | VTvalue _ when rem = [] -> f
               | VTvalue _ -> assert false
@@ -554,7 +551,7 @@ and print_app info ~raise_expr gamma builder params e = match e.e_node with
                   info
                   ~params
                   ~raises
-                  (fun ~raise_expr ~params builder ->
+                  (fun ~exn ~params builder ->
                      let params =
                        let rec aux acc = function
                          | 0 -> acc
@@ -567,7 +564,7 @@ and print_app info ~raise_expr gamma builder params e = match e.e_node with
                        in
                        aux params given_params_nbr
                      in
-                     apply f ~raises ~raise_expr params builder
+                     apply ~exn f params builder
                   )
               in
               Module.build_store_field closure "f" func builder;
@@ -578,7 +575,7 @@ and print_app info ~raise_expr gamma builder params e = match e.e_node with
       aux f (Some ps) ps.ps_aty params
   | Eapp (e, v, spec) ->
       let v = get_value info v.pv_vs.vs_name gamma builder in
-      print_app info ~raise_expr gamma builder ((v, spec) :: params) e
+      print_app ~exn info gamma builder ((v, spec) :: params) e
   | Elogic _
   | Evalue _
   | Elet _
@@ -598,7 +595,7 @@ and print_app info ~raise_expr gamma builder params e = match e.e_node with
       (* TODO *)
       assert false
 
-and print_expr info ~raise_expr gamma e builder =
+and print_expr ~exn info gamma e builder =
   if e.e_ghost then
     Module.unit_value
   else match e.e_node with
@@ -608,49 +605,42 @@ and print_expr info ~raise_expr gamma e builder =
       get_value info v.pv_vs.vs_name gamma builder
   | Earrow _
   | Eapp _ ->
-      print_app info ~raise_expr gamma builder [] e
+      print_app ~exn info gamma builder [] e
   | Elet ({ let_expr = e1 }, e2) when e1.e_ghost ->
-      print_expr info ~raise_expr gamma e2 builder
+      print_expr ~exn info gamma e2 builder
   | Elet ({ let_sym = lv ; let_expr = e1 }, e2) ->
       let id = get_id_from_let lv in
       let v = Module.create_named_value info id Module.null_value builder in
       Module.build_block
         (fun builder ->
-           let v' = print_expr info ~raise_expr gamma e1 builder in
+           let v' = print_expr ~exn info gamma e1 builder in
            Module.build_store v v' builder;
         )
         builder;
       let gamma = Mid.add id (Value v) gamma in
-      let res = print_expr info ~raise_expr gamma e2 builder in
+      let res = print_expr ~exn info gamma e2 builder in
       Module.forget_id id;
       res
   | Eif (e0,e1,e2) ->
-      print_if (print_expr info ~raise_expr gamma) builder (e0, e1, e2)
+      print_if (print_expr ~exn info gamma) builder (e0, e1, e2)
   | Eassign (pl,e,_,pv) ->
       let field_number = match get_field info pl.pl_ls with
         | Some x -> x
         | None -> assert false
       in
-      let e = print_expr info ~raise_expr gamma e builder in
+      let e = print_expr ~exn info gamma e builder in
       let e = print_record_access e builder in
       let pv = get_value info pv.pv_vs.vs_name gamma builder in
       Module.build_store_array e field_number pv builder;
       Module.unit_value
   | Eloop (_,_,e) ->
-      let exn = Module.create_exn builder in
       Module.build_while
         (fun builder ->
-           let new_raise_expr value builder =
-             Module.build_store exn value builder;
-             Module.build_break builder;
-           in
-           ignore (print_expr info ~raise_expr:new_raise_expr gamma e builder)
+           ignore (print_expr ~exn info gamma e builder)
         )
         builder;
-      Module.build_if_not_null exn (raise_expr exn) builder;
       Module.unit_value
   | Efor (pv, (pvfrom, dir, pvto), _, e) ->
-      let exn = Module.create_exn builder in
       let i = get_value info pvfrom.pv_vs.vs_name gamma builder in
       let i = Module.clone_mpz i builder in
       let pvto = get_value info pvto.pv_vs.vs_name gamma builder in
@@ -663,51 +653,44 @@ and print_expr info ~raise_expr gamma e builder =
              (fun builder ->
                 let i = Module.clone_mpz i builder in
                 let gamma = Mid.add pv.pv_vs.vs_name (Value i) gamma in
-                let new_raise_expr value builder =
-                  Module.build_store exn value builder;
-                  Module.build_break builder;
-                in
-                ignore (print_expr info ~raise_expr:new_raise_expr gamma e builder)
+                ignore (print_expr ~exn info gamma e builder)
              )
              builder;
            Module.build_else Module.build_break builder;
            Module.build_mpz_succ i builder;
         )
         builder;
-      Module.build_if_not_null exn (raise_expr exn) builder;
       Module.unit_value
   | Eraise (xs,e) ->
-      let e = print_expr info ~raise_expr gamma e builder in
+      let e = print_expr ~exn info gamma e builder in
       let value = Module.malloc_exn builder in
       Module.build_store_field value "key" (get_xs info xs) builder;
       Module.build_store_field value "val" e builder;
-      raise_expr value builder;
+      Module.build_store Module.exn_value value builder;
+      Module.build_call_longjmp exn builder;
       Module.null_value
-  | Etry (e,bl) ->
-      let exn = Module.create_exn builder in
+  | Etry (e', bl) ->
+      let raises = not (Sexn.is_empty e.e_effect.eff_raises) in
+      let exn' = Module.create_exn builder in
       let res = Module.create_value Module.null_value builder in
-      Module.build_do_while
+      Module.build_if_setjmp
+        exn'
         (fun builder ->
-           let new_raise_expr value builder =
-             Module.build_store exn value builder;
-             Module.build_break builder;
-           in
-           let value = print_expr info ~raise_expr:new_raise_expr gamma e builder in
+           let value = print_expr ~exn:exn' info gamma e' builder in
            Module.build_store res value builder;
         )
         builder;
-      Module.build_if_not_null
-        exn
+      Module.build_else
         (fun builder ->
            Module.build_if_else_if_else
-             (List.map (print_xbranch info gamma ~raise_expr ~exn ~res builder) bl)
-             (raise_expr exn)
+             (List.map (print_xbranch info gamma ~exn ~res builder) bl)
+             (if raises then Module.build_call_longjmp exn else Module.build_abort)
              builder
         )
         builder;
       res
   | Eabstr (e,_) ->
-      print_expr info ~raise_expr gamma e builder
+      print_expr ~exn info gamma e builder
   | Eabsurd ->
       Module.build_abort builder;
       Module.null_value
@@ -726,7 +709,7 @@ and print_expr info ~raise_expr gamma e builder =
             let ghost = e1.e_ghost in
             let ty = ity_of_expr e1.e_vty in
             let pv = create_pvsymbol (id_fresh "matched_value") ~ghost ty in
-            let e1 = print_expr info ~raise_expr gamma e1 builder in
+            let e1 = print_expr ~exn info gamma e1 builder in
             let gamma = Mid.add pv.pv_vs.vs_name (Value e1) gamma in
             (t_var pv.pv_vs, gamma)
       in
@@ -734,7 +717,7 @@ and print_expr info ~raise_expr gamma e builder =
       let mk_case t pattern = PreM (t, pattern) in
       let mk_let vs t pe = PreL (vs, t, pe) in
       let e2 = Pattern.compile_bare ~mk_case ~mk_let [matched_value] bl in
-      print_pattern ~current_is_ghost:false info ~raise_expr gamma Mvs.empty builder e2
+      print_pattern ~exn ~current_is_ghost:false info gamma Mvs.empty builder e2
   | Erec (fdl, e) ->
       let local_arr = Module.create_array (List.length fdl) builder in
       let gamma =
@@ -751,7 +734,7 @@ and print_expr info ~raise_expr gamma e builder =
         end
       in
       Lists.iteri aux fdl;
-      print_expr info ~raise_expr gamma e builder
+      print_expr ~exn info gamma e builder
 
 and print_rec info builder gamma {fun_ps = ps; fun_lambda = lam} =
   let raises = not (Sexn.is_empty ps.ps_aty.aty_spec.c_effect.eff_raises) in
@@ -763,36 +746,36 @@ and print_rec info builder gamma {fun_ps = ps; fun_lambda = lam} =
       ~name:ps.ps_name
       ~params:(List.map (fun x -> x.pv_vs.vs_name) lam.l_args)
       ~raises
-      (fun ~raise_expr ~params builder ->
+      (fun ~exn ~params builder ->
          let gamma =
            let aux gamma x y = Mid.add x.pv_vs.vs_name (Value y) gamma in
            List.fold_left2 aux gamma lam.l_args params
          in
-         print_expr info ~raise_expr gamma lam.l_expr builder
+         print_expr ~exn info gamma lam.l_expr builder
       )
   in
   Module.build_store_field closure "f" func builder;
   Module.build_store_field closure "env" env builder;
   closure
 
-and print_xbranch info gamma ~raise_expr ~exn ~res builder (xs, pv, e) =
+and print_xbranch info gamma ~exn ~res builder (xs, pv, e) =
   let tag = get_xs info xs in
-  let key = Module.build_access_field ~ty:Module.TyExnTag exn "key" builder in
+  let key = Module.build_access_field ~ty:Module.TyExnTag Module.exn_value "key" builder in
   let cond = Module.const_equal key tag in
   let f builder =
     let gamma =
       if ity_equal xs.xs_ity ity_unit then
         gamma
       else
-        let param = Module.build_access_field exn "val" builder in
+        let param = Module.build_access_field Module.exn_value "val" builder in
         Mid.add pv.pv_vs.vs_name (Value param) gamma
     in
-    let value = print_expr info ~raise_expr gamma e builder in
+    let value = print_expr ~exn info gamma e builder in
     Module.build_store res value builder;
   in
   (cond, f)
 
-and print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl builder =
+and print_branches ~exn ~current_is_ghost info gamma map_ghost ~e1 ~bl builder =
   let e1 = Module.cast_to_variant e1 builder in
   let v = Module.build_access_field ~ty:Module.TyValuePtr e1 "val" builder in
   let res = Module.create_value Module.null_value builder in
@@ -802,7 +785,7 @@ and print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl bu
          begin match p.pat_node with
          | Pwild ->
              let f builder =
-               let e = print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder e in
+               let e = print_pattern ~exn ~current_is_ghost info gamma map_ghost builder e in
                Module.build_store res e builder;
              in
              (None, f)
@@ -839,7 +822,7 @@ and print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl bu
                        in
                        Lists.fold_lefti2 aux (gamma, map_ghost) patterns fields
                      in
-                     print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder e
+                     print_pattern ~exn ~current_is_ghost info gamma map_ghost builder e
                    in
                    (Some i, f)
                | None ->
@@ -856,7 +839,7 @@ and print_branches ~current_is_ghost info ~raise_expr gamma map_ghost ~e1 ~bl bu
                        in
                        Lists.fold_lefti aux (gamma, map_ghost) patterns
                      in
-                     print_pattern ~current_is_ghost info ~raise_expr gamma map_ghost builder e
+                     print_pattern ~exn ~current_is_ghost info gamma map_ghost builder e
                    in
                    (Some i, f)
              in
@@ -886,12 +869,12 @@ and print_rec_decl info gamma fdl =
           ~name:ps.ps_name
           ~params:(List.map (fun x -> x.pv_vs.vs_name) lam.l_args)
           ~raises
-          (fun ~raise_expr ~params builder ->
+          (fun ~exn ~params builder ->
              let gamma =
                let aux gamma x y = Mid.add x.pv_vs.vs_name (Value y) gamma in
                List.fold_left2 aux gamma lam.l_args params
              in
-             print_expr info ~raise_expr gamma lam.l_expr builder
+             print_expr ~exn info gamma lam.l_expr builder
           )
       in
       Module.define_global_closure info fd.fun_ps.ps_name func;
