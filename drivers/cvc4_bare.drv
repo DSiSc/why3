@@ -15,6 +15,10 @@ prelude "(set-option :produce-models true)"
 (* Counterexamples: makes it possible to get rid of more quantifiers while introducing premises *) 
 (* transformation "split_intro" *)
 
+
+(* Counterexamples: makes it possible to get rid of more quantifiers while introducing premises *) 
+(* transformation "split_intro" *)
+
 (* Counterexamples: get rid of some quantifiers - makes it possible to query model values of the variables in premises *)
 transformation "introduce_premises"
 
