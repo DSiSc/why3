@@ -95,12 +95,14 @@ type prover_result = {
   pr_output : string;
   pr_time   : float;
   pr_steps  : int;		(* -1 if unknown *)
+  pr_model  : (string * string) list;
 }
 
 type prover_result_parser = {
   prp_regexps     : (Str.regexp * prover_answer) list;
   prp_timeregexps : timeregexp list;
   prp_exitcodes   : (int * prover_answer) list;
+  prp_model_parser : Model_parser.model_parser;
 }
 
 let print_prover_answer fmt = function
@@ -155,6 +157,22 @@ type pre_prover_call = unit -> prover_call
 
 let save f = f ^ ".save"
 
+let rec debug_print_model model =
+  match model with
+  | [] -> ()
+  | (term, value)::t -> begin
+    Debug.dprintf debug "Call_provers: model %s = %s@." term value;
+    debug_print_model t;
+  end
+
+let rec add_model str model =
+  match model with
+  | [] -> str
+  | (term, value)::t -> begin
+    let n_str = str ^ term ^ " = " ^ value ^ "\n" in
+    add_model n_str t
+  end
+
 let parse_prover_run res_parser time out ret on_timelimit timelimit =
   let ans = match ret with
     | Unix.WSTOPPED n ->
@@ -175,11 +193,17 @@ let parse_prover_run res_parser time out ret on_timelimit timelimit =
       && time >= (0.9 *. float timelimit) -> Timeout
     | _ -> ans
   in
+  let model = res_parser.prp_model_parser out in
+  let out_with_model = add_model (out^"\nModel:\n") model
+  in
+  Debug.dprintf debug "Call_provers: model:@.";
+  debug_print_model model;
   { pr_answer = ans;
     pr_status = ret;
-    pr_output = out;
+    pr_output = out_with_model;
     pr_time   = time;
     pr_steps  = steps;
+    pr_model  = model;
   }
 
 let actualcommand command timelimit memlimit stepslimit file =
