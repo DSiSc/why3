@@ -24,7 +24,7 @@ model_parser "cvc4_z3"
 import "smt-libv2.drv"
 
 (* regexp for steps *)
-time "smt::SmtEngine::resourceUnitsUsed, %S"
+steps "smt::SmtEngine::resourceUnitsUsed, \\([0-9]+.?[0-9]*\\)" 1
 
 (* CVC4 division seems to be neither the Euclidean one, nor the Computer one *)
 (*

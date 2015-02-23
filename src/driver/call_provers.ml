@@ -11,17 +11,25 @@
 
 open Format
 
+let debug = Debug.register_info_flag "call_prover"
+  ~desc:"Print@ debugging@ messages@ about@ prover@ calls@ \
+         and@ keep@ temporary@ files."
+
 (** time regexp "%h:%m:%s" *)
 type timeunit =
   | Hour
   | Min
   | Sec
   | Msec
-  | Step
 
 type timeregexp = {
   re    : Str.regexp;
   group : timeunit array; (* i-th corresponds to the group i+1 *)
+}
+
+type stepsregexp = {
+  steps_re        : Str.regexp;
+  steps_group_num : int; (* the number of matched group which corresponds to the number of steps *)
 }
 
 let timeregexp s =
@@ -35,7 +43,6 @@ let timeregexp s =
     | "m" -> add_unit Min
     | "s" -> add_unit Sec
     | "i" -> add_unit Msec
-    | "S" -> add_unit Step
     | _ -> failwith "unknown format specifier, use %%h, %%m, %%s, %%i, %%S"
   in
   let s = Str.global_substitute cmd_regexp replace s in
@@ -43,40 +50,35 @@ let timeregexp s =
   List.iter (fun (i,u) -> group.(i) <- u) !l;
   { re = Str.regexp s; group = group}
 
-let unknown_time = 0.
-let unknown_steps = (-1)
-let grep_time_result_known t s = 
-  if t <> unknown_time && s <> unknown_steps then true
-  else false
 
-(* Applyes regular expressions in the list given as parameter until
-both time and steps are collected or there are no regular expressions
-in the list. *)
-let rec grep_time_rec out collected_time collected_steps regexpr_list = 
-  if grep_time_result_known collected_time collected_steps then 
-    Some(collected_time, collected_steps)
-  else begin
-    match regexpr_list with
-    | [] -> None
-    | re :: l ->
-      begin try
-              ignore (Str.search_forward re.re out 0);
-              let t = ref collected_time in
-	      let s = ref collected_steps in
-              Array.iteri (fun i u ->
-		let v = Str.matched_group (succ i) out in
-		match u with
+let rec grep_time out = function
+  | [] -> None
+  | re :: l ->
+    begin try
+            ignore (Str.search_forward re.re out 0);
+            let t = ref 0. in
+            Array.iteri (fun i u ->
+              let v = Str.matched_group (succ i) out in
+              match u with
                 | Hour -> t := !t +. float_of_string v *. 3600.
                 | Min  -> t := !t +. float_of_string v *. 60.
                 | Sec  -> t := !t +. float_of_string v
-                | Msec -> t := !t +. float_of_string v /. 1000.
-		| Step -> s := int_of_string v ) re.group;
-	      if l == [] then Some( !t, !s )
-	      else grep_time_rec out !t !s l
-	with _ -> grep_time_rec out collected_time collected_steps l end
-  end
-	
-let grep_time out l = grep_time_rec out unknown_time unknown_steps l
+                | Msec -> t := !t +. float_of_string v /. 1000. ) re.group;
+            Some( !t )
+      with _ -> grep_time out l 
+    end
+
+let stepsregexp s_re s_group_num = {steps_re = (Str.regexp s_re); steps_group_num = s_group_num}
+
+let rec grep_steps out = function
+  | [] -> None
+  | re :: l ->
+    begin try
+	    ignore (Str.search_forward re.steps_re out 0);
+	    let v = Str.matched_group (re.steps_group_num) out in
+	    Some(int_of_string v)
+      with _ -> grep_steps out l
+    end
 
 (** *)
 
@@ -101,6 +103,7 @@ type prover_result = {
 type prover_result_parser = {
   prp_regexps     : (Str.regexp * prover_answer) list;
   prp_timeregexps : timeregexp list;
+  prp_stepsregexp : stepsregexp list;
   prp_exitcodes   : (int * prover_answer) list;
   prp_model_parser : Model_parser.model_parser;
 }
@@ -140,11 +143,6 @@ let rec grep out l = match l with
         | Failure s -> Failure (Str.replace_matched s out)
         | HighFailure -> assert false
       with Not_found -> grep out l end
-
-
-let debug = Debug.register_info_flag "call_prover"
-  ~desc:"Print@ debugging@ messages@ about@ prover@ calls@ \
-         and@ keep@ temporary@ files."
 
 type post_prover_call = unit -> prover_result
 
@@ -187,8 +185,8 @@ let parse_prover_run res_parser time out ret on_timelimit timelimit =
          with Not_found -> grep out res_parser.prp_regexps)
   in
   Debug.dprintf debug "Call_provers: prover output:@\n%s@." out;
-  let time,steps = Opt.get_def (time,-1) (grep_time out res_parser.prp_timeregexps) in
-  (* TODO: separate grep for time and for steps into different regexps *)
+  let time = Opt.get_def (time) (grep_time out res_parser.prp_timeregexps) in
+  let steps = Opt.get_def (-1) (grep_steps out res_parser.prp_stepsregexp) in 
   let ans = match ans with
     | Unknown _ | HighFailure when on_timelimit && timelimit > 0
       && time >= (0.9 *. float timelimit) -> Timeout

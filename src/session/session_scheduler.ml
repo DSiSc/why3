@@ -293,6 +293,7 @@ let schedule_edition t command filename callback =
     { Call_provers.prp_exitcodes = [(0,Call_provers.Unknown "")];
       Call_provers.prp_regexps = [];
       Call_provers.prp_timeregexps = [];
+      Call_provers.prp_stepsregexp = [];
       Call_provers.prp_model_parser = fun _ -> [] 
     } in
   let precall =

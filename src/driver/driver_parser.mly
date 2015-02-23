@@ -23,7 +23,7 @@
 %token <string> OPERATOR
 %token <string> INPUT (* never reaches the parser *)
 %token THEORY END SYNTAX REMOVE META PRELUDE PRINTER MODEL_PARSER
-%token VALID INVALID TIMEOUT OUTOFMEMORY UNKNOWN FAIL TIME
+%token VALID INVALID TIMEOUT OUTOFMEMORY UNKNOWN FAIL TIME STEPS
 %token UNDERSCORE LEFTPAR RIGHTPAR DOT QUOTE EOF
 %token BLACKLIST
 %token MODULE EXCEPTION VAL CONVERTER
@@ -57,6 +57,7 @@ global:
 | TIMEOUT STRING { RegexpTimeout $2 }
 | OUTOFMEMORY STRING { RegexpOutOfMemory $2 }
 | TIME STRING  { TimeRegexp $2 }
+| STEPS STRING INTEGER { StepRegexp ($2, $3) }
 | UNKNOWN STRING STRING { RegexpUnknown ($2, $3) }
 | FAIL STRING STRING { RegexpFailure ($2, $3) }
 | VALID INTEGER { ExitCodeValid $2 }
@@ -113,6 +114,7 @@ ident:
 | BLACKLIST    { "blacklist" }
 | PRINTER      { "printer" }
 | MODEL_PARSER { "model_parser" }
+| STEPS        { "steps" }
 | VALID        { "valid" }
 | INVALID      { "invalid" }
 | TIMEOUT      { "timeout" }
