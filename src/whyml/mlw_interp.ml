@@ -521,41 +521,44 @@ let rec to_program_value_rec env regions s ity ls vl =
 let rec get_regions acc ity =
   match ity.ity_node with
   | Ityvar _ -> assert false
-  | Ityapp(_,ty,rl) ->
+  | Ityapp(its,tl,rl) ->
      List.map (get_reg env) rl
   | Itypur(ts,tl) ->
-     eprintf "@[<hov 2>error while fetching regions from value %a@ of type %a@]@."
-             print_value v Mlw_pretty.print_vty ty;
-     assert false
+    *)
 
+let find_fields env ity ls =
+  try
+    let csl = Mlw_decl.inst_constructors env.tknown env.mknown ity in
+    let rec find_cs csl =
+      match csl with
+      | [] -> assert false (* FIXME ? *)
+      | (cs,fdl)::rem ->
+        if ls_equal cs ls then fdl else find_cs rem
+    in find_cs csl
+  with Not_found ->
+    (* absurd, [ity] would be a pure type *)
+    assert false
 
-let to_program_value env s ty v =
-  match ty,v with
-  | VTarrow _, _ -> s,v
-  | VTvalue ity,Vapp(ls,vl) ->
-    if ity_immutable ity then s,v else
+let rec remove_prefix l r =
+  match l,r with
+  | _,[] -> l
+  | [],_ -> assert false
+  | r1::l,r2::r -> assert (r1 == r2); remove_prefix l r
+
+let rec to_program_value env s ity v =
+  match v with
+  | Vapp(ls,vl) ->
+    if ity_immutable ity then [],s,v else
       begin
-        let regions = [] in
-(*
+        let fdl = find_fields env ity ls in
+        let targs,regions =
           match ity.ity_node with
-          | Ityapp(_,_,rl) ->
-             List.map (get_reg env) rl
+          | Ityapp(_,tl,rl) -> tl, List.map (get_reg env) rl
           | Ityvar _ -> assert false
-          | Itypur(ts,tl) ->
-             eprintf "@[<hov 2>error while fetching regions from value %a@ of type %a@]@."
-                     print_value v Mlw_pretty.print_vty ty;
-             assert false
+          | Itypur(_,tl) -> tl, []
         in
- *)
-        let s,regions,v = to_program_value_rec env regions s ity ls vl in
-        match regions with
-        | [] -> s,v
-        | _ ->
-          eprintf "@[<hov 2>error while converting logic value (%a:%a) \
-              to a program value:@ regions should be empty, not@ [%a]@]@."
-            print_value v Mlw_pretty.print_vty ty
-            (Pp.print_list Pp.comma Mlw_pretty.print_reg) regions;
-          assert false
+        let s,v = to_program_value_list env s targs fdl regions ls vl in
+        regions, s, v
       end
   | _ -> assert (ity_immutable ity); [], s,v
 
