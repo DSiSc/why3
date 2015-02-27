@@ -3,6 +3,8 @@ theory T
 
   use import int.Int
 
+  goal g_binop : forall x:int. x + 2 <= 3
+
   goal g_no_lab : forall x:int. x >= 42 -> x + 3 <= 50
 
   goal g_lab0 : forall x "model":int. ("model" x >= 42) ->

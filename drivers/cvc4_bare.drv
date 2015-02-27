@@ -12,6 +12,9 @@ prelude "(set-logic AUFLIRA)"
 prelude ";; Enable model construction"
 prelude "(set-option :produce-models true)"
 
+(* Counterexamples: experimental feature *)
+(* transformation "add_name_traceability_labels" *)
+
 (* Counterexamples: makes it possible to get rid of more quantifiers while introducing premises *) 
 (* transformation "split_intro" *)
 

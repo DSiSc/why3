@@ -1,162 +1,163 @@
-####################################################################
-#                                                                  #
-#  The Why3 Verification Platform   /   The Why3 Development Team  #
-#  Copyright 2010-2014   --   INRIA - CNRS - Paris-Sud University  #
-#                                                                  #
-#  This software is distributed under the terms of the GNU Lesser  #
-#  General Public License version 2.1, with the special exception  #
-#  on linking described in file LICENSE.                           #
-#                                                                  #
-####################################################################
+ ####################################################################
+ #                                                                  #
+ #  The Why3 Verification Platform   /   The Why3 Development Team  #
+ #  Copyright 2010-2014   --   INRIA - CNRS - Paris-Sud University  #
+ #                                                                  #
+ #  This software is distributed under the terms of the GNU Lesser  #
+ #  General Public License version 2.1, with the special exception  #
+ #  on linking described in file LICENSE.                           #
+ #                                                                  #
+ ####################################################################
 
-VERBOSEMAKE ?= @enable_verbose_make@
+ VERBOSEMAKE ?= @enable_verbose_make@
 
-ifeq ($(VERBOSEMAKE),yes)
-  QUIET =
-else
-  QUIET = yes
-endif
+ ifeq ($(VERBOSEMAKE),yes)
+   QUIET =
+ else
+   QUIET = yes
+ endif
 
-# install the binaries
-DESTDIR =
+ # install the binaries
+ DESTDIR =
 
-prefix	    = @prefix@
-exec_prefix = @exec_prefix@
-datarootdir = @datarootdir@
+ prefix	    = @prefix@
+ exec_prefix = @exec_prefix@
+ datarootdir = @datarootdir@
 
-BINDIR  = $(DESTDIR)@bindir@
-LIBDIR  = $(DESTDIR)@libdir@
-DATADIR = $(DESTDIR)@datarootdir@
-MANDIR  = $(DESTDIR)@mandir@
-TOOLDIR = $(LIBDIR)/why3/commands
+ BINDIR  = $(DESTDIR)@bindir@
+ LIBDIR  = $(DESTDIR)@libdir@
+ DATADIR = $(DESTDIR)@datarootdir@
+ MANDIR  = $(DESTDIR)@mandir@
+ TOOLDIR = $(LIBDIR)/why3/commands
 
-# OS specific stuff
-EXE   = @EXE@
+ # OS specific stuff
+ EXE   = @EXE@
 
-# other variables
-CC        = @CC@
-OCAMLC    = @OCAMLC@
-OCAMLOPT  = @OCAMLOPT@
-OCAMLDEP  = @OCAMLDEP@
-OCAMLLEX  = @OCAMLLEX@
-OCAMLYACC = @OCAMLYACC@
-OCAMLDOC  = @OCAMLDOC@
-OCAMLLIB  = @OCAMLLIB@
-OCAMLINSTALLLIB  = $(DESTDIR)@OCAMLINSTALLLIB@
-OCAMLBEST = @OCAMLBEST@
-OCAMLVERSION = @OCAMLVERSION@
-COQC      = @COQC@
-COQDEP    = @COQDEP@
-CAMLP5O   = @CAMLP5O@
-FRAMAC_LIBDIR = $(DESTDIR)@FRAMAC_LIBDIR@
+ # other variables
+ CC        = @CC@
+ OCAMLC    = @OCAMLC@
+ OCAMLOPT  = @OCAMLOPT@
+ OCAMLDEP  = @OCAMLDEP@
+ OCAMLLEX  = @OCAMLLEX@
+ OCAMLYACC = @OCAMLYACC@
+ OCAMLDOC  = @OCAMLDOC@
+ OCAMLLIB  = @OCAMLLIB@
+ OCAMLINSTALLLIB  = $(DESTDIR)@OCAMLINSTALLLIB@
+ OCAMLBEST = @OCAMLBEST@
+ OCAMLVERSION = @OCAMLVERSION@
+ COQC      = @COQC@
+ COQDEP    = @COQDEP@
+ CAMLP5O   = @CAMLP5O@
+ FRAMAC_LIBDIR = $(DESTDIR)@FRAMAC_LIBDIR@
 
-ifeq (@enable_menhirLib@,yes)
-MENHIR	  = @MENHIR@ --table
-else
-MENHIR	  = @MENHIR@
-endif
+ ifeq (@enable_menhirLib@,yes)
+ MENHIR	  = @MENHIR@ --table
+ else
+ MENHIR	  = @MENHIR@
+ endif
 
-DEPFLAGS  = -slash -I lib/why3
-ifeq (@OCAMLBEST@,opt)
-DEPFLAGS += -native
-endif
+ DEPFLAGS  = -slash -I lib/why3
+ ifeq (@OCAMLBEST@,opt)
+ DEPFLAGS += -native
+ endif
 
-RUBBER = @RUBBER@
-HEVEA = @HEVEA@
-HACHA = @HACHA@
-EMACS = @EMACS@
+ RUBBER = @RUBBER@
+ HEVEA = @HEVEA@
+ HACHA = @HACHA@
+ EMACS = @EMACS@
 
-#PSVIEWER  = @PSVIEWER@
-#PDFVIEWER = @PDFVIEWER@
+ #PSVIEWER  = @PSVIEWER@
+ #PDFVIEWER = @PDFVIEWER@
 
-INCLUDES = @ZIPINCLUDE@ @MENHIRINCLUDE@
-OFLAGS = -w Aer-41-44-45 -dtypes -g -I lib/why3 $(INCLUDES)
-BFLAGS = -w Aer-41-44-45 -dtypes -g -I lib/why3 $(INCLUDES)
+ INCLUDES = @ZIPINCLUDE@ @MENHIRINCLUDE@
+ OFLAGS = -w Aer-41-44-45 -dtypes -g -I lib/why3 $(INCLUDES)
+ BFLAGS = -w Aer-41-44-45 -dtypes -g -I lib/why3 $(INCLUDES)
 
-OLINKFLAGS = -linkall $(EXTCMXA)
-BLINKFLAGS = -linkall $(EXTCMA)
+ OLINKFLAGS = -linkall $(EXTCMXA)
+ BLINKFLAGS = -linkall $(EXTCMA)
 
-ifeq (@enable_profiling@,yes)
-OFLAGS += -g -p
-endif
+ ifeq (@enable_profiling@,yes)
+ OFLAGS += -g -p
+ endif
 
-ifeq (@enable_bin_annot@,yes)
-OFLAGS += -bin-annot
-BFLAGS += -bin-annot
-endif
+ ifeq (@enable_bin_annot@,yes)
+ OFLAGS += -bin-annot
+ BFLAGS += -bin-annot
+ endif
 
-# external libraries common to all binaries
+ # external libraries common to all binaries
 
-EXTOBJS = @MENHIRLIB@
-EXTLIBS = str unix nums dynlink @ZIPLIB@
+ EXTOBJS = @MENHIRLIB@
+ EXTLIBS = str unix nums dynlink @ZIPLIB@
 
-EXTCMA	= $(addsuffix .cma,$(EXTLIBS)) $(addsuffix .cmo,$(EXTOBJS))
-EXTCMXA = $(addsuffix .cmxa,$(EXTLIBS)) $(addsuffix .cmx,$(EXTOBJS))
+ EXTCMA	= $(addsuffix .cma,$(EXTLIBS)) $(addsuffix .cmo,$(EXTOBJS))
+ EXTCMXA = $(addsuffix .cmxa,$(EXTLIBS)) $(addsuffix .cmx,$(EXTOBJS))
 
-INSTALLED_LIB_EXTS = a cma cmx cmi cmxa cmxs
-COMPILED_LIB_EXTS = $(INSTALLED_LIB_EXTS) o cmo cmt cmti annot dep conflicts
+ INSTALLED_LIB_EXTS = a cma cmx cmi cmxa cmxs
+ COMPILED_LIB_EXTS = $(INSTALLED_LIB_EXTS) o cmo cmt cmti annot dep conflicts
 
-TARGET_EMACS = share/emacs/why3.elc
+ TARGET_EMACS = share/emacs/why3.elc
 
-###############
-# main target
-###############
+ ###############
+ # main target
+ ###############
 
-all: @OCAMLBEST@
-plugins: plugins.@OCAMLBEST@
-opt: plugins.opt
-byte: plugins.byte
+ all: @OCAMLBEST@
+ plugins: plugins.@OCAMLBEST@
+ opt: plugins.opt
+ byte: plugins.byte
 
-ifeq (@enable_local@,yes)
-all: install_local
-endif
+ ifeq (@enable_local@,yes)
+ all: install_local
+ endif
 
-.PHONY: byte opt clean depend all install install_local install_no_local
-.PHONY: plugins plugins.byte plugins.opt
+ .PHONY: byte opt clean depend all install install_local install_no_local
+ .PHONY: plugins plugins.byte plugins.opt
 
-CLEANDIRS =
-CLEANLIBS =
-GENERATED =
+ CLEANDIRS =
+ CLEANLIBS =
+ GENERATED =
 
-##############
-# Why3 library
-##############
+ ##############
+ # Why3 library
+ ##############
 
-LIBGENERATED = src/util/config.ml \
-	       src/util/rc.ml src/util/lexlib.ml src/parser/lexer.ml \
-	       src/parser/parser.mli src/parser/parser.ml \
-	       src/driver/driver_parser.mli src/driver/driver_parser.ml \
-	       src/driver/driver_lexer.ml \
-	       src/session/compress.ml src/session/xml.ml \
-	       src/session/strategy_parser.ml \
-	       lib/ocaml/why3__BigInt_compat.ml
+ LIBGENERATED = src/util/config.ml \
+		src/util/rc.ml src/util/lexlib.ml src/parser/lexer.ml \
+		src/parser/parser.mli src/parser/parser.ml \
+		src/driver/driver_parser.mli src/driver/driver_parser.ml \
+		src/driver/driver_lexer.ml \
+		src/session/compress.ml src/session/xml.ml \
+		src/session/strategy_parser.ml \
+		lib/ocaml/why3__BigInt_compat.ml
 
-LIB_UTIL = config bigInt util opt lists strings \
-	   extmap extset exthtbl weakhtbl \
-	   hashcons stdlib exn_printer pp debug loc lexlib print_tree \
-	   cmdline warning sysutil rc plugin bigInt number pqueue
+ LIB_UTIL = config bigInt util opt lists strings \
+	    extmap extset exthtbl weakhtbl \
+	    hashcons stdlib exn_printer pp debug loc lexlib print_tree \
+	    cmdline warning sysutil rc plugin bigInt number pqueue
 
-LIB_CORE = ident ty term pattern decl theory \
-	   task pretty dterm env trans printer model_parser
+ LIB_CORE = ident ty term pattern decl theory \
+	    task pretty dterm env trans printer model_parser
 
-LIB_DRIVER = call_provers driver_ast driver_parser driver_lexer driver \
-	     whyconf autodetection parse_cvc4_z3_model
+ LIB_DRIVER = call_provers driver_ast driver_parser driver_lexer driver \
+	      whyconf autodetection parse_cvc4_z3_model
 
-LIB_MLW = ity expr dexpr
+ LIB_MLW = ity expr dexpr
 
-LIB_PARSER = ptree glob parser typing lexer
+ LIB_PARSER = ptree glob parser typing lexer
 
-LIB_TRANSFORM = simplify_formula inlining split_goal induction \
-		eliminate_definition eliminate_algebraic \
-		eliminate_inductive eliminate_let eliminate_if \
-		libencoding discriminate encoding encoding_select \
-		encoding_guards_full encoding_tags_full \
-		encoding_guards encoding_tags encoding_twin \
-		encoding_sort simplify_array filter_trigger \
-		introduction abstraction close_epsilon lift_epsilon \
-		eliminate_epsilon \
-		eval_match instantiate_predicate smoke_detector \
-		reduction_engine compute induction_pr prop_curry
+ LIB_TRANSFORM = simplify_formula inlining split_goal induction \
+		 eliminate_definition eliminate_algebraic \
+		 eliminate_inductive eliminate_let eliminate_if \
+		 libencoding discriminate encoding encoding_select \
+		 encoding_guards_full encoding_tags_full \
+		 encoding_guards encoding_tags encoding_twin \
+		 encoding_sort simplify_array filter_trigger \
+		 introduction abstraction close_epsilon lift_epsilon \
+		 eliminate_epsilon \
+		 eval_match instantiate_predicate smoke_detector \
+		 reduction_engine compute induction_pr prop_curry \
+		 add_name_traceability_labels
 
 LIB_PRINTER = alt_ergo why3printer smtv1 smtv2 coq pvs isabelle \
 	      simplify gappa cvc3 yices mathematica
