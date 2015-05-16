@@ -45,7 +45,7 @@ let ident_printer () =
       "declare-datatypes"; "get-model"; "echo"; "assert-rewrite";
       "assert-reduction"; "assert-propagation"; "declare-sorts";
       "declare-funs"; "declare-preds"; "define"; "declare-const";
-      "simplify";
+      "simplify"; "par";
 
       (* attributes *)
 
@@ -64,7 +64,7 @@ let ident_printer () =
       "cos"; "sin"; "tan"; "atan"; "pi";
 
       (* Other stuff that Why3 seems to need *)
-      "DECIMAL"; "NUMERAL"; "par"; "STRING";
+      "DECIMAL"; "NUMERAL"; "STRING";
       "unsat";"sat";
       "Bool"; "true"; "false";
       "Array";"const";
@@ -104,8 +104,11 @@ let print_ident info fmt id =
   fprintf fmt "%s" (id_unique info.info_printer id)
 
 (** type *)
+let print_type_var info fmt tv =
+  print_ident info fmt tv.tv_name
+
 let rec print_type info fmt ty = match ty.ty_node with
-  | Tyvar _ -> unsupported "smt : you must encode the polymorphism"
+  | Tyvar tv -> print_type_var info fmt tv
   | Tyapp (ts, l) ->
      begin match query_syntax info.info_syn ts.ts_name, l with
       | Some s, _ -> syntax_arguments s (print_type info) fmt l
@@ -113,9 +116,6 @@ let rec print_type info fmt ty = match ty.ty_node with
       | None, _ -> fprintf fmt "(%a %a)" (print_ident info) ts.ts_name
           (print_list space (print_type info)) l
      end
-
-let print_type info fmt ty = try print_type info fmt ty
-  with Unsupported s -> raise (UnsupportedType (ty,s))
 
 let print_type_value info fmt = function
   | None -> fprintf fmt "Bool"
@@ -202,32 +202,48 @@ let rec print_term info fmt t =
       | _ -> raise Exit
     with Exit ->
     (* non converter applies, then ... *)
-    match query_syntax info.info_syn ls.ls_name with
+      let model_trace () =
+        let vc_term_info = info.info_vc_term in
+	if vc_term_info.vc_inside then begin
+	  match vc_term_info.vc_loc with
+	  | None -> ()
+	  | Some loc ->
+	    let labels = match vc_term_info.vc_func_name with
+	      | None ->
+		ls.ls_name.id_label
+	      | Some _ ->
+		model_trace_for_postcondition ~labels:ls.ls_name.id_label info.info_vc_term in
+	    let _t_check_pos = t_label ~loc labels t in
+	    (* TODO: temporarily disable collecting variables inside the term triggering VC *)
+	    (*info.info_model <- add_model_element t_check_pos info.info_model;*)
+	    ()
+	end
+      in
+      match query_syntax info.info_syn ls.ls_name with
       | Some s -> syntax_arguments_typed s (print_term info)
         (print_type info) t fmt tl
-      | None -> begin match tl with (* for cvc3 wich doesn't accept (toto ) *)
+      | None when unambig_fs ls ->
+        begin match tl with (* for cvc3 wich doesn't accept (toto ) *)
           | [] ->
-	    let vc_term_info = info.info_vc_term in
-	    if vc_term_info.vc_inside then begin
-	      match vc_term_info.vc_loc with
-	      | None -> ()
-	      | Some loc ->
-		let labels = match vc_term_info.vc_func_name with
-		  | None ->
-		    ls.ls_name.id_label
-		  | Some _ ->
-		    model_trace_for_postcondition ~labels:ls.ls_name.id_label info.info_vc_term in
-		let _t_check_pos = t_label ~loc labels t in
-		(* TODO: temporarily disable collecting variables inside the term triggering VC *)
-		(*info.info_model <- add_model_element t_check_pos info.info_model;*)
-		()
-	    end;
-	    fprintf fmt "@[%a@]" (print_ident info) ls.ls_name
-          | _ ->
-	    fprintf fmt "@[(%a@ %a)@]"
-	      (print_ident info) ls.ls_name
-              (print_list space (print_term info)) tl
-        end end
+            model_trace ();
+            fprintf fmt "@[%a@]" (print_ident info) ls.ls_name
+          | _ -> fprintf fmt "@[(%a@ %a)@]"
+              (print_ident info) ls.ls_name (print_list space (print_term info)) tl
+        end
+      | None ->
+        begin match tl with (* for cvc3 wich doesn't accept (toto ) *)
+          | [] ->
+            model_trace ();
+            fprintf fmt "@[(as %a %a)@]"
+              (print_ident info) ls.ls_name
+              (print_type info) (t_type t)
+          | _ -> fprintf fmt "@[(as (%a@ %a) %a)@]"
+                   (print_ident info) ls.ls_name
+                   (print_list space (print_term info)) tl
+                   (print_type info) (t_type t)
+
+        end
+    end
   | Tlet (t1, tb) ->
       let v, t2 = t_open_bound tb in
       fprintf fmt "@[(let ((%a %a))@ %a)@]" (print_var info) v
@@ -408,17 +424,34 @@ let print_type_decl info fmt ts =
 
 let print_param_decl info fmt ls =
   if Mid.mem ls.ls_name info.info_syn then () else
-  fprintf fmt "@[<hov 2>(declare-fun %a (%a) %a)@]@\n@\n"
-    (print_ident info) ls.ls_name
-    (print_list space (print_type info)) ls.ls_args
-    (print_type_value info) ls.ls_value
+    let freevars = ls_ty_freevars ls in
+    if Stv.is_empty freevars then
+      fprintf fmt "@[<hov 2>(declare-fun %a (%a) %a)@]@\n@\n"
+        (print_ident info) ls.ls_name
+        (print_list space (print_type info)) ls.ls_args
+        (print_type_value info) ls.ls_value
+    else
+      fprintf fmt "@[<hov 2>(declare-fun %a (par (%a) (%a) %a))@]@\n@\n"
+        (print_ident info) ls.ls_name
+        (print_iter1 Stv.iter space (print_type_var info)) freevars
+        (print_list space (print_type info)) ls.ls_args
+        (print_type_value info) ls.ls_value
 
 let print_logic_decl info fmt (ls,def) =
   if Mid.mem ls.ls_name info.info_syn then () else begin
     collect_model_ls info ls;
-    let vsl,expr = Decl.open_ls_defn def in
+  let vsl,expr = Decl.open_ls_defn def in
+  let freevars = ls_ty_freevars ls in
+  if Stv.is_empty freevars then
     fprintf fmt "@[<hov 2>(define-fun %a (%a) %a %a)@]@\n@\n"
       (print_ident info) ls.ls_name
+      (print_var_list info) vsl
+      (print_type_value info) ls.ls_value
+      (print_expr info) expr
+  else
+    fprintf fmt "@[<hov 2>(define-fun %a (par (%a) ((%a) %a %a)))@]@\n@\n"
+      (print_ident info) ls.ls_name
+      (print_iter1 Stv.iter space (print_type_var info)) freevars
       (print_var_list info) vsl
       (print_type_value info) ls.ls_value
       (print_expr info) expr;
@@ -450,17 +483,29 @@ let print_info_model cntexample fmt info =
 
 let print_prop_decl vc_loc cntexample args info fmt k pr f = match k with
   | Paxiom ->
+    let freevars = t_ty_freevars Stv.empty f in
+    if Stv.is_empty freevars then
       fprintf fmt "@[<hov 2>;; %s@\n(assert@ %a)@]@\n@\n"
-        pr.pr_name.id_string (* FIXME? collisions *)
+        pr.pr_name.id_string
         (print_fmla info) f
+    else
+      fprintf fmt "@[<hov 2>;; %s@\n(assert@ (par (%a) %a))@]@\n@\n"
+        pr.pr_name.id_string
+        (print_iter1 Stv.iter space (print_type_var info)) freevars
+        (print_fmla info) f
+
   | Pgoal ->
       fprintf fmt "@[(assert@\n";
       fprintf fmt "@[;; %a@]@\n" (print_ident info) pr.pr_name;
       (match pr.pr_name.id_loc with
         | None -> ()
         | Some loc -> fprintf fmt " @[;; %a@]@\n"
-            Loc.gen_report_position loc);
+         Loc.gen_report_position loc);
       info.info_in_goal <- true;
+      let freevars = t_ty_freevars Stv.empty f in
+      if not (Stv.is_empty freevars) then
+        raise (UnsupportedTerm(f, "No polymorphism in goal, \
+                                   you should introduce the types"));
       fprintf fmt "  @[(not@ %a))@]@\n" (print_fmla info) f;
       info.info_in_goal <- false;
       (*if cntexample then fprintf fmt "@[(push)@]@\n"; (* z3 specific stuff *)*)
@@ -501,8 +546,13 @@ let print_decl vc_loc cntexample args info fmt d =
       print_type_decl info fmt ts
   | Ddata [(ts,_)] when query_syntax info.info_syn ts.ts_name <> None -> ()
   | Ddata dl ->
-      fprintf fmt "@[(declare-datatypes ()@ (%a))@]@\n"
-        (print_list space (print_data_decl info)) dl
+    let freevars = List.fold_left (fun acc (ts,_) ->
+        List.fold_right Stv.add ts.ts_args acc
+      ) Stv.empty dl
+    in
+    fprintf fmt "@[(declare-datatypes (%a)@ (%a))@]@\n"
+      (print_iter1 Stv.iter space (print_type_var info)) freevars
+      (print_list space (print_data_decl info)) dl
   | Dparam ls ->
       collect_model_ls info ls;
       print_param_decl info fmt ls
