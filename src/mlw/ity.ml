@@ -242,25 +242,25 @@ let     ity_r_occurs r ity = Util.any ity_r_fold (reg_r_occurs r) ity
 
 (* detect stale regions *)
 
-let rec ity_r_stale reg cvr exp ity =
+let rec ity_r_stale rst cvr exp ity =
   exp && not ity.ity_pure && match ity.ity_node with
-  | Ityreg r -> reg_r_stale reg cvr r
+  | Ityreg r -> reg_r_stale rst cvr r
   | Itypur (s,tl) when its_impure s ->
       (* snapshot types expose every argument *)
-      List.exists (ity_r_stale reg cvr true) tl
-  | Itypur (s,tl) -> its_r_stale reg cvr s tl []
-  | Ityapp (s,tl,rl) -> its_r_stale reg cvr s tl rl
+      List.exists (ity_r_stale rst cvr true) tl
+  | Itypur (s,tl) -> its_r_stale rst cvr s tl []
+  | Ityapp (s,tl,rl) -> its_r_stale rst cvr s tl rl
   | Ityvar _ -> false
 
-and reg_r_stale reg cvr r =
-  reg_equal r reg || (not (Sreg.mem r cvr) &&
-    its_r_stale reg cvr r.reg_its r.reg_args r.reg_regs)
+and reg_r_stale rst cvr r =
+  Sreg.mem r rst || (not (Mreg.mem r cvr) &&
+    its_r_stale rst cvr r.reg_its r.reg_args r.reg_regs)
 
-and its_r_stale reg cvr s tl rl =
-  List.exists2 (ity_r_stale reg cvr) s.its_arg_exp tl ||
-  List.exists (reg_r_stale reg cvr) rl
+and its_r_stale rst cvr s tl rl =
+  List.exists2 (ity_r_stale rst cvr) s.its_arg_exp tl ||
+  List.exists (reg_r_stale rst cvr) rl
 
-let ity_r_stale reg cvr ity = ity_r_stale reg cvr true ity
+let ity_r_stale rst cvr ity = ity_r_stale rst cvr true ity
 
 (* detect non-ghost type variables and regions *)
 
@@ -645,7 +645,7 @@ exception GhostDivergence
 type effect = {
   eff_reads  : Spv.t;         (* known variables *)
   eff_writes : Spv.t Mreg.t;  (* modifications to specific fields *)
-  eff_covers : Sreg.t Mreg.t; (* confinement of regions to covers *)
+  eff_covers : Sreg.t;        (* locked by writes *)
   eff_taints : Sreg.t;        (* ghost modifications *)
   eff_raises : Sexn.t;        (* raised exceptions *)
   eff_oneway : bool;          (* non-termination *)
@@ -655,7 +655,7 @@ type effect = {
 let eff_empty = {
   eff_reads  = Spv.empty;
   eff_writes = Mreg.empty;
-  eff_covers = Mreg.empty;
+  eff_covers = Sreg.empty;
   eff_taints = Sreg.empty;
   eff_raises = Sexn.empty;
   eff_oneway = false;
@@ -665,21 +665,24 @@ let eff_empty = {
 let eff_equal e1 e2 =
   Spv.equal e1.eff_reads e2.eff_reads &&
   Mreg.equal Spv.equal e1.eff_writes e2.eff_writes &&
-  Mreg.equal Sreg.equal e1.eff_covers e2.eff_covers &&
+  Sreg.equal e1.eff_covers e2.eff_covers &&
   Sreg.equal e1.eff_taints e2.eff_taints &&
   Sexn.equal e1.eff_raises e2.eff_raises &&
   e1.eff_oneway = e2.eff_oneway &&
   e1.eff_ghost = e2.eff_ghost
 
+(*TODO: check the uses of eff_pure since now we potentially lose writes
+ which migrate into resets *)
 let eff_pure e =
   Mreg.is_empty e.eff_writes &&
   Sexn.is_empty e.eff_raises &&
   not e.eff_oneway
 
-let check_covers cvr pvs =
-  if not (Mreg.is_empty cvr) then Spv.iter (fun v ->
-    Mreg.iter (fun r c -> if ity_r_stale r c v.pv_ity
-      then raise (StaleVariable (v,r))) cvr) pvs
+let check_covers rst cvr pvs =
+  if not (Mreg.is_empty rst) then Spv.iter (fun v ->
+    if ity_r_stale rst cvr v.pv_ity then
+      Sreg.iter (fun r -> if ity_r_stale (Sreg.singleton r) cvr v.pv_ity
+        then raise (StaleVariable (v,r))) rst) pvs
 
 let check_taints tnt pvs =
   if not (Sreg.is_empty tnt) then Spv.iter (fun v ->
@@ -717,7 +720,7 @@ let eff_read_pre rd e =
 let eff_read_post e rd =
   if Spv.is_empty rd then e else
   let _ = check_taints e.eff_taints rd in
-  let _ = check_covers e.eff_covers rd in
+  let _ = check_covers e.eff_covers e.eff_writes rd in
   { e with eff_reads = Spv.union e.eff_reads rd }
 
 let eff_bind rd e = if Mpv.is_empty rd then e else
@@ -735,6 +738,7 @@ let eff_bind_single v e = eff_bind (Spv.singleton v) e
 let check_mutable_field fn r f =
   if not (List.memq f r.reg_its.its_mfields) then invalid_arg fn
 
+(*TODO: add the third arg (resets) and check the invariants*)
 let eff_write rd wr =
   if Mreg.is_empty wr then { eff_empty with eff_reads = rd } else
   let kn = Spv.fold (fun v s -> ity_freeregs s v.pv_ity) rd Sreg.empty in
@@ -768,7 +772,8 @@ let freeze_of_writes wr =
     List.fold_left frz_mf frz r.reg_its.its_mfields in
   Mreg.fold freeze_of_write wr isb_empty
 
-let eff_assign asl =
+let eff_assign _asl = assert false (*TODO*)
+(*
   let get_reg = function
     | {pv_ity = {ity_node = Ityreg r}} -> r
     | _ -> invalid_arg "Ity.eff_assign" in
@@ -822,15 +827,18 @@ let eff_strong ({eff_writes = wr} as e) =
   let cvr = Mreg.map (fun ro -> get_cover ro wr) cvr in
   let cvr = Mreg.union merge_covers e.eff_covers cvr in
   { e with eff_covers = cvr }
+*)
 
 let eff_raise e x = { e with eff_raises = Sexn.add x e.eff_raises }
 let eff_catch e x = { e with eff_raises = Sexn.remove x e.eff_raises }
-let eff_reset e r = { e with eff_covers = Mreg.add r Sreg.empty e.eff_covers }
+
+(*TODO: should we use it and what semantics to give ? *)
+(*let eff_reset e r = { e with eff_covers = Sreg.add r e.eff_covers }*)
 
 let eff_union e1 e2 = {
   eff_reads  = Spv.union e1.eff_reads e2.eff_reads;
   eff_writes = Mreg.union merge_fields e1.eff_writes e2.eff_writes;
-  eff_covers = Mreg.union merge_covers e1.eff_covers e2.eff_covers;
+  eff_covers = Sreg.union merge_covers e1.eff_covers e2.eff_covers;
   eff_taints = Sreg.union e1.eff_taints e2.eff_taints;
   eff_raises = Sexn.union e1.eff_raises e2.eff_raises;
   eff_oneway = e1.eff_oneway || e2.eff_oneway;

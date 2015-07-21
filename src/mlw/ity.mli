@@ -190,8 +190,8 @@ val reg_v_occurs : tvsymbol -> region -> bool
 val ity_r_occurs : region -> ity -> bool
 val reg_r_occurs : region -> region -> bool
 
-val ity_r_stale  : region -> Sreg.t -> ity -> bool
-val reg_r_stale  : region -> Sreg.t -> region -> bool
+val ity_r_stale  : Sreg.t -> 'a Mreg.t -> ity -> bool
+val reg_r_stale  : Sreg.t -> 'a Mreg.t -> region -> bool
 
 val ity_closed    : ity -> bool
 
@@ -286,7 +286,7 @@ exception GhostDivergence
 type effect = private {
   eff_reads  : Spv.t;         (* known variables *)
   eff_writes : Spv.t Mreg.t;  (* modifications to specific fields *)
-  eff_covers : Sreg.t Mreg.t; (* confinement of regions to covers *)
+  eff_covers : Sreg.t;        (* locked by writes *)
   eff_taints : Sreg.t;        (* ghost modifications *)
   eff_raises : Sexn.t;        (* raised exceptions *)
   eff_oneway : bool;          (* non-termination *)
