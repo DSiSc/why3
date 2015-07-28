@@ -679,13 +679,13 @@ let eff_pure e =
   Sexn.is_empty e.eff_raises &&
   not e.eff_oneway
 
-let check_covers rst cvr pvs =
+let check_covers {eff_resets = rst; eff_covers = cvr} pvs =
   if not (Mreg.is_empty rst) then Spv.iter (fun v ->
     if ity_r_stale rst cvr v.pv_ity then
       Sreg.iter (fun r -> if ity_r_stale (Sreg.singleton r) cvr v.pv_ity
         then raise (StaleVariable (v,r))) rst) pvs
 
-let check_taints tnt pvs =
+let check_taints {eff_taints = tnt} pvs =
   if not (Sreg.is_empty tnt) then Spv.iter (fun v ->
     ity_visible Util.const (fun () r -> if Sreg.mem r tnt
       then raise (BadGhostWrite (v,r))) () (not v.pv_ghost) v.pv_ity) pvs
@@ -701,8 +701,9 @@ let visible_reads e =
 let reset_taints e =
   let tnt = if e.eff_ghost then visible_writes e else
     Sreg.diff (visible_writes e) (visible_reads e) in
-  if e.eff_ghost then check_taints tnt e.eff_reads;
-  { e with eff_taints = tnt }
+  let e = { e with eff_taints = tnt } in
+  if e.eff_ghost then check_taints e e.eff_reads;
+  e
 
 let eff_ghostify gh e =
   if e.eff_ghost || not gh then e else
@@ -715,13 +716,13 @@ let eff_diverge e = if e.eff_oneway then e else
 
 let eff_read_pre rd e =
   if Spv.is_empty rd then e else
-  let _ = check_taints e.eff_taints rd in
+  let _ = check_taints e rd in
   { e with eff_reads = Spv.union e.eff_reads rd }
 
 let eff_read_post e rd =
   if Spv.is_empty rd then e else
-  let _ = check_taints e.eff_taints rd in
-  let _ = check_covers e.eff_resets e.eff_covers rd in
+  let _ = check_taints e rd in
+  let _ = check_covers e rd in
   { e with eff_reads = Spv.union e.eff_reads rd }
 
 let eff_bind rd e = if Mpv.is_empty rd then e else
@@ -842,21 +843,21 @@ let eff_catch e x = { e with eff_raises = Sexn.remove x e.eff_raises }
 (*TODO: should we use it and what semantics to give ? *)
 (*let eff_reset e r = { e with eff_resets = Sreg.add r e.eff_resets }*)
 
-let remove_stale rst cvr srg =
-  Mreg.filter (fun r _ -> not (reg_r_stale rst cvr r)) srg
+let remove_stale e srg =
+  Mreg.filter (fun r _ -> not (reg_r_stale e.eff_resets e.eff_covers r)) srg
 
 let eff_union e1 e2 = {
   eff_reads  = Spv.union e1.eff_reads e2.eff_reads;
   eff_writes = Mreg.union merge_fields e1.eff_writes e2.eff_writes;
   eff_taints = Sreg.union e1.eff_taints e2.eff_taints;
-  eff_covers = Sreg.union
-    (remove_stale e2.eff_resets e2.eff_covers e1.eff_covers)
-    (remove_stale e1.eff_resets e1.eff_covers e2.eff_covers);
+  eff_covers = Sreg.union (remove_stale e2 e1.eff_covers)
+                          (remove_stale e1 e2.eff_covers);
   eff_resets = Sreg.union e1.eff_resets e2.eff_resets;
   eff_raises = Sexn.union e1.eff_raises e2.eff_raises;
   eff_oneway = e1.eff_oneway || e2.eff_oneway;
   eff_ghost  = e2.eff_ghost }
 
+(* TODO: remove later *)
 let eff_union e1 e2 =
   let e = eff_union e1 e2 in
   assert (Sreg.disjoint e.eff_covers e.eff_resets);
@@ -870,16 +871,16 @@ let eff_contagious e = e.eff_ghost &&
 let eff_union_par e1 e2 =
   let e1 = eff_ghostify e2.eff_ghost e1 in
   let e2 = eff_ghostify e1.eff_ghost e2 in
-  check_taints e1.eff_taints e2.eff_reads;
-  check_taints e2.eff_taints e1.eff_reads;
+  check_taints e1 e2.eff_reads;
+  check_taints e2 e1.eff_reads;
   eff_union e1 e2
 
 let eff_union_seq e1 e2 =
   let e1 = eff_ghostify e2.eff_ghost e1 in
   let e2 = eff_ghostify (eff_contagious e1) e2 in
-  check_covers e1.eff_resets e1.eff_covers e2.eff_reads;
-  check_taints e1.eff_taints e2.eff_reads;
-  check_taints e2.eff_taints e1.eff_reads;
+  check_covers e1 e2.eff_reads;
+  check_taints e1 e2.eff_reads;
+  check_taints e2 e1.eff_reads;
   eff_union e1 e2
 
 (* NOTE: do not export this function *)
