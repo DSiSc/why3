@@ -1012,7 +1012,7 @@ let create_cty args pre post xpost oldies effect result =
      to get rid of non-ghost writes into ghost regions.
      These writes can occur when a bound regular variable
      aliases an external ghost region:
-        let (* non-ghost *) x = Nil in
+        let (* non-ghost *) x = None in
         let ghost y = if true then x else Some ghost_ref in
         match x with Some r -> r := 0 | None -> () end
      The write is regular here, but the only path to it, via
@@ -1024,13 +1024,13 @@ let create_cty args pre post xpost oldies effect result =
   let filter m = Mreg.set_inter m known.isb_reg in
   let effect = reset_taints { effect with
     eff_writes = filter effect.eff_writes;
-    eff_resets = Mreg.map filter (filter effect.eff_resets) } in
+    eff_covers = filter effect.eff_covers;
+    eff_resets = filter effect.eff_resets } in
   (* reset every fresh region in the result *)
   let resreg = ity_freeregs Sreg.empty result in
-  let unknwn = Mreg.set_diff resreg known.isb_reg in
-  let resets = Mreg.map (fun _ -> Sreg.empty) unknwn in
-  let covers = Mreg.set_union resets effect.eff_resets in
-  let effect = { effect with eff_resets = covers } in
+  let resets = Mreg.set_diff resreg known.isb_reg in
+  let resets = Sreg.union resets effect.eff_resets in
+  let effect = { effect with eff_resets = resets } in
   cty_unsafe args pre post xpost oldies effect result freeze
 
 let cty_apply c vl args res =
