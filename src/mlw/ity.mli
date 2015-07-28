@@ -312,7 +312,7 @@ val eff_read_single_pre  : pvsymbol -> effect -> effect
 val eff_read_single_post : effect -> pvsymbol -> effect
 val eff_bind_single      : pvsymbol -> effect -> effect
 
-val eff_reset : effect -> region -> effect  (* confine to an empty cover *)
+(* val eff_reset : effect -> region -> effect  (* confine to an empty cover *) *)
 val eff_strong : effect -> effect (* confine all subregions under writes *)
 
 val eff_raise : effect -> xsymbol -> effect

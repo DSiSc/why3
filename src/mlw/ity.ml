@@ -821,8 +821,11 @@ let eff_assign _asl = assert false (*TODO*)
     eff_raises = Sexn.empty;
     eff_oneway = false;
     eff_ghost  = ghost }
+*)
 
-let eff_strong ({eff_writes = wr} as e) =
+(* TODO *)
+let eff_strong ({eff_writes = _wr} as _e) = assert false
+(*
   let freeze r _ sbs = List.fold_left reg_freeze
     (List.fold_left ity_freeze sbs r.reg_args) r.reg_regs in
   let sbs = Mreg.fold freeze wr isb_empty in
@@ -1086,10 +1089,9 @@ let cty_apply c vl args res =
   let effect = if ity_equal c.cty_result res then effect else
     let known = List.fold_right freeze_pv rargs freeze in
     let resreg = ity_freeregs Sreg.empty res in
-    let unknwn = Mreg.set_diff resreg known.isb_reg in
-    let resets = Mreg.map (fun _ -> Sreg.empty) unknwn in
-    let covers = Mreg.set_union resets effect.eff_resets in
-    { effect with eff_resets = covers } in
+    let resets = Mreg.set_diff resreg known.isb_reg in
+    let resets = Mreg.set_union resets effect.eff_resets in
+    { effect with eff_resets = resets } in
   (* stage 5: instantiate the specification *)
   let tsb = Mtv.map ty_of_ity isb.isb_tv in
   let same = same || Mtv.for_all (fun v {ty_node = n} ->
@@ -1234,11 +1236,7 @@ let print_spec args pre post xpost oldies eff fmt ity =
       fprintf fmt "(%a).%s" (print_pfx reg) pfx id.id_string in
     if Spv.is_empty fds then print_pfx reg fmt pfx else
       Pp.print_list Pp.comma print_fld fmt (Spv.elements fds) in
-  let print_raise fmt (reg,cvr) =
-    let print_cvr fmt reg = print_pfx reg fmt (find_prefix reg) in
-    if Sreg.is_empty cvr then print_pfx reg fmt (find_prefix reg) else
-      fprintf fmt "%a@ (under %a)" (print_pfx reg) (find_prefix reg)
-        (Pp.print_list Pp.comma print_cvr) (Sreg.elements cvr) in
+  let print_region fmt reg = print_pfx reg fmt (find_prefix reg) in
   let print_result fmt ity = fprintf fmt " :@ %a" print_ity ity in
   let print_pre fmt p = fprintf fmt "@\nrequires { @[%a@] }" print_term p in
   let print_old fmt (o,v) =
@@ -1267,8 +1265,10 @@ let print_spec args pre post xpost oldies eff fmt ity =
     (Pp.print_list Pp.comma print_pv) (Spv.elements reads);
   if not (Mreg.is_empty eff.eff_writes) then fprintf fmt "@\nwrites { %a }"
     (Pp.print_list Pp.comma print_write) (Mreg.bindings eff.eff_writes);
-  if not (Mreg.is_empty eff.eff_resets) then fprintf fmt "@\ncovers { %a }"
-    (Pp.print_list Pp.comma print_raise) (Mreg.bindings eff.eff_resets);
+  if not (Mreg.is_empty eff.eff_covers) then fprintf fmt "@\ncovers { %a }"
+    (Pp.print_list Pp.comma print_region) (Sreg.elements eff.eff_covers);
+  if not (Mreg.is_empty eff.eff_resets) then fprintf fmt "@\nresets { %a }"
+    (Pp.print_list Pp.comma print_region) (Sreg.elements eff.eff_resets);
   Pp.print_list Pp.nothing print_pre fmt pre;
   Pp.print_list Pp.nothing print_old fmt (Mpv.bindings oldies);
   Pp.print_list Pp.nothing print_post fmt post;
