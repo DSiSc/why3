@@ -286,8 +286,9 @@ exception GhostDivergence
 type effect = private {
   eff_reads  : Spv.t;         (* known variables *)
   eff_writes : Spv.t Mreg.t;  (* modifications to specific fields *)
-  eff_covers : Sreg.t;        (* locked by writes *)
   eff_taints : Sreg.t;        (* ghost modifications *)
+  eff_covers : Sreg.t;        (* surviving writes *)
+  eff_resets : Sreg.t;        (* locked by covers *)
   eff_raises : Sexn.t;        (* raised exceptions *)
   eff_oneway : bool;          (* non-termination *)
   eff_ghost  : bool;          (* ghost status *)

@@ -645,8 +645,9 @@ exception GhostDivergence
 type effect = {
   eff_reads  : Spv.t;         (* known variables *)
   eff_writes : Spv.t Mreg.t;  (* modifications to specific fields *)
-  eff_resets : Sreg.t;        (* locked by writes *)
   eff_taints : Sreg.t;        (* ghost modifications *)
+  eff_covers : Sreg.t;        (* surviving writes *)
+  eff_resets : Sreg.t;        (* locked by covers *)
   eff_raises : Sexn.t;        (* raised exceptions *)
   eff_oneway : bool;          (* non-termination *)
   eff_ghost  : bool;          (* ghost status *)
@@ -655,8 +656,9 @@ type effect = {
 let eff_empty = {
   eff_reads  = Spv.empty;
   eff_writes = Mreg.empty;
-  eff_resets = Sreg.empty;
   eff_taints = Sreg.empty;
+  eff_covers = Sreg.empty;
+  eff_resets = Sreg.empty;
   eff_raises = Sexn.empty;
   eff_oneway = false;
   eff_ghost  = false;
@@ -665,14 +667,13 @@ let eff_empty = {
 let eff_equal e1 e2 =
   Spv.equal e1.eff_reads e2.eff_reads &&
   Mreg.equal Spv.equal e1.eff_writes e2.eff_writes &&
-  Sreg.equal e1.eff_resets e2.eff_resets &&
   Sreg.equal e1.eff_taints e2.eff_taints &&
+  Sreg.equal e1.eff_covers e2.eff_covers &&
+  Sreg.equal e1.eff_resets e2.eff_resets &&
   Sexn.equal e1.eff_raises e2.eff_raises &&
   e1.eff_oneway = e2.eff_oneway &&
   e1.eff_ghost = e2.eff_ghost
 
-(*TODO: check the uses of eff_pure since now we potentially lose writes
- which migrate into resets *)
 let eff_pure e =
   Mreg.is_empty e.eff_writes &&
   Sexn.is_empty e.eff_raises &&
@@ -720,7 +721,7 @@ let eff_read_pre rd e =
 let eff_read_post e rd =
   if Spv.is_empty rd then e else
   let _ = check_taints e.eff_taints rd in
-  let _ = check_covers e.eff_resets e.eff_writes rd in
+  let _ = check_covers e.eff_resets e.eff_covers rd in
   { e with eff_reads = Spv.union e.eff_reads rd }
 
 let eff_bind rd e = if Mpv.is_empty rd then e else
@@ -746,10 +747,12 @@ let eff_write rd wr =
     if not p && Spv.is_empty fs then invalid_arg "Ity.eff_write";
     Spv.iter (check_mutable_field "Ity.eff_write" r) fs;
     Sreg.mem r kn) wr in
-  reset_taints { eff_empty with eff_reads = rd; eff_writes = wr }
+  let cv = Mreg.map ignore wr in
+  reset_taints { eff_empty with eff_reads = rd; eff_writes = wr; eff_covers = cv }
 
 let merge_fields _ f1 f2 = Some (Spv.union f1 f2)
-
+(*TODO*)
+(*
 let merge_covers reg c1 c2 = Some (Sreg.union
   (Sreg.filter (fun r -> not (reg_r_stale reg c1 r)) c2)
   (Sreg.filter (fun r -> not (reg_r_stale reg c2 r)) c1))
@@ -771,6 +774,7 @@ let freeze_of_writes wr =
                                        r.reg_its.its_reg_frz r.reg_regs in
     List.fold_left frz_mf frz r.reg_its.its_mfields in
   Mreg.fold freeze_of_write wr isb_empty
+*)
 
 let eff_assign _asl = assert false (*TODO*)
 (*
@@ -840,18 +844,21 @@ let remove_stale rst cvr srg =
 
 let eff_union e1 e2 = {
   eff_reads  = Spv.union e1.eff_reads e2.eff_reads;
-  eff_writes = Mreg.union merge_fields
-    (remove_stale e2.eff_resets e2.eff_writes e1.eff_writes)
-    (remove_stale e1.eff_resets e1.eff_writes e2.eff_writes);
-  eff_resets = Sreg.union e1.eff_resets e2.eff_resets;
+  eff_writes = Mreg.union merge_fields e1.eff_writes e2.eff_writes;
   eff_taints = Sreg.union e1.eff_taints e2.eff_taints;
+  eff_covers = Sreg.union
+    (remove_stale e2.eff_resets e2.eff_covers e1.eff_covers)
+    (remove_stale e1.eff_resets e1.eff_covers e2.eff_covers);
+  eff_resets = Sreg.union e1.eff_resets e2.eff_resets;
   eff_raises = Sexn.union e1.eff_raises e2.eff_raises;
   eff_oneway = e1.eff_oneway || e2.eff_oneway;
   eff_ghost  = e2.eff_ghost }
 
 let eff_union e1 e2 =
   let e = eff_union e1 e2 in
-  assert (Mreg.set_disjoint e.eff_writes e.eff_resets);
+  assert (Sreg.disjoint e.eff_covers e.eff_resets);
+  assert (Mreg.for_all (fun r _ -> reg_r_stale e.eff_resets e.eff_covers r)
+            (Mreg.set_diff e.eff_writes e.eff_covers) );
   e
 
 let eff_contagious e = e.eff_ghost &&
@@ -867,7 +874,7 @@ let eff_union_par e1 e2 =
 let eff_union_seq e1 e2 =
   let e1 = eff_ghostify e2.eff_ghost e1 in
   let e2 = eff_ghostify (eff_contagious e1) e2 in
-  check_covers e1.eff_resets e1.eff_writes e2.eff_reads;
+  check_covers e1.eff_resets e1.eff_covers e2.eff_reads;
   check_taints e1.eff_taints e2.eff_reads;
   check_taints e2.eff_taints e1.eff_reads;
   eff_union e1 e2
@@ -885,6 +892,7 @@ let eff_inst sbs e =
   let writes = inst e.eff_writes in
   let resets = inst e.eff_resets in
   let taints = inst e.eff_taints in
+  let covers = inst e.eff_covers in
   let impact = Mreg.merge (fun r fld void -> match fld, void with
     | Some _, Some _ -> raise (IllegalAlias r)
     | _ -> Some ()) writes resets in
@@ -897,7 +905,8 @@ let eff_inst sbs e =
   let dst = Mreg.fold (fun _ r s -> Sreg.add r s) sreg Sreg.empty in
   let dst = Mtv.fold (fun _ i s -> ity_freeregs s i) sbs.isb_tv dst in
   ignore (Mreg.inter (fun r _ _ -> raise (IllegalAlias r)) dst impact);
-  { e with eff_writes = writes; eff_resets = resets; eff_taints = taints }
+  { e with eff_writes = writes; eff_taints = taints;
+           eff_covers = covers; eff_resets = resets }
 
 (** specification *)
 
