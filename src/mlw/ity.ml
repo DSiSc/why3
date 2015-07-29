@@ -787,6 +787,13 @@ let rec fold_left4 fn acc l1 l2 l3 l4 = match l1, l2, l3, l4 with
   | [], [], [], [] -> acc
   | _, _, _, _ -> invalid_arg "fold_left4"
 
+
+(* TODO:
+1)  Snapshots should have no mutable components (will simplify ity_pur)
+2)  Exposed type variables : phantom type variables should be considered as exposed
+    NB: Are Phantom vars mutable by default ?
+3)  Should Phantom vars have the same skeleton ?
+4)  Review F_strong  *)
 let eff_assign asl =
   let get_reg = function
     | {pv_ity = {ity_node = Ityreg r}} -> r
