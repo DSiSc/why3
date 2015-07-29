@@ -685,7 +685,7 @@ let check_covers {eff_resets = rst; eff_covers = cvr} pvs =
       Sreg.iter (fun r -> if ity_r_stale (Sreg.singleton r) cvr v.pv_ity
         then raise (StaleVariable (v,r))) rst) pvs
 
-let check_taints {eff_taints = tnt} pvs =
+let check_taints tnt pvs =
   if not (Sreg.is_empty tnt) then Spv.iter (fun v ->
     ity_visible Util.const (fun () r -> if Sreg.mem r tnt
       then raise (BadGhostWrite (v,r))) () (not v.pv_ghost) v.pv_ity) pvs
@@ -701,9 +701,8 @@ let visible_reads e =
 let reset_taints e =
   let tnt = if e.eff_ghost then visible_writes e else
     Sreg.diff (visible_writes e) (visible_reads e) in
-  let e = { e with eff_taints = tnt } in
-  if e.eff_ghost then check_taints e e.eff_reads;
-  e
+  if e.eff_ghost then check_taints tnt e.eff_reads;
+  { e with eff_taints = tnt }
 
 let eff_ghostify gh e =
   if e.eff_ghost || not gh then e else
@@ -716,13 +715,13 @@ let eff_diverge e = if e.eff_oneway then e else
 
 let eff_read_pre rd e =
   if Spv.is_empty rd then e else
-  let _ = check_taints e rd in
+  let _ = check_taints e.eff_taints rd in
   { e with eff_reads = Spv.union e.eff_reads rd }
 
 let eff_read_post e rd =
   if Spv.is_empty rd then e else
-  let _ = check_taints e rd in
   let _ = check_covers e rd in
+  let _ = check_taints e.eff_taints rd in
   { e with eff_reads = Spv.union e.eff_reads rd }
 
 let eff_bind rd e = if Mpv.is_empty rd then e else
@@ -777,8 +776,18 @@ let freeze_of_writes wr =
   Mreg.fold freeze_of_write wr isb_empty
 *)
 
-let eff_assign _asl = assert false (*TODO*)
-(*
+let rec fold_left3 fn acc l1 l2 l3 = match l1, l2, l3 with
+  | x1::l1, x2::l2, x3::l3 -> fold_left3 fn (fn acc x1 x2 x3) l1 l2 l3
+  | [], [], [] -> acc
+  | _, _, _ -> invalid_arg "fold_left3"
+
+let rec fold_left4 fn acc l1 l2 l3 l4 = match l1, l2, l3, l4 with
+  | x1::l1, x2::l2, x3::l3, x4::l4 ->
+      fold_left4 fn (fn acc x1 x2 x3 x4) l1 l2 l3 l4
+  | [], [], [], [] -> acc
+  | _, _, _, _ -> invalid_arg "fold_left4"
+
+let eff_assign asl =
   let get_reg = function
     | {pv_ity = {ity_node = Ityreg r}} -> r
     | _ -> invalid_arg "Ity.eff_assign" in
@@ -789,6 +798,73 @@ let eff_assign _asl = assert false (*TODO*)
     Mreg.change (fun fs -> Some (match fs with
       | Some fs -> Mpv.add_new (DuplicateField (r,f)) f ity fs
       | None    -> Mpv.singleton f ity)) r wr) Mreg.empty asl in
+  let ghost = List.for_all (fun (r,f,v) ->
+    r.pv_ghost || f.pv_ghost || v.pv_ghost) asl in
+  let taint = List.fold_left (fun s (r,f,v) ->
+    if (r.pv_ghost || v.pv_ghost) && not f.pv_ghost then
+      Sreg.add (get_reg r) s else s) Sreg.empty asl in
+  let reads = List.fold_left (fun s (r,_,v) ->
+    Spv.add r (Spv.add v s)) Spv.empty asl in
+  check_taints taint reads;
+  (* 2 *)
+  let rec ity3 rl exp t1 t2 =
+    if not exp then rl else
+    if t1.ity_pure then (ity_equal_check t1 t2; rl) else
+    match t1.ity_node, t2.ity_node with
+    | Ityapp (s1,l1,r1), Ityapp (s2,l2,r2) when its_equal s1 s2 ->
+        let rl = List.fold_left2 reg2 rl r1 r2 in
+        fold_left3 ity3 rl s1.its_arg_exp l1 l2
+    | Itypur (s1,l1), Itypur (s2,l2) when its_equal s1 s2 ->
+        let ity2 rl t1 t2 = ity3 rl true t1 t2 in
+        if its_impure s1 then List.fold_left2 ity2 rl l1 l2 else
+        fold_left3 ity3 rl s1.its_arg_exp l1 l2
+    | Ityreg r1, Ityreg r2 -> reg2 rl r1 r2
+    | Ityvar v1, Ityvar v2 when tv_equal v1 v2 -> rl
+    | _ -> raise (TypeMismatch (t1, t2, isb_empty))
+  and reg2 rl ({reg_its = s} as r1) r2 =
+    if not (its_equal s r2.reg_its) then
+      raise (TypeMismatch (ity_reg r1, ity_reg r2, isb_empty));
+    let rl = (r1,r2) :: rl in
+    let fs = Mreg.find_def Mpv.empty r2 writes in
+    if Mpv.is_empty fs then
+      let rl = List.fold_left2 reg2 rl r1.reg_regs r2.reg_regs in
+      fold_left3 ity3 rl s.its_arg_exp r1.reg_args r2.reg_args
+    else
+      under_reg2 rl r1 r2 fs
+  and under_reg2 rl ({reg_its = s} as r1) r2 fs =
+    let add_arg rl exp frz t1 t2 = if frz then ity3 rl exp t1 t2 else rl in
+    let add_reg rl     frz r1 r2 = if frz then reg2 rl     r1 r2 else rl in
+    let rl = fold_left4 add_arg rl s.its_arg_exp
+                                   s.its_arg_frz r1.reg_args r2.reg_args in
+    let rl = fold_left3 add_reg rl s.its_reg_frz r1.reg_regs r2.reg_regs in
+    let sbs1 = its_match_regs s r1.reg_args r1.reg_regs in
+    let sbs2 = its_match_regs s r2.reg_args r2.reg_regs in
+    let add_fld rl f =
+      let t1 = ity_full_inst sbs1 f.pv_ity in
+      let t2 = match Mpv.find_opt f fs with
+        | Some t2 -> t2
+        | _ -> ity_full_inst sbs2 f.pv_ity in
+      ity3 rl true t1 t2 in
+    List.fold_left add_fld rl s.its_mfields in
+  let add_write r fs m =
+    let l = under_reg2 [] r r fs in
+    Mint.change (fun rl -> Some (match rl with
+      | Some rl -> Mreg.add r l rl
+      | _ -> Mreg.singleton r l)) (- List.length l) m in
+  let m = Mreg.fold add_write writes Mint.empty in
+  (* 3 *)
+  let resets = assert false in
+  { eff_reads  = reads;
+    eff_writes = Mreg.map Mpv.domain writes;
+    eff_taints = taint;
+    eff_covers = Mreg.domain (Mreg.set_diff writes resets);
+    eff_resets = resets;
+    eff_raises = Sexn.empty;
+    eff_oneway = false;
+    eff_ghost  = ghost }
+
+
+(*
   (* type variables and regions outside modified fields are frozen *)
   let frz = freeze_of_writes writes in
   (* non-frozen regions are allowed to be renamed, preserving aliases *)
@@ -807,22 +883,8 @@ let eff_assign _asl = assert false (*TODO*)
     if reg_equal ro rn then None else Some (get_cover ro writes)) sbst in
   let reset = Mreg.map (fun _ -> Sreg.empty) (Mreg.set_diff sbsf sbst) in
   (* construct the effect *)
-  let ghost = List.for_all (fun (r,f,v) ->
-    r.pv_ghost || f.pv_ghost || v.pv_ghost) asl in
-  let taint = List.fold_left (fun s (r,f,v) ->
-    if (r.pv_ghost || v.pv_ghost) && not f.pv_ghost then
-      Sreg.add (get_reg r) s else s) Sreg.empty asl in
-  let reads = List.fold_left (fun s (r,_,v) ->
-    Spv.add r (Spv.add v s)) Spv.empty asl in
-  check_taints taint reads;
-  { eff_reads  = reads;
-    eff_writes = Mreg.map Mpv.domain writes;
-    eff_resets = Mreg.set_union reset cover;
-    eff_taints = taint;
-    eff_raises = Sexn.empty;
-    eff_oneway = false;
-    eff_ghost  = ghost }
-*)
+  *)
+
 
 (* TODO *)
 let eff_strong ({eff_writes = _wr} as _e) = assert false
@@ -871,16 +933,16 @@ let eff_contagious e = e.eff_ghost &&
 let eff_union_par e1 e2 =
   let e1 = eff_ghostify e2.eff_ghost e1 in
   let e2 = eff_ghostify e1.eff_ghost e2 in
-  check_taints e1 e2.eff_reads;
-  check_taints e2 e1.eff_reads;
+  check_taints e1.eff_taints e2.eff_reads;
+  check_taints e2.eff_taints e1.eff_reads;
   eff_union e1 e2
 
 let eff_union_seq e1 e2 =
   let e1 = eff_ghostify e2.eff_ghost e1 in
   let e2 = eff_ghostify (eff_contagious e1) e2 in
+  check_taints e1.eff_taints e2.eff_reads;
+  check_taints e2.eff_taints e1.eff_reads;
   check_covers e1 e2.eff_reads;
-  check_taints e1 e2.eff_reads;
-  check_taints e2 e1.eff_reads;
   eff_union e1 e2
 
 (* NOTE: do not export this function *)
@@ -1078,7 +1140,7 @@ let cty_apply c vl args res =
   let isb = if same then isb_empty else
     let isb = ity_match isb c.cty_result res in
     List.fold_left2 match_v isb rcargs rargs in
-  (* stage 3: instantiate the effect *)
+  (* stage 3 instantiate the effect *)
   let effect =
     if same then c.cty_effect else eff_inst isb c.cty_effect in
   let binds = List.fold_right Spv.add c.cty_args Spv.empty in
