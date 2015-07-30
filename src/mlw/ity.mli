@@ -281,6 +281,7 @@ exception AssignPrivate of region
 exception StaleVariable of pvsymbol * region
 exception BadGhostWrite of pvsymbol * region
 exception DuplicateField of region * pvsymbol
+exception IllegalAssign of region * region * region
 exception GhostDivergence
 
 type effect = private {

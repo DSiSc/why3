@@ -788,6 +788,8 @@ let rec fold_left4 fn acc l1 l2 l3 l4 = match l1, l2, l3, l4 with
   | _, _, _, _ -> invalid_arg "fold_left4"
 
 
+exception IllegalAssign of region * region * region
+
 (* TODO:
 1)  Snapshots should have no mutable components (will simplify ity_pur)
 2)  Exposed type variables : phantom type variables should be considered as exposed
@@ -860,7 +862,18 @@ let eff_assign asl =
       | _ -> Mreg.singleton r l)) (- List.length l) m in
   let m = Mreg.fold add_write writes Mint.empty in
   (* 3 *)
-  let resets = assert false in
+  let add_bind r1 r2 m = Mreg.change (function
+    | Some r3 -> raise (IllegalAssign (r1,r2,r3))
+    | None    -> Some r2) r1 m in
+  let add_pair (rst, mt, mf) (r1,r2) =
+    let rst = if reg_equal r1 r2 then rst else Sreg.add r1 (Sreg.add r2 rst) in
+    rst, add_bind r1 r2 mt, add_bind r2 r1 mf in
+  let add_write r rl ((rst,_,_) as acc) =
+    if Sreg.mem r rst then acc else
+    List.fold_left add_pair acc rl in
+  let add_level _ mrl acc =
+    Mreg.fold add_write mrl acc in
+  let resets,_,_ = Mint.fold add_level m (Sreg.empty,Mreg.empty,Mreg.empty) in
   { eff_reads  = reads;
     eff_writes = Mreg.map Mpv.domain writes;
     eff_taints = taint;
@@ -870,31 +883,8 @@ let eff_assign asl =
     eff_oneway = false;
     eff_ghost  = ghost }
 
-
-(*
-  (* type variables and regions outside modified fields are frozen *)
-  let frz = freeze_of_writes writes in
-  (* non-frozen regions are allowed to be renamed, preserving aliases *)
-  let sbst, sbsf = Mreg.fold (fun r fs acc ->
-    let sbs = its_match_regs r.reg_its r.reg_args r.reg_regs in
-    (* TODO: catch the TypeMismatch exception
-       and produce a reasonable error message *)
-    Mpv.fold (fun f ity (sbst,sbsf) ->
-      let fity = ity_full_inst sbs f.pv_ity in
-      ity_match sbst fity ity,
-      ity_match sbsf ity fity) fs acc) writes (frz,frz) in
-  let sbst, sbsf = sbst.isb_reg, sbsf.isb_reg in
-  (* every LHS region not instantiated to itself is confined,
-     every non-instantiated RHS region is reset *)
-  let cover = Mreg.mapi_filter (fun ro rn ->
-    if reg_equal ro rn then None else Some (get_cover ro writes)) sbst in
-  let reset = Mreg.map (fun _ -> Sreg.empty) (Mreg.set_diff sbsf sbst) in
-  (* construct the effect *)
-  *)
-
-
 (* TODO *)
-let eff_strong ({eff_writes = _wr} as _e) = assert false
+let eff_strong ({eff_writes = _wr} as e) = e
 (*
   let freeze r _ sbs = List.fold_left reg_freeze
     (List.fold_left ity_freeze sbs r.reg_args) r.reg_regs in
@@ -1402,4 +1392,7 @@ let () = Exn_printer.register (fun fmt e -> match e with
       "This ghost expression may not terminate"
   | IllegalAlias _reg -> fprintf fmt
       "This application creates an illegal alias"
+  | IllegalAssign (r1,r2,r3) -> fprintf fmt
+      "This assignment mismatches regions (%a: %a - %a)"
+        print_reg r1 print_reg r2 print_reg r3
   | _ -> raise e)
