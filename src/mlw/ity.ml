@@ -739,7 +739,7 @@ let eff_bind_single v e = eff_bind (Spv.singleton v) e
 let check_mutable_field fn r f =
   if not (List.memq f r.reg_its.its_mfields) then invalid_arg fn
 
-(*TODO: add the third arg (resets) and check the invariants*)
+(*TODO ? add the third arg (resets) and check the invariants *)
 let eff_write rd wr =
   if Mreg.is_empty wr then { eff_empty with eff_reads = rd } else
   let kn = Spv.fold (fun v s -> ity_freeregs s v.pv_ity) rd Sreg.empty in
@@ -748,45 +748,16 @@ let eff_write rd wr =
     Spv.iter (check_mutable_field "Ity.eff_write" r) fs;
     Sreg.mem r kn) wr in
   let cv = Mreg.map ignore wr in
-  reset_taints { eff_empty with eff_reads = rd; eff_writes = wr; eff_covers = cv }
+  reset_taints
+    { eff_empty with eff_reads = rd; eff_writes = wr; eff_covers = cv }
 
-let merge_fields _ f1 f2 = Some (Spv.union f1 f2)
-(*TODO*)
-(*
-let merge_covers reg c1 c2 = Some (Sreg.union
-  (Sreg.filter (fun r -> not (reg_r_stale reg c1 r)) c2)
-  (Sreg.filter (fun r -> not (reg_r_stale reg c2 r)) c1))
-
-let get_cover reg m = Mreg.subdomain (fun r _ ->
-  not (reg_equal reg r) && reg_r_occurs reg r) m
-
-(* freeze type variables and regions outside modified fields *)
-let freeze_of_writes wr =
-  let freeze_of_write r fs frz =
-    let sbs = its_match_regs r.reg_its r.reg_args r.reg_regs in
-    let frz_fa frz b a = if b then ity_freeze frz a else frz in
-    let frz_fr frz b r = if b then reg_freeze frz r else frz in
-    let frz_if frz f = ity_freeze frz (ity_full_inst sbs f.pv_ity) in
-    let frz_mf frz f = if Mpv.mem f fs then frz else frz_if frz f in
-    let frz = reg_v_fold (fun frz v -> (* freeze type variables *)
-      { frz with isb_tv = Mtv.add v (ity_var v) frz.isb_tv }) frz r in
-    let frz = dfold2 frz_fa frz_fr frz r.reg_its.its_arg_frz r.reg_args
-                                       r.reg_its.its_reg_frz r.reg_regs in
-    List.fold_left frz_mf frz r.reg_its.its_mfields in
-  Mreg.fold freeze_of_write wr isb_empty
-*)
+(*TODO: should we use it and what semantics to give ? *)
+(*let eff_reset e r = { e with eff_resets = Sreg.add r e.eff_resets }*)
 
 let rec fold_left3 fn acc l1 l2 l3 = match l1, l2, l3 with
   | x1::l1, x2::l2, x3::l3 -> fold_left3 fn (fn acc x1 x2 x3) l1 l2 l3
   | [], [], [] -> acc
   | _, _, _ -> invalid_arg "fold_left3"
-
-let rec fold_left4 fn acc l1 l2 l3 l4 = match l1, l2, l3, l4 with
-  | x1::l1, x2::l2, x3::l3, x4::l4 ->
-      fold_left4 fn (fn acc x1 x2 x3 x4) l1 l2 l3 l4
-  | [], [], [], [] -> acc
-  | _, _, _, _ -> invalid_arg "fold_left4"
-
 
 exception IllegalAssign of region * region * region
 
@@ -794,8 +765,7 @@ exception IllegalAssign of region * region * region
 1)  Snapshots should have no mutable components (will simplify ity_pur)
 2)  Exposed type variables : phantom type variables should be considered as exposed
     NB: Are Phantom vars mutable by default ?
-3)  Should Phantom vars have the same skeleton ?
-4)  Review F_strong  *)
+3)  Should Phantom vars have the same skeleton ?  *)
 let eff_assign asl =
   let get_reg = function
     | {pv_ity = {ity_node = Ityreg r}} -> r
@@ -816,23 +786,20 @@ let eff_assign asl =
     Spv.add r (Spv.add v s)) Spv.empty asl in
   check_taints taint reads;
   (* 2 *)
-  let rec ity3 rl exp t1 t2 =
-    if not exp then rl else
+  let rec ity2 rl t1 t2 =
     if t1.ity_pure then (ity_equal_check t1 t2; rl) else
     match t1.ity_node, t2.ity_node with
     | Ityapp (s1,l1,r1), Ityapp (s2,l2,r2) when its_equal s1 s2 ->
         let rl = List.fold_left2 reg2 rl r1 r2 in
         fold_left3 ity3 rl s1.its_arg_exp l1 l2
     | Itypur (s1,l1), Itypur (s2,l2) when its_equal s1 s2 ->
-        let ity2 rl t1 t2 = ity3 rl true t1 t2 in
         if its_impure s1 then List.fold_left2 ity2 rl l1 l2 else
         fold_left3 ity3 rl s1.its_arg_exp l1 l2
-    | Ityreg r1, Ityreg r2 -> reg2 rl r1 r2
+    | Ityreg r1, Ityreg r2 when its_equal r1.reg_its r2.reg_its ->
+        reg2 rl r1 r2
     | Ityvar v1, Ityvar v2 when tv_equal v1 v2 -> rl
     | _ -> raise (TypeMismatch (t1, t2, isb_empty))
   and reg2 rl ({reg_its = s} as r1) r2 =
-    if not (its_equal s r2.reg_its) then
-      raise (TypeMismatch (ity_reg r1, ity_reg r2, isb_empty));
     let rl = (r1,r2) :: rl in
     let fs = Mreg.find_def Mpv.empty r2 writes in
     if Mpv.is_empty fs then
@@ -840,21 +807,20 @@ let eff_assign asl =
       fold_left3 ity3 rl s.its_arg_exp r1.reg_args r2.reg_args
     else
       under_reg2 rl r1 r2 fs
+  and ity3 rl exp t1 t2 = if exp then ity2 rl t1 t2 else rl
+  and reg3 rl exp r1 r2 = if exp then reg2 rl r1 r2 else rl
   and under_reg2 rl ({reg_its = s} as r1) r2 fs =
-    let add_arg rl exp frz t1 t2 = if frz then ity3 rl exp t1 t2 else rl in
-    let add_reg rl     frz r1 r2 = if frz then reg2 rl     r1 r2 else rl in
-    let rl = fold_left4 add_arg rl s.its_arg_exp
-                                   s.its_arg_frz r1.reg_args r2.reg_args in
-    let rl = fold_left3 add_reg rl s.its_reg_frz r1.reg_regs r2.reg_regs in
+    let rl = fold_left3 ity3 rl s.its_arg_frz r1.reg_args r2.reg_args in
+    let rl = fold_left3 reg3 rl s.its_reg_frz r1.reg_regs r2.reg_regs in
     let sbs1 = its_match_regs s r1.reg_args r1.reg_regs in
     let sbs2 = its_match_regs s r2.reg_args r2.reg_regs in
-    let add_fld rl f =
+    let add_mfield rl f =
       let t1 = ity_full_inst sbs1 f.pv_ity in
       let t2 = match Mpv.find_opt f fs with
         | Some t2 -> t2
         | _ -> ity_full_inst sbs2 f.pv_ity in
-      ity3 rl true t1 t2 in
-    List.fold_left add_fld rl s.its_mfields in
+      ity2 rl t1 t2 in
+    List.fold_left add_mfield rl s.its_mfields in
   let add_write r fs m =
     let l = under_reg2 [] r r fs in
     Mint.change (fun rl -> Some (match rl with
@@ -863,8 +829,9 @@ let eff_assign asl =
   let m = Mreg.fold add_write writes Mint.empty in
   (* 3 *)
   let add_bind r1 r2 m = Mreg.change (function
+    | (Some r3) as v when reg_equal r2 r3 -> v
     | Some r3 -> raise (IllegalAssign (r1,r2,r3))
-    | None    -> Some r2) r1 m in
+    | None -> Some r2) r1 m in
   let add_pair (rst, mt, mf) (r1,r2) =
     let rst = if reg_equal r1 r2 then rst else Sreg.add r1 (Sreg.add r2 rst) in
     rst, add_bind r1 r2 mt, add_bind r2 r1 mf in
@@ -883,24 +850,43 @@ let eff_assign asl =
     eff_oneway = false;
     eff_ghost  = ghost }
 
-(* TODO *)
-let eff_strong ({eff_writes = _wr} as e) = e
-(*
-  let freeze r _ sbs = List.fold_left reg_freeze
-    (List.fold_left ity_freeze sbs r.reg_args) r.reg_regs in
-  let sbs = Mreg.fold freeze wr isb_empty in
-  let frz = (freeze_of_writes wr).isb_reg in
-  let cvr = Mreg.set_diff sbs.isb_reg frz in
-  let cvr = Mreg.map (fun ro -> get_cover ro wr) cvr in
-  let cvr = Mreg.union merge_covers e.eff_resets cvr in
-  { e with eff_resets = cvr }
-*)
+let eff_reset_overwritten ({eff_writes = wr} as e) =
+  if not (Sreg.is_empty e.eff_resets) then
+    invalid_arg "Ity.eff_reset_overwritten";
+  let rec ity2 uw acc t =
+    if t.ity_pure then acc else
+    match t.ity_node with
+    | Ityapp (s,tl,rl) ->
+        let acc = List.fold_left (reg2 uw) acc rl in
+        List.fold_left2 (ity3 uw) acc s.its_arg_exp tl
+    | Itypur (s,tl) when its_impure s ->
+        List.fold_left (ity2 uw) acc tl
+    | Itypur (s,tl) ->
+        List.fold_left2 (ity3 uw) acc s.its_arg_exp tl
+    | Ityreg r -> reg2 uw acc r
+    | Ityvar _ -> acc
+  and reg2 uw ((svv,rst) as acc) ({reg_its = s} as r) =
+    if Mreg.mem r wr then acc else
+    let svv = if uw then svv else Sreg.add r svv in
+    let rst = if uw then Sreg.add r rst else rst in
+    let acc = List.fold_left (reg2 uw) (svv,rst) r.reg_regs in
+    List.fold_left2 (ity3 uw) acc s.its_arg_exp r.reg_args
+  and ity3 uw acc exp t = if exp then ity2 uw acc t else acc
+  and reg3 uw acc exp r = if exp then reg2 uw acc r else acc in
+  let add_write ({reg_its = s} as r) fs (svv, rst) =
+    let acc = Sreg.add r svv, rst in
+    let sbs = its_match_regs s r.reg_args r.reg_regs in
+    let acc = List.fold_left2 (ity3 false) acc s.its_arg_frz r.reg_args in
+    let acc = List.fold_left2 (reg3 false) acc s.its_reg_frz r.reg_regs in
+    let add_mfld acc f = ity2 (Spv.mem f fs) acc (ity_full_inst sbs f.pv_ity) in
+    List.fold_left add_mfld acc s.its_mfields in
+  let svv, rst = Mreg.fold add_write wr (Sreg.empty,Sreg.empty) in
+  { e with eff_resets = Sreg.diff rst svv }
 
 let eff_raise e x = { e with eff_raises = Sexn.add x e.eff_raises }
 let eff_catch e x = { e with eff_raises = Sexn.remove x e.eff_raises }
 
-(*TODO: should we use it and what semantics to give ? *)
-(*let eff_reset e r = { e with eff_resets = Sreg.add r e.eff_resets }*)
+let merge_fields _ f1 f2 = Some (Spv.union f1 f2)
 
 let remove_stale e srg =
   Mreg.filter (fun r _ -> not (reg_r_stale e.eff_resets e.eff_covers r)) srg
