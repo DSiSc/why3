@@ -197,10 +197,11 @@ module Translate = struct
         []
 
   let type_decl info ts = match ts.ts_def with
-    | None ->
+    | TYabstract ->
         ML.Dabstract
-    | Some ty ->
-        ML.Dalias (type_ info ty)
+    | TYalias ty ->
+      ML.Dalias (type_ info ty)
+    | TYrange _ -> unsupported "you must eliminate range types"
 
   let type_args = List.map (fun tv -> tv.tv_name)
 

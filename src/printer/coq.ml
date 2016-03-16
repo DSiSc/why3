@@ -674,7 +674,7 @@ let print_previous_proof def info fmt previous =
 let print_type_decl ~prev info fmt ts =
   if is_ts_tuple ts then () else
   match ts.ts_def with
-    | None ->
+    | TYabstract ->
       if info.realization then
         match prev with
         | Some (Query (_,Notation,c)) ->
@@ -700,12 +700,13 @@ let print_type_decl ~prev info fmt ts =
         end;
         fprintf fmt "@\n"
       end
-    | Some ty ->
+    | TYalias ty ->
       fprintf fmt "(* Why3 assumption *)@\n@[<hov 2>Definition %a%a :=@ %a.@]@\n@\n"
         print_ts ts
           (print_list_pre space
              (print_tv_binder info ~whytypes:false ~implicit:false)) ts.ts_args
-        (print_ty info) ty
+          (print_ty info) ty
+    | TYrange _ -> unsupported "you must eliminate range types"
 
 let print_type_decl ~prev info fmt ts =
   if not (Mid.mem ts.ts_name info.info_syn) then

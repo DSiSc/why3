@@ -32,6 +32,7 @@ let debug_type_only  = Debug.register_flag "type_only"
 exception UnboundTypeVar of string
 exception DuplicateTypeVar of string
 exception ClashTheory of string
+exception EmptyRange of string
 
 (** lazy declaration of tuples *)
 
@@ -428,29 +429,41 @@ let add_types dl th =
               | PTparen ty ->
                   apply ty
             in
-            create_tysymbol id vl (Some (apply ty))
+            create_tysymbol id vl (TYalias (apply ty))
         | TDabstract | TDalgebraic _ ->
-            create_tysymbol id vl None
+            create_tysymbol id vl TYabstract
         | TDrecord _ ->
-            assert false
+          assert false
+        | TDrange (a,b) ->
+          let a_val = Number.compute_int a  in
+          let b_val = Number.compute_int b in
+          if BigInt.lt b_val a_val then
+            Loc.error ?loc:id.pre_loc (EmptyRange id.pre_name)
+          else
+            create_tysymbol id vl (TYrange (a_val,b_val))
       in
       Hstr.add tysymbols x (Some ts);
       ts
   in
   let th' =
-    let add_ts (abstr,alias) d =
+    let add_ts (abstr,alias,range) d =
       let ts = visit d.td_ident.id_str in
-      if ts.ts_def = None then ts::abstr, alias else abstr, ts::alias in
-    let abstr,alias = List.fold_left add_ts ([],[]) dl in
+      match ts.ts_def with
+      | TYabstract -> ts::abstr, alias, range
+      | TYalias _ -> abstr, ts::alias, range
+      | TYrange _ -> abstr, alias, ts::range
+    in
+    let abstr,alias,range = List.fold_left add_ts ([],[],[]) dl in
     try
       let th = List.fold_left add_ty_decl th abstr in
       let th = List.fold_left add_ty_decl th alias in
+      let th = List.fold_left add_ty_decl th range in
       th
     with ClashSymbol s ->
       Loc.error ~loc:(Mstr.find s def).td_loc (ClashSymbol s)
   in
   let csymbols = Hstr.create 17 in
-  let decl d (abstr,algeb,alias) =
+  let decl d (abstr,algeb,alias,range) =
     let ts = match Hstr.find tysymbols d.td_ident.id_str with
       | None ->
           assert false
@@ -458,8 +471,8 @@ let add_types dl th =
           ts
     in
     match d.td_def with
-      | TDabstract -> ts::abstr, algeb, alias
-      | TDalias _ -> abstr, algeb, ts::alias
+      | TDabstract -> ts::abstr, algeb, alias, range
+      | TDalias _ -> abstr, algeb, ts::alias, range
       | TDalgebraic cl ->
           let ht = Hstr.create 17 in
           let constr = List.length cl in
@@ -486,15 +499,18 @@ let add_types dl th =
             Hstr.replace csymbols id.id_str loc;
             create_fsymbol ~opaque ~constr (create_user_id id) tyl ty, pjl
           in
-          abstr, (ts, List.map constructor cl) :: algeb, alias
+          abstr, (ts, List.map constructor cl) :: algeb, alias, range
       | TDrecord _ ->
-          assert false
+        assert false
+      | TDrange (_a,_b) ->
+          abstr, algeb, alias, ts::range
   in
-  let abstr,algeb,alias = List.fold_right decl dl ([],[],[]) in
+  let abstr,algeb,alias,range = List.fold_right decl dl ([],[],[],[]) in
   try
     let th = List.fold_left add_ty_decl th abstr in
     let th = if algeb = [] then th else add_data_decl th algeb in
     let th = List.fold_left add_ty_decl th alias in
+    let th = List.fold_left add_ty_decl th range in
     th
   with
     | ClashSymbol s ->
@@ -512,7 +528,7 @@ let prepare_typedef td =
   if td.td_inv <> [] then
     Loc.errorm ~loc:td.td_loc "pure types cannot have invariants";
   match td.td_def with
-  | TDabstract | TDalgebraic _ | TDalias _ ->
+  | TDabstract | TDrange _ | TDalgebraic _ | TDalias _ ->
       td
   | TDrecord fl ->
       let field { f_loc = loc; f_ident = id; f_pty = ty;
@@ -674,7 +690,7 @@ let rec clone_ns kn sl path ns2 ns1 s =
     | Some ts2 when ts_equal ts1 ts2 -> acc
     | Some _ when not (Sid.mem ts1.ts_name sl) ->
         raise (NonLocal ts1.ts_name)
-    | Some _ when ts1.ts_def <> None ->
+    | Some _ when ts1.ts_def <> TYabstract ->
         raise (CannotInstantiate ts1.ts_name)
     | Some ts2 ->
         begin match (Mid.find ts1.ts_name kn).d_node with
@@ -682,7 +698,7 @@ let rec clone_ns kn sl path ns2 ns1 s =
           | _ -> raise (CannotInstantiate ts1.ts_name)
         end
     | None when not (Sid.mem ts1.ts_name sl) -> acc
-    | None when ts1.ts_def <> None -> acc
+    | None when ts1.ts_def <> TYabstract -> acc
     | None ->
         begin match (Mid.find ts1.ts_name kn).d_node with
           | Decl.Dtype _ -> Loc.errorm
@@ -757,7 +773,7 @@ let type_inst th t s =
       let ts1 = find_tysymbol_ns t.th_export p in
       let id = id_user (ts1.ts_name.id_string ^ "_subst") loc in
       let tvl = List.map (fun id -> tv_of_string id.id_str) tvl in
-      let def = Some (ty_of_pty th pty) in
+      let def = TYalias (ty_of_pty th pty) in
       let ts2 = Loc.try3 ~loc create_tysymbol id tvl def in
       if Mts.mem ts1 s.inst_ts
       then Loc.error ~loc (ClashSymbol ts1.ts_name.id_string);

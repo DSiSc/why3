@@ -253,9 +253,11 @@ let print_enum_decl info fmt ts csl =
     (print_list alt2 print_cs) csl
 
 let print_ty_decl info fmt ts =
-  if ts.ts_def <> None then () else
-  if Mid.mem ts.ts_name info.info_syn then () else
-  (fprintf fmt "%a@\n@\n" (print_type_decl info) ts; forget_tvs info)
+  match ts.ts_def with
+  | TYalias _ -> ()
+  | TYabstract -> if Mid.mem ts.ts_name info.info_syn then () else
+      (fprintf fmt "%a@\n@\n" (print_type_decl info) ts; forget_tvs info)
+  | TYrange _ -> unsupported "you must eliminate range types"
 
 let print_data_decl info fmt = function
   | ts, csl (* monomorphic enumeration *)

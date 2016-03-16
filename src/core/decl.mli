@@ -114,6 +114,7 @@ val d_hash : decl -> int
 (** {2 Declaration constructors} *)
 
 val create_ty_decl : tysymbol -> decl
+(* val create_range_decl : tysymbol * BigInt.t * BigInt.t -> decl *)
 val create_data_decl : data_decl list -> decl
 val create_param_decl : lsymbol -> decl
 val create_logic_decl : logic_decl list -> decl

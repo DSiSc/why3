@@ -412,8 +412,16 @@ let syms_ls s ls = Sid.add ls.ls_name s
 let syms_ty s ty = ty_s_fold syms_ts s ty
 let syms_term s t = t_s_fold syms_ty syms_ls s t
 
-let create_ty_decl ts =
+(* let create_range_decl (ts,a,b) =
   let syms = Opt.fold syms_ty Sid.empty ts.ts_def in
+  let news = Sid.singleton ts.ts_name in
+   mk_decl (Drange (ts,a,b)) syms news *)
+
+let create_ty_decl ts =
+  let syms = match ts.ts_def with
+    | TYabstract | TYrange _ -> Sid.empty
+    | TYalias ty -> syms_ty Sid.empty ty
+  in
   let news = Sid.singleton ts.ts_name in
   mk_decl (Dtype ts) syms news
 
@@ -454,7 +462,7 @@ let create_data_decl tdl =
   let check_decl (syms,news) (ts,cl) =
     let cll = List.length cl in
     if cl = [] then raise (EmptyAlgDecl ts);
-    if ts.ts_def <> None then raise (IllegalTypeAlias ts);
+    if ts.ts_def <> TYabstract then raise (IllegalTypeAlias ts);
     let news = news_id news ts.ts_name in
     let pjs = List.fold_left (fun s (_,pl) -> List.fold_left
       (Opt.fold (fun s ls -> Sls.add ls s)) s pl) Sls.empty cl in
@@ -716,7 +724,7 @@ let check_foundness kn d =
   | _ -> ()
 
 let rec ts_extract_pos kn sts ts =
-  assert (ts.ts_def = None);
+  assert (ts.ts_def = TYabstract);
   if ts_equal ts ts_func then [false;true] else
   if ts_equal ts ts_pred then [false] else
   if Sts.mem ts sts then List.map Util.ttrue ts.ts_args else

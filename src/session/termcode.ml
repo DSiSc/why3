@@ -520,7 +520,10 @@ module Checksum = struct
   let tysymbol b ts =
     ident b ts.Ty.ts_name;
     list tvsymbol b ts.Ty.ts_args;
-    option ty b ts.Ty.ts_def
+    match ts.Ty.ts_def with
+    | Ty.TYabstract -> char b 'a'
+    | Ty.TYrange _ -> char b 'r'
+    | Ty.TYalias t -> char b 'b'; ty b t
 
   let lsymbol b ls =
     ident b ls.ls_name;

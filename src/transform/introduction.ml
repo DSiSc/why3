@@ -57,7 +57,7 @@ let rec intros pr f = match f.t_node with
 
 let intros pr f =
   let tvs = t_ty_freevars Stv.empty f in
-  let mk_ts tv () = create_tysymbol (id_clone tv.tv_name) [] None in
+  let mk_ts tv () = create_tysymbol (id_clone tv.tv_name) [] TYabstract in
   let tvm = Mtv.mapi mk_ts tvs in
   let decls = Mtv.map create_ty_decl tvm in
   let subst = Mtv.map (fun ts -> ty_app ts []) tvm in

@@ -247,14 +247,19 @@ let print_constr fmt (cs,pjl) =
     (List.fold_right2 add_pj pjl cs.ls_args [])
 
 let print_type_decl fmt ts = match ts.ts_def with
-  | None ->
+  | TYabstract ->
       fprintf fmt "@[<hov 2>type %a%a%a@]@\n@\n"
         print_ts ts print_ident_labels ts.ts_name
         (print_list nothing print_tv_arg) ts.ts_args
-  | Some ty ->
+  | TYalias ty ->
       fprintf fmt "@[<hov 2>type %a%a%a =@ %a@]@\n@\n"
         print_ts ts print_ident_labels ts.ts_name
         (print_list nothing print_tv_arg) ts.ts_args print_ty ty
+  | TYrange (a,b) ->
+      fprintf fmt "@[<hov 2>type %a%a%a =@ %s .. %s@]@\n@\n"
+        print_ts ts print_ident_labels ts.ts_name
+        (print_list nothing print_tv_arg) ts.ts_args
+        (BigInt.to_string a) (BigInt.to_string b)
 
 let print_type_decl fmt ts =
   if not (query_remove ts.ts_name) then

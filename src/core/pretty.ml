@@ -326,8 +326,10 @@ let print_constr fmt (cs,pjl) =
 
 let print_ty_decl fmt ts =
   let print_def fmt = function
-    | None -> ()
-    | Some ty -> fprintf fmt " =@ %a" print_ty ty
+    | TYabstract -> ()
+    | TYalias ty -> fprintf fmt " =@ %a" print_ty ty
+    | TYrange (a,b) ->
+      fprintf fmt " =@ %s .. %s" (BigInt.to_string a) (BigInt.to_string b)
   in
   fprintf fmt "@[<hov 2>type %a%a%a%a@]"
     print_ts ts print_id_labels ts.ts_name

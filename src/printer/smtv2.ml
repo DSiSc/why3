@@ -523,10 +523,13 @@ and print_triggers info fmt = function
     (print_triggers info) l
 
 let print_type_decl info fmt ts =
-  if ts.ts_def <> None then () else
-  if Mid.mem ts.ts_name info.info_syn then () else
-  fprintf fmt "(declare-sort %a %i)@\n@\n"
-    (print_ident info) ts.ts_name (List.length ts.ts_args)
+  match ts.ts_def with
+  | TYabstract ->
+      if Mid.mem ts.ts_name info.info_syn then () else
+        fprintf fmt "(declare-sort %a %i)@\n@\n"
+          (print_ident info) ts.ts_name (List.length ts.ts_args)
+  | TYalias _ -> ()
+  | TYrange _ -> unsupported "you must eliminate range types"
 
 let print_param_decl info fmt ls =
   if Mid.mem ls.ls_name info.info_syn then () else

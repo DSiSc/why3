@@ -36,8 +36,10 @@ val tv_of_string : string -> tvsymbol
 type tysymbol = private {
   ts_name : ident;
   ts_args : tvsymbol list;
-  ts_def  : ty option;
+  ts_def  : ty_def;
 }
+
+and ty_def = TYabstract | TYalias of ty | TYrange of BigInt.t * BigInt.t
 
 and ty = private {
   ty_node : ty_node;
@@ -71,7 +73,7 @@ exception BadTypeArity of tysymbol * int
 exception DuplicateTypeVar of tvsymbol
 exception UnboundTypeVar of tvsymbol
 
-val create_tysymbol : preid -> tvsymbol list -> ty option -> tysymbol
+val create_tysymbol : preid -> tvsymbol list -> ty_def -> tysymbol
 
 val ty_var : tvsymbol -> ty
 val ty_app : tysymbol -> ty list -> ty

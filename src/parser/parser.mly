@@ -344,6 +344,9 @@ typedefn:
     { $1, $2, TDrecord $4, $6 }
 | model abstract ty invariant*
     { $1, $2, TDalias $3, $4 }
+(* fixme : allow negative bounds *)
+| EQUAL INTEGER DOTDOT INTEGER
+    { false, Public, TDrange ($2, $4), [] }
 
 model:
 | EQUAL         { false }
