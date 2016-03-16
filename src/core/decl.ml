@@ -14,6 +14,23 @@ open Ident
 open Ty
 open Term
 
+(** {2 Special type declaration} *)
+
+type range_decl = {
+  range_ts        : tysymbol;
+  range_to_int    : lsymbol;
+  range_lo        : BigInt.t;
+  range_hi        : BigInt.t;
+}
+
+type float_decl = {
+  float_ts        : tysymbol;
+  float_to_real   : lsymbol;
+  float_is_finite : lsymbol;
+  float_eb        : BigInt.t;
+  float_sb        : BigInt.t;
+}
+
 (** Type declaration *)
 
 type constructor = lsymbol * lsymbol option list
@@ -305,7 +322,7 @@ and decl_node =
   | Dtype  of tysymbol          (* abstract types and aliases *)
   | Ddata  of data_decl list    (* recursive algebraic types *)
   | Dparam of lsymbol           (* abstract functions and predicates *)
-  | Dlogic of logic_decl list   (* recursive functions and predicates *)
+  | Dlogic of logic_decl list   (* defined functions and predicates *)
   | Dind   of ind_list          (* (co)inductive predicates *)
   | Dprop  of prop_decl         (* axiom / lemma / goal *)
 
@@ -756,13 +773,6 @@ let check_positivity kn d = match d.d_node with
       let check_decl (ts,cl) = List.iter (check_constr ts) cl in
       List.iter check_decl tdl
   | _ -> ()
-
-let known_add_decl kn d =
-  let kn = known_add_decl kn d in
-  check_positivity kn d;
-  check_foundness kn d;
-  check_match kn d;
-  kn
 
 (** Records *)
 

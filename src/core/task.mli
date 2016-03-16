@@ -17,20 +17,7 @@ open Term
 open Decl
 open Theory
 
-type tdecl_set = private {
-  tds_set : Stdecl.t;
-  tds_tag : Weakhtbl.tag;
-}
-
-val tds_equal : tdecl_set -> tdecl_set -> bool
-val tds_hash : tdecl_set -> int
-val tds_compare : tdecl_set -> tdecl_set -> int
-val tds_empty : tdecl_set
-
-val mk_tds : Stdecl.t -> tdecl_set
-
 type clone_map = tdecl_set Mid.t
-type meta_map = tdecl_set Mmeta.t
 
 (** Task *)
 

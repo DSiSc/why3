@@ -114,6 +114,44 @@ module Htdecl : Exthtbl.S with type key = tdecl
 val td_equal : tdecl -> tdecl -> bool
 val td_hash : tdecl -> int
 
+type tdecl_set = private {
+  tds_set : Stdecl.t;
+  tds_tag : Weakhtbl.tag;
+}
+
+val tds_equal : tdecl_set -> tdecl_set -> bool
+val tds_hash : tdecl_set -> int
+val tds_compare : tdecl_set -> tdecl_set -> int
+val tds_empty : tdecl_set
+val tds_singleton : tdecl -> tdecl_set
+val tds_add : tdecl -> tdecl_set -> tdecl_set
+
+val mk_tds : Stdecl.t -> tdecl_set
+
+type meta_map = tdecl_set Mmeta.t
+
+val mm_find : meta_map -> meta -> tdecl_set
+val mm_add : meta_map -> meta -> tdecl -> meta_map
+
+exception UnknownLiteralType of tysymbol
+
+val known_add_decl : known_map -> meta_map -> decl-> known_map
+
+val meta_range : meta
+val meta_float : meta
+
+(** Returns the projection to_int and the low and high bounds of the
+    range associated to the type symbol in the meta map.
+    Raise UnknownLiteralTypesym if no corresponding meta is found. *)
+val find_range : meta_map -> Ty.tysymbol -> lsymbol * string * string
+(** Returns the projection to_real, is_finite predicate and the number of bits
+    in the exponent and mantissa associated to the type symbol in the
+    meta map.
+    Raise UnknownLiteralTypesym if no corresponding meta is found. *)
+val find_float : meta_map -> Ty.tysymbol -> lsymbol * lsymbol * string * string
+val is_range_type : meta_map -> Ty.tysymbol -> bool
+val is_float_type : meta_map -> Ty.tysymbol -> bool
+
 (** {2 Constructors and utilities} *)
 
 type theory_uc  (** a theory under construction *)
@@ -126,6 +164,7 @@ val close_namespace : theory_uc -> bool (* import *) -> theory_uc
 
 val get_namespace : theory_uc -> namespace
 val get_known : theory_uc -> known_map
+val get_meta : theory_uc -> meta_map
 val get_rev_decls : theory_uc -> tdecl list
 
 val restore_path : ident -> string list * string * string list
@@ -226,4 +265,3 @@ exception KnownMeta of meta
 exception UnknownMeta of string
 exception BadMetaArity of meta * int
 exception MetaTypeMismatch of meta * meta_arg_type * meta_arg_type
-

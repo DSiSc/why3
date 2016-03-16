@@ -195,7 +195,7 @@ let print_decl info fmt d = match d.d_node with
   | Dtype ts ->
       print_type_decl info fmt ts
   | Ddata _ -> unsupportedDecl d
-      "smtv1 : algebraic types are not supported"
+      "smtv1: algebraic types are not supported"
   | Dparam ls ->
       print_param_decl info fmt ls
   | Dlogic _ -> unsupportedDecl d

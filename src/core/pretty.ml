@@ -12,7 +12,6 @@
 open Format
 open Pp
 open Stdlib
-open Number
 open Ident
 open Ty
 open Term
@@ -133,16 +132,6 @@ let rec print_ty_node pri fmt ty = match ty.ty_node with
 
 let print_ty fmt ty = print_ty_node 0 fmt ty
 
-let print_const fmt = function
-  | ConstInt (IConstDec s) -> fprintf fmt "%s" s
-  | ConstInt (IConstHex s) -> fprintf fmt "0x%s" s
-  | ConstInt (IConstOct s) -> fprintf fmt "0o%s" s
-  | ConstInt (IConstBin s) -> fprintf fmt "0b%s" s
-  | ConstReal (RConstDec (i,f,None)) -> fprintf fmt "%s.%s" i f
-  | ConstReal (RConstDec (i,f,Some e)) -> fprintf fmt "%s.%se%s" i f e
-  | ConstReal (RConstHex (i,f,Some e)) -> fprintf fmt "0x%s.%sp%s" i f e
-  | ConstReal (RConstHex (i,f,None)) -> fprintf fmt "0x%s.%s" i f
-
 (* can the type of a value be derived from the type of the arguments? *)
 let unambig_fs fs =
   let rec lookup v ty = match ty.ty_node with
@@ -244,7 +233,7 @@ and print_tnode pri fmt t = match t.t_node with
   | Tvar v ->
       print_vs fmt v
   | Tconst c ->
-      print_const fmt c
+      Number.print_constant fmt c
   | Tapp (fs, tl) when is_fs_tuple fs ->
       fprintf fmt "(%a)" (print_list comma print_term) tl
   | Tapp (fs, tl) when unambig_fs fs ->
@@ -557,6 +546,8 @@ let () = Exn_printer.register
       fprintf fmt "Not a term: %a" print_term t
   | Term.FmlaExpected t ->
       fprintf fmt "Not a formula: %a" print_term t
+  | Theory.UnknownLiteralType ts ->
+      fprintf fmt "Unknown literal type symbol %a" print_ts ts
   | Pattern.ConstructorExpected (ls,ty) ->
       fprintf fmt "%s %a is not a constructor of type %a"
         (if ls.ls_value = None then "Predicate" else "Function") print_ls ls
@@ -576,8 +567,6 @@ let () = Exn_printer.register
       fprintf fmt
         "Type symbol %a is a type alias and cannot be declared as algebraic"
         print_ts ts
-  | Decl.NonFoundedTypeDecl ts ->
-      fprintf fmt "Cannot construct a value of type %a" print_ts ts
   | Decl.NonPositiveTypeDecl (_ts, ls, ty) ->
       fprintf fmt "Constructor %a \
           contains a non strictly positive occurrence of type %a"
@@ -585,6 +574,8 @@ let () = Exn_printer.register
   | Decl.InvalidIndDecl (_ls, pr) ->
       fprintf fmt "Ill-formed inductive clause %a"
         print_pr pr
+  | Decl.NonFoundedTypeDecl ts ->
+      fprintf fmt "Cannot construct a value of type %a" print_ts ts
   | Decl.NonPositiveIndDecl (_ls, pr, ls1) ->
       fprintf fmt "Inductive clause %a contains \
           a non strictly positive occurrence of symbol %a"

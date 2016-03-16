@@ -484,7 +484,8 @@ let rec dexpr ({uc = uc} as lenv) denv {expr_desc = desc; expr_loc = loc} =
       let e1, ch = if chainable_op uc denv op2
         then get_chain e12 ch else e12, ch in
       make_chain "q1 " "q2 " (dexpr lenv denv e1) ch
-  | Ptree.Econst c -> DEconst c
+  | Ptree.Econst (Number.ConstInt _ as c) -> DEconst (c, dity_int)
+  | Ptree.Econst (Number.ConstReal _ as c) -> DEconst (c, dity_real)
   | Ptree.Erecord [] -> raise Decl.EmptyRecord
   | Ptree.Erecord ((q,_)::_ as fl) ->
       let prog_val cs pj = function
@@ -624,7 +625,21 @@ let rec dexpr ({uc = uc} as lenv) denv {expr_desc = desc; expr_loc = loc} =
   | Ptree.Enamed (Lstr lab, e1) ->
       DElabel (dexpr lenv denv e1, Slab.singleton lab)
   | Ptree.Ecast (e1, pty) ->
-      DEcast (dexpr lenv denv e1, ity_of_pty uc pty))
+      (* FIXME: accepts and silently ignores double casts: ((0:ty1):ty2) *)
+      let e1 = dexpr lenv denv e1 in
+      let ity = ity_of_pty uc pty in
+      match e1.de_node, ity.ity_node with
+      | DEconst (Number.ConstInt _ as c, _), Itypur (ts, []) ->
+          if is_range_type (Theory.get_meta (get_theory uc)) ts then
+            DEconst (c, dity_of_ity ity)
+          else
+            DEcast (e1, ity)
+      | DEconst (Number.ConstReal _ as c, _), Itypur (ts, []) ->
+          if is_float_type (Theory.get_meta (get_theory uc)) ts then
+            DEconst (c, dity_of_ity ity)
+          else
+            DEcast (e1, ity)
+      | _ -> DEcast (e1, ity))
 
 and drec_defn ~top lenv denv fdl =
   let prep (id, gh, (bl, pty, e, sp)) =
@@ -683,7 +698,7 @@ let look_for_loc tdl s =
   let look loc d =
     let loc = look_id loc d.td_ident in
     match d.td_def with
-      | TDabstract | TDalias _ -> loc
+      | TDabstract | TDalias _ | TDrange _ | TDfloat _ -> loc
       | TDalgebraic csl -> List.fold_left look_cs loc csl
       | TDrecord fl -> List.fold_left look_fl loc fl
   in
@@ -713,7 +728,8 @@ let add_types ~wp uc tdl =
           | PTtyapp (q,tyl) -> List.fold_left check (ts_seen seen q) tyl
           | PTtuple tyl -> List.fold_left check seen tyl in
         let seen = match d.td_def with
-          | TDabstract | TDalgebraic _ | TDrecord _ -> seen
+          | TDabstract | TDrange _ | TDfloat _ | TDalgebraic _ | TDrecord _ ->
+            seen
           | TDalias ty -> check (Mstr.add x false seen) ty in
         Mstr.add x true seen in
   ignore (Mstr.fold cyc_visit def Mstr.empty);
@@ -741,7 +757,7 @@ let add_types ~wp uc tdl =
       let imp =
         let td = Mstr.find x def in
         match td.td_def with
-        | TDabstract -> false
+        | TDabstract | TDrange _ | TDfloat _ -> false
         | TDalias ty -> check ty
         | TDalgebraic csl ->
             let check (_,_,gh,ty) = gh || check ty in
@@ -780,7 +796,7 @@ let add_types ~wp uc tdl =
       let mut =
         let td = Mstr.find x def in
         match td.td_def with
-        | TDabstract -> false
+        | TDabstract | TDrange _ | TDfloat _ -> false
         | TDalias ty -> check ty
         | TDalgebraic csl ->
             let check (_,_,_,ty) = check ty in
@@ -924,7 +940,7 @@ let add_types ~wp uc tdl =
             PT (create_itysymbol id ~abst ~priv ~inv ~ghost_reg vl rl None)
         | TDalgebraic _ | TDrecord _ when Hstr.find impures x ->
             PT (create_itysymbol id ~abst ~priv ~inv:false vl [] None)
-        | TDalgebraic _ | TDrecord _ | TDabstract ->
+        | TDalgebraic _ | TDrecord _ | TDabstract | TDrange _ | TDfloat _ ->
             TS (create_tysymbol id vl None)
       in
       Hstr.add tysymbols x (Some ts);
@@ -934,7 +950,7 @@ let add_types ~wp uc tdl =
 
   (* create predefinitions for immutable types *)
 
-  let def_visit d (abstr,algeb,alias) =
+  let def_visit d (abstr,algeb,alias,range,float) =
     let x = d.td_ident.id_str in
     let ts = Opt.get (Hstr.find tysymbols x) in
     let vl = match ts with
@@ -969,11 +985,50 @@ let add_types ~wp uc tdl =
     in
     match d.td_def with
       | TDabstract ->
-          ts :: abstr, algeb, alias
+          ts :: abstr, algeb, alias, range, float
       | TDalias _ ->
-          abstr, algeb, ts :: alias
+          abstr, algeb, ts :: alias, range, float
+      | TDrange (a,b,proj) ->
+          (* FIXME: all sanity checks must be done in Decl (still valid ?) *)
+          let ts = match ts with
+            | TS ts -> ts
+            | PT _ -> assert false in
+          let a_val = Number.compute_int a  in
+          let b_val = Number.compute_int b in
+          if BigInt.lt b_val a_val then
+            Loc.error ~loc:d.td_loc Typing.EmptyRange;
+          let id = create_user_id proj in
+          let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
+          let ri = {
+            range_ts     = ts;
+            range_lo     = a_val;
+            range_hi     = b_val;
+            range_to_int = ls } in
+          abstr, algeb, alias, ri :: range, float
+      | TDfloat (eb,sb,proj,isF) ->
+          (* FIXME: all sanity checks must be done in Decl (still valid ?) *)
+          let ts = match ts with
+            | TS ts -> ts
+            | PT _ -> assert false in
+          let eb_val = Number.compute_int eb in
+          let sb_val = Number.compute_int sb in
+          if BigInt.lt eb_val (BigInt.of_int 1) ||
+             BigInt.lt sb_val (BigInt.of_int 1) then
+            Loc.error ~loc:d.td_loc Typing.BadFloatSpec;
+          let proj_id = create_user_id proj in
+          let isF_id = create_user_id isF in
+          let ty = ty_app ts [] in
+          let proj = create_lsymbol proj_id [ty] (Some ty_real) in
+          let isF = create_lsymbol isF_id [ty] None in
+          let fi = {
+            float_ts         = ts;
+            float_eb         = eb_val;
+            float_sb         = sb_val;
+            float_to_real    = proj;
+            float_is_finite  = isF; } in
+          abstr, algeb, alias, range, fi :: float
       | (TDalgebraic _ | TDrecord _) when Hstr.find mutables x ->
-          abstr, (ts, Hstr.find predefs x) :: algeb, alias
+          abstr, (ts, Hstr.find predefs x) :: algeb, alias, range, float
       | TDalgebraic csl ->
           let projs = Hstr.create 5 in
           let mk_proj (_loc,id,gh,pty) =
@@ -994,16 +1049,16 @@ let add_types ~wp uc tdl =
           in
           let mk_constr (_loc,cid,pjl) =
             Typing.create_user_id cid, List.map mk_proj pjl in
-          abstr, (ts, List.map mk_constr csl) :: algeb, alias
+          abstr, (ts, List.map mk_constr csl) :: algeb, alias, range, float
       | TDrecord fl ->
           let mk_field f =
             let fid = Typing.create_user_id f.f_ident in
             Some fid, mk_field (parse f.f_pty) f.f_ghost None in
           let cid = { d.td_ident with id_str = "mk " ^ d.td_ident.id_str } in
           let csl = [Typing.create_user_id cid, List.map mk_field fl] in
-          abstr, (ts, csl) :: algeb, alias
+          abstr, (ts, csl) :: algeb, alias, range, float
   in
-  let abstr,algeb,alias = List.fold_right def_visit tdl ([],[],[]) in
+  let abstr,algeb,alias,range,float = List.fold_right def_visit tdl ([],[],[],[],[]) in
 
   (* create pure type declarations *)
 
@@ -1041,10 +1096,18 @@ let add_types ~wp uc tdl =
     | PT ts -> add_pdecl_with_tuples ~wp uc (create_ty_decl ts)
     | TS ts -> add_decl_with_tuples uc (Decl.create_ty_decl ts)
   in
+  let add_range_decl uc rd =
+    add_decl_with_tuples uc (Decl.create_ty_decl rd.range_ts)
+  in
+  let add_float_decl uc fd =
+    add_decl_with_tuples uc (Decl.create_ty_decl fd.float_ts)
+  in
   let add_invariant uc d = if d.td_inv = [] then uc else
     add_type_invariant d.td_loc uc d.td_ident d.td_params d.td_inv in
   try
     let uc = List.fold_left add_type_decl uc abstr in
+    let uc = List.fold_left add_range_decl uc range in
+    let uc = List.fold_left add_float_decl uc float in
     let uc = if alg_imp = [] then uc else
       add_pdecl_with_tuples ~wp uc (create_data_decl alg_imp) in
     let uc = if alg_pur = [] then uc else

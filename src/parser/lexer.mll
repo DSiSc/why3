@@ -36,12 +36,14 @@
         "exists", EXISTS;
         "export", EXPORT;
         "false", FALSE;
+        "float", FLOAT;
         "forall", FORALL;
         "function", FUNCTION;
         "goal", GOAL;
         "if", IF;
         "import", IMPORT;
         "in", IN;
+        "is", IS;
         "inductive", INDUCTIVE;
         "lemma", LEMMA;
         "let", LET;
@@ -51,6 +53,7 @@
         "not", NOT;
         "predicate", PREDICATE;
         "prop", PROP;
+        "range", RANGE;
         "so", SO;
         "then", THEN;
         "theory", THEORY;
@@ -146,14 +149,14 @@ rule token = parse
   | (digit+ as i) ("" as f) ['e' 'E'] (['-' '+']? digit+ as e)
   | (digit+ as i) '.' (digit* as f) (['e' 'E'] (['-' '+']? digit+ as e))?
   | (digit* as i) '.' (digit+ as f) (['e' 'E'] (['-' '+']? digit+ as e))?
-      { FLOAT (Number.real_const_dec i f
+      { REAL (Number.real_const_dec i f
           (Opt.map Lexlib.remove_leading_plus e)) }
   | '0' ['x' 'X'] (hexadigit+ as i) ("" as f) ['p' 'P'] (['-' '+']? digit+ as e)
   | '0' ['x' 'X'] (hexadigit+ as i) '.' (hexadigit* as f)
         (['p' 'P'] (['-' '+']? digit+ as e))?
   | '0' ['x' 'X'] (hexadigit* as i) '.' (hexadigit+ as f)
         (['p' 'P'] (['-' '+']? digit+ as e))?
-      { FLOAT (Number.real_const_hex i f
+      { REAL (Number.real_const_hex i f
           (Opt.map Lexlib.remove_leading_plus e)) }
   | "(*)"
       { LEFTPAR_STAR_RIGHTPAR }
@@ -244,10 +247,3 @@ rule token = parse
   let () = Env.register_format Env.base_language "why" ["why"] read_channel
     ~desc:"WhyML@ logical@ language"
 }
-
-(*
-Local Variables:
-compile-command: "unset LANG; make -C ../.. test"
-End:
-*)
-

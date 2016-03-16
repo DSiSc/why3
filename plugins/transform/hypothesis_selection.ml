@@ -514,18 +514,19 @@ module Select = struct
       This is the function directly used to filter axioms. *)
   let filter fTbl tTbl symTbl goal_clauses (gc,gp) decl =
     match decl.d_node with
-      | Dtype _ | Ddata _ | Dparam _ | Dlogic _ | Dind _ -> [decl]
-      | Dprop (Paxiom,_,fmla) -> (* filter only axioms *)
-          Format.eprintf "filter : @[%a@]@." Pretty.print_term fmla;
-          let goal_exprs = goal_clauses in
-          let return_value =
-            if is_pertinent_predicate symTbl goal_clauses gp fmla &&
-              is_pertinent_dynamic fTbl tTbl goal_exprs gc fmla
-            then [decl] else [] in
-          if return_value = [] then Format.eprintf "NO@.@."
-          else Format.eprintf "YES@.@.";
-          return_value
-      | Dprop(_,_,_) -> [decl]
+    | Dtype _ | Ddata _ | Dparam _ | Dlogic _ | Dind _ ->
+      [decl]
+    | Dprop (Paxiom,_,fmla) -> (* filter only axioms *)
+      Format.eprintf "filter : @[%a@]@." Pretty.print_term fmla;
+      let goal_exprs = goal_clauses in
+      let return_value =
+        if is_pertinent_predicate symTbl goal_clauses gp fmla &&
+           is_pertinent_dynamic fTbl tTbl goal_exprs gc fmla
+        then [decl] else [] in
+      if return_value = [] then Format.eprintf "NO@.@."
+      else Format.eprintf "YES@.@.";
+      return_value
+    | Dprop(_,_,_) -> [decl]
 end
 
 (** persistent incremental tables *)

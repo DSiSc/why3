@@ -822,12 +822,8 @@ let t_app ls tl ty = ignore (ls_app_inst ls tl ty); t_app ls tl ty
 let fs_app fs tl ty = t_app fs tl (Some ty)
 let ps_app ps tl    = t_app ps tl None
 
-let t_const c = match c with
-  | Number.ConstInt _  -> t_const c ty_int
-  | Number.ConstReal _ -> t_const c ty_real
-
 let t_nat_const n =
-  t_const (Number.ConstInt (Number.int_const_dec (string_of_int n)))
+  t_const (Number.ConstInt (Number.int_const_dec (string_of_int n))) ty_int
 
 let t_if f t1 t2 =
   t_ty_check t2 t1.t_ty;

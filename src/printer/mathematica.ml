@@ -168,7 +168,7 @@ let rec print_term info fmt t =
       | Some s -> syntax_arguments s term fmt []
       | None -> print_ident fmt id
     end
-  | Tapp ( { ls_name = id } ,[t] ) 
+  | Tapp ( { ls_name = id } ,[t] )
       when try String.sub id.id_string 0 6 = "index_" with Invalid_argument _
         -> false ->
             fprintf fmt "%a" term t
@@ -305,7 +305,7 @@ exception AlreadyDefined
 
 (* TODO *)
 let is_number = function
-  | Tyapp (ts, _) -> 
+  | Tyapp (ts, _) ->
       ts.ts_name.id_string = "int" || ts.ts_name.id_string = "real"
   | _ -> false
 
@@ -327,17 +327,16 @@ let filter_logic info ((params,funs,preds,types) as acc) (ls,ld) =
 
 let rec filter_hyp info params defs eqs hyps pr f =
   match f.t_node with
-  | Tapp(ls,[t1;t2]) when ls == ps_equ -> (* parameter definition *)
+  | Tapp(ls,[t1;t2]) when ls_equal ls ps_equ -> (* parameter definition *)
       let try_equality t1 t2 =
         match t1.t_node with
           | Tapp(l,[]) ->
               if Hid.mem defs l.ls_name then raise AlreadyDefined;
               Hid.add defs l.ls_name ();
-              t_s_fold (fun _ _ -> ()) (fun _ ls -> 
+              t_s_fold (fun _ _ -> ()) (fun _ ls ->
                   Hid.replace defs ls.ls_name ()) () t2;
               (* filters out the defined parameter *)
-              let params = List.filter (fun p -> p.ls_name <> l.ls_name) params 
-              in
+              let params = List.filter (fun p -> not (ls_equal p l)) params in
               (params, (pr,t1,t2)::eqs, hyps)
           | _ -> raise AlreadyDefined in
       begin try
@@ -356,7 +355,7 @@ let rec filter_hyp info params defs eqs hyps pr f =
          Mathematica's point of view and better delegated to a SAT solver. *)
       (params,eqs,hyps)
   | Ttrue -> (params,eqs,hyps)
-  | _ -> 
+  | _ ->
       (params, eqs, (pr,f)::hyps)
 
 type filter_goal =
@@ -366,29 +365,29 @@ type filter_goal =
 
 let filter_goal pr f =
   match f.t_node with
-    | Tapp(ps,[]) -> 
+    | Tapp(ps,[]) ->
         Goal_bad ("symbol " ^ ps.ls_name.Ident.id_string ^ " unknown")
         (* todo: filter more goals *)
-    | _ -> 
+    | _ ->
         Goal_good(pr,f)
 
 
 let prepare info defs ((params,funs,preds,eqs,hyps,goal,types) as acc) d =
   match d.d_node with
-    (*| Dtype [ts, Talgebraic csl] -> 
+    (*| Dtype [ts, Talgebraic csl] ->
         (params,funs,preds,eqs,hyps,goal,(ts,csl)::types)*)
-    (*| Dtype [ts, Tabstract] -> 
+    (*| Dtype [ts, Tabstract] ->
         printf "abst type: %a@\n" print_ident ts.ts_name;
         if Mid.mem ts.ts_name types then acc else
         let types = Mid.add (ts.ts_name,[]) types in
           (params,funs,preds,eqs,hyps,goal,types)*)
     | Dtype _ -> acc
-        
+
     | Dparam ls ->
         begin match ls.ls_args, ls.ls_value with
           | [], Some ty -> if is_number ty.ty_node then (* params *)
               (ls::params,funs,preds,eqs,hyps,goal,types)
-            else 
+            else
               acc
           | _ -> acc
         end
@@ -399,12 +398,12 @@ let prepare info defs ((params,funs,preds,eqs,hyps,goal,types) as acc) d =
           (filter_logic info) (params,funs,preds,types) dl
         in (params,funs,preds,eqs,hyps,goal,types)
     | Dprop (Paxiom, pr, f) ->
-        let (params,eqs,hyps) = filter_hyp info params defs eqs hyps pr f in 
+        let (params,eqs,hyps) = filter_hyp info params defs eqs hyps pr f in
         (params,funs,preds,eqs,hyps,goal,types)
     | Dprop (Pgoal, pr, f) ->
         begin
           match goal with
-            | Goal_none -> 
+            | Goal_none ->
                 let goal = filter_goal pr f in
                 (params,funs,preds,eqs,hyps,goal,types)
             | _ -> assert false
@@ -464,7 +463,7 @@ let print_type_def _info fmt (ts,csl) =
   let print_args fmt () =
     for i = 1 to alen do
       fprintf fmt ", v%d" i done in
-  let rec print_case fmt n = 
+  let rec print_case fmt n =
     if n > 1 then
       fprintf fmt "If[x == %d, v%d, %a]" n n print_case (n-1)
     else
@@ -478,7 +477,7 @@ let print_hyp info fmt (pr,f) =
   fprintf fmt "%a \\[Implies]@\n" (print_fmla info) f
 
 let is_integer = function
-  | Tyapp (ts, _) -> 
+  | Tyapp (ts, _) ->
       ts.ts_name.id_string = "int"
   | _ -> false
 
@@ -527,7 +526,7 @@ let print_task args ?old:_ fmt task =
   List.iter (print_fun_def  info fmt) (List.rev funs);
   List.iter (print_pred_def info fmt) (List.rev preds);
   List.iter (print_type_def info fmt) (List.rev types);
-  fprintf fmt 
+  fprintf fmt
     "@[<hov 2>vcWhy = %a(%a%a);@]@\n"
     (print_list nothing (print_hyp info)) (List.rev hyps)
     (*"@[<hov 2>vcWhy = (@\n%a%a@,);@]@\n" *)
@@ -535,7 +534,7 @@ let print_task args ?old:_ fmt task =
     (print_goal info) goal;
 
   (*fprintf fmt "@[<hov 2>varsWhy = {%a%s@ %a};@]@\n" *)
-  fprintf fmt "@[<hov 2>varsWhy = {%a};@]@\n" 
+  fprintf fmt "@[<hov 2>varsWhy = {%a};@]@\n"
     (print_list simple_comma (print_param info)) params;
     (*(if List.length params = 0 then "" else ",")
     (print_list simple_comma (print_var   info)) info.info_vars;*)

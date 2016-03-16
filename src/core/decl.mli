@@ -15,14 +15,31 @@ open Ident
 open Ty
 open Term
 
-(** {2 Type declaration} *)
+(** {2 Special type declaration} *)
+
+type range_decl = {
+  range_ts        : tysymbol;
+  range_to_int    : lsymbol;
+  range_lo        : BigInt.t;
+  range_hi        : BigInt.t;
+}
+
+type float_decl = {
+  float_ts        : tysymbol;
+  float_to_real   : lsymbol;
+  float_is_finite : lsymbol;
+  float_eb        : BigInt.t;
+  float_sb        : BigInt.t;
+}
+
+(** {2 Algebraic type declaration} *)
 
 type constructor = lsymbol * lsymbol option list
 (** constructor symbol with the list of projections *)
 
 type data_decl = tysymbol * constructor list
 
-(** {2 Logic symbols declaration} *)
+(** {2 Logic symbol declaration} *)
 
 type ls_defn
 
@@ -99,7 +116,7 @@ and decl_node = private
   | Dtype  of tysymbol          (** abstract types and aliases *)
   | Ddata  of data_decl list    (** recursive algebraic types *)
   | Dparam of lsymbol           (** abstract functions and predicates *)
-  | Dlogic of logic_decl list   (** defined functions and predicates (possibly recursively) *)
+  | Dlogic of logic_decl list   (** defined functions and predicates *)
   | Dind   of ind_list          (** (co)inductive predicates *)
   | Dprop  of prop_decl         (** axiom / lemma / goal *)
 
@@ -165,19 +182,25 @@ end
 type known_map = decl Mid.t
 
 val known_id : known_map -> ident -> unit
-val known_add_decl : known_map -> decl -> known_map
 val merge_known : known_map -> known_map -> known_map
+
+val known_add_decl : known_map -> decl -> known_map
 
 exception KnownIdent of ident
 exception UnknownIdent of ident
 exception RedeclaredIdent of ident
-exception NonFoundedTypeDecl of tysymbol
 
 val find_constructors : known_map -> tysymbol -> constructor list
 val find_inductive_cases : known_map -> lsymbol -> (prsymbol * term) list
 val find_logic_definition : known_map -> lsymbol -> ls_defn option
 val find_prop : known_map -> prsymbol -> term
 val find_prop_decl : known_map -> prsymbol -> prop_kind * term
+
+exception NonFoundedTypeDecl of tysymbol
+
+val check_positivity : known_map -> decl -> unit
+val check_foundness  : known_map -> decl -> unit
+val check_match      : known_map -> decl -> unit
 
 (** {2 Records} *)
 

@@ -1,0 +1,12 @@
+module Test_float
+
+ use import real.Real
+ use import real.Abs
+
+ use import ieee_float.Float32
+
+ goal g  : forall x:t. x = (0.5 : t)
+
+ goal i : not ((0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) = (1.0 : t))
+
+end

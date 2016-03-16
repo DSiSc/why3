@@ -1,0 +1,9 @@
+theory T
+
+   type f is float to_real, is_finite: 3, 3
+
+   type single is float to_real2, is_finite2: 8, 24
+
+   function (+) single single : single
+
+end

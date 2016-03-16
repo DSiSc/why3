@@ -76,6 +76,9 @@ theory bv.BV_Gen
 end
 
 theory bv.BV64
+  meta "literal:keep" type t
+
+  syntax literal t "#x%16x"
   syntax type t "(_ BitVec 64)"
 
   syntax function zeros "#x0000000000000000"
@@ -86,6 +89,9 @@ theory bv.BV64
 end
 
 theory bv.BV32
+  meta "literal:keep" type t
+
+  syntax literal t "#x%8x"
   syntax type t "(_ BitVec 32)"
 
   syntax function zeros "#x00000000"
@@ -96,6 +102,9 @@ theory bv.BV32
 end
 
 theory bv.BV16
+  meta "literal:keep" type t
+
+  syntax literal t "#x%4x"
   syntax type t "(_ BitVec 16)"
 
   syntax function zeros "#x0000"
@@ -106,6 +115,9 @@ theory bv.BV16
 end
 
 theory bv.BV8
+  meta "literal:keep" type t
+
+  syntax literal t (* "#b%8b"  *) "#x%2x"
   syntax type t "(_ BitVec 8)"
 
   syntax function zeros "#x00"
