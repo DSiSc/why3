@@ -532,7 +532,13 @@ module Checksum = struct
   (* start: T D R L I P (C M) *)
   let decl b d = match d.Decl.d_node with
     | Decl.Dtype ts ->
-        char b 'T'; tysymbol b ts
+      char b 'T'; tysymbol b ts
+    | Decl.Drange (ts,a',b',ls) ->
+      char b 'G';
+      tysymbol b ts;
+      lsymbol b ls;
+      string b (BigInt.to_string a');
+      string b (BigInt.to_string b')
     | Decl.Ddata ddl ->
         let constructor b (ls, l) = lsymbol b ls; list (option lsymbol) b l in
         let data_decl b (ts, cl) = tysymbol b ts; list constructor b cl in

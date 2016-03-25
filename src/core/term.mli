@@ -70,6 +70,7 @@ exception UncoveredVar of vsymbol
 exception BadArity of lsymbol * int
 exception FunctionSymbolExpected of lsymbol
 exception PredicateSymbolExpected of lsymbol
+exception OutOfRange of Number.integer_constant
 exception ConstructorExpected of lsymbol
 
 (** {2 Patterns} *)
@@ -203,6 +204,8 @@ val ls_app_inst : lsymbol -> term list -> ty option -> ty Mtv.t
 
 val t_var : vsymbol -> term
 val t_const : Number.constant -> term
+val t_range_const : Number.integer_constant ->
+  tysymbol -> BigInt.t -> BigInt.t -> lsymbol -> term
 val t_if : term -> term -> term -> term
 val t_let : term -> term_bound -> term
 val t_case : term -> term_branch list -> term

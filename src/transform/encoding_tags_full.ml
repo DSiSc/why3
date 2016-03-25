@@ -62,7 +62,7 @@ let deco_term kept tvar =
 
 let deco_decl kept d = match d.d_node with
   | Dtype { ts_def = Some _ } -> []
-  | Dtype ts -> [d; lsdecl_of_ts ts]
+  | Dtype ts | Drange (ts,_,_,_) -> [d; lsdecl_of_ts ts]
   | Ddata _ -> Printer.unsupportedDecl d
       "Algebraic types are not supported, run eliminate_algebraic"
   | Dparam _ -> [d]

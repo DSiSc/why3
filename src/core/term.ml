@@ -162,6 +162,7 @@ exception BadArity of lsymbol * int
 exception FunctionSymbolExpected of lsymbol
 exception PredicateSymbolExpected of lsymbol
 exception ConstructorExpected of lsymbol
+exception OutOfRange of Number.integer_constant
 
 let pat_app fs pl ty =
   let s = match fs.ls_value with
@@ -933,6 +934,19 @@ let t_pred_app pr t = t_equ (t_func_app pr t) t_bool_true
 let t_func_app_l fn tl = List.fold_left t_func_app fn tl
 let t_pred_app_l pr tl = t_equ (t_func_app_l pr tl) t_bool_true
 
+let t_range_const c ts a b ls =
+  let v = Number.compute_int c in
+  if BigInt.le a v && BigInt.le v b
+  then
+    let id = Ident.id_fresh "dummy" in
+    let ty = ty_app ts [] in
+    let vs = create_vsymbol id ty in
+    let t = t_equ (t_app ls [t_var vs] (Some ty_int))
+                  (t_const (Number.ConstInt c)) in
+    let bi = t_close_bound vs t in
+    t_eps bi
+  else raise (OutOfRange c)
+
 (** Term library *)
 
 (* generic map over types, symbols and variables *)
@@ -1639,4 +1653,3 @@ module TermTF = struct
   let tr_fold fnT fnF = tr_fold (t_selecti fnT fnF)
   let tr_map_fold fnT fnF = tr_map_fold (t_selecti fnT fnF)
 end
-

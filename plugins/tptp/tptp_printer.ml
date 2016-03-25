@@ -240,6 +240,8 @@ let print_decl info fmt d = match d.d_node with
       fprintf fmt "@[<hov 2>tff(%s, type,@ %a:@ %a).@]@\n@\n"
         (id_unique pr_printer ls.ls_name)
         print_symbol ls.ls_name print_sig ls
+  | Drange _ -> unsupportedDecl d
+      "TPTP does not support range types, use eliminate_epsilon"
   | Ddata _ -> unsupportedDecl d
       "TPTP does not support algebraic datatypes, use eliminate_algebraic"
   | Dlogic _ -> unsupportedDecl d

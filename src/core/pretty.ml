@@ -335,6 +335,11 @@ let print_ty_decl fmt ts =
     print_def ts.ts_def;
   forget_tvs ()
 
+let print_range_decl fmt (ts,a,b,_ls) =
+  fprintf fmt "@[<hov 2>type %a%a = %s .. %s@]"
+    print_ts ts print_id_labels ts.ts_name
+    (BigInt.to_string a) (BigInt.to_string b)
+
 let print_data_decl fst fmt (ts,csl) =
   fprintf fmt "@[<hov 2>%s %a%a%a =@\n@[<hov>%a@]@]"
     (if fst then "type" else "with") print_ts ts
@@ -404,6 +409,7 @@ let print_list_next sep print fmt = function
 
 let print_decl fmt d = match d.d_node with
   | Dtype ts  -> print_ty_decl fmt ts
+  | Drange ri -> print_range_decl fmt ri
   | Ddata tl  -> print_list_next newline print_data_decl fmt tl
   | Dparam ls -> print_param_decl fmt ls
   | Dlogic ll -> print_list_next newline print_logic_decl fmt ll
@@ -547,7 +553,8 @@ let () = Exn_printer.register
   | Term.FunctionSymbolExpected ls ->
       fprintf fmt "Not a function symbol: %a" print_ls ls
   | Term.PredicateSymbolExpected ls ->
-      fprintf fmt "Not a predicate symbol: %a" print_ls ls
+    fprintf fmt "Not a predicate symbol: %a" print_ls ls
+  | Term.OutOfRange c -> fprintf fmt "%a is out of range" print_const (ConstInt c)
   | Term.ConstructorExpected ls ->
       fprintf fmt "%s %a is not a constructor"
         (if ls.ls_value = None then "Predicate" else "Function") print_ls ls

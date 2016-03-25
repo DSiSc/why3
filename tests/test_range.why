@@ -1,5 +1,5 @@
 theory T
   type t = 0 .. 42
 
-  goal g : forall x:t. x = (57 : t)
+  goal g : forall x:t. x = (12 : t)
 end

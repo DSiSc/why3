@@ -260,6 +260,14 @@ let print_type_decl fmt ts =
   if not (query_remove ts.ts_name) then
     (print_type_decl fmt ts; forget_tvs ())
 
+let print_range_decl fmt (ts,a,b,_ls) =
+  if not (query_remove ts.ts_name) then begin
+    fprintf fmt "@[<hov 2>type %a%a = %s .. %s@]"
+      print_ts ts print_ident_labels ts.ts_name
+      (BigInt.to_string a) (BigInt.to_string b);
+    forget_tvs ()
+  end
+
 let print_data_decl fst fmt (ts,csl) =
   fprintf fmt "@[<hov 2>%s %a%a%a =@\n@[<hov>%a@]@]@\n@\n"
     (if fst then "type" else "with") print_ts ts
@@ -336,6 +344,7 @@ let print_list_next sep print fmt = function
 
 let print_decl fmt d = match d.d_node with
   | Dtype ts  -> print_type_decl fmt ts
+  | Drange ri -> print_range_decl fmt ri
   | Ddata tl  -> print_list_next nothing print_data_decl fmt tl
   | Dparam ls -> print_param_decl fmt ls
   | Dlogic ll -> print_list_next nothing print_logic_decl fmt ll

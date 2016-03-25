@@ -294,6 +294,8 @@ type prop_decl = prop_kind * prsymbol * term
 
 (** Declaration type *)
 
+type range_info = tysymbol * BigInt.t * BigInt.t * Term.lsymbol
+
 type decl = {
   d_node : decl_node;
   d_syms : Sid.t;         (* idents used in declaration *)
@@ -303,6 +305,7 @@ type decl = {
 
 and decl_node =
   | Dtype  of tysymbol          (* abstract types and aliases *)
+  | Drange of range_info        (* range types *)
   | Ddata  of data_decl list    (* recursive algebraic types *)
   | Dparam of lsymbol           (* abstract functions and predicates *)
   | Dlogic of logic_decl list   (* recursive functions and predicates *)
@@ -332,6 +335,8 @@ module Hsdecl = Hashcons.Make (struct
 
   let equal d1 d2 = match d1.d_node, d2.d_node with
     | Dtype  s1, Dtype  s2 -> ts_equal s1 s2
+    | Drange (ts1,a1,b1,ls1), Drange (ts2,a2,b2,ls2) ->
+      ts_equal ts1 ts2 && ls_equal ls1 ls2 && BigInt.eq a1 a2 && BigInt.eq b1 b2
     | Ddata  l1, Ddata  l2 -> Lists.equal eq_td l1 l2
     | Dparam s1, Dparam s2 -> ls_equal s1 s2
     | Dlogic l1, Dlogic l2 -> Lists.equal eq_ld l1 l2
@@ -356,6 +361,7 @@ module Hsdecl = Hashcons.Make (struct
 
   let hash d = match d.d_node with
     | Dtype  s -> ts_hash s
+    | Drange (ts,_a,_b,ls) -> Hashcons.combine (ts_hash ts) (ls_hash ls)
     | Ddata  l -> Hashcons.combine_list hs_td 3 l
     | Dparam s -> ls_hash s
     | Dlogic l -> Hashcons.combine_list hs_ld 5 l
@@ -416,6 +422,11 @@ let create_ty_decl ts =
   let syms = Opt.fold syms_ty Sid.empty ts.ts_def in
   let news = Sid.singleton ts.ts_name in
   mk_decl (Dtype ts) syms news
+
+let create_range_decl ((ts,_a,_b,ls) as ri) =
+  let syms = Sid.empty in
+  let news = Sid.add ls.ls_name (Sid.singleton ts.ts_name) in
+  mk_decl (Drange ri) syms news
 
 let create_data_decl tdl =
   if tdl = [] then raise EmptyDecl;
@@ -547,7 +558,7 @@ let create_prop_decl k p f =
 (** Utilities *)
 
 let decl_map fn d = match d.d_node with
-  | Dtype _ | Ddata _ | Dparam _ -> d
+  | Dtype _ | Drange _ | Ddata _ | Dparam _ -> d
   | Dlogic l ->
       let fn (ls,ld) =
         let vl,e,close = open_ls_defn_cb ld in
@@ -562,7 +573,7 @@ let decl_map fn d = match d.d_node with
       create_prop_decl k pr (fn f)
 
 let decl_fold fn acc d = match d.d_node with
-  | Dtype _ | Ddata _ | Dparam _ -> acc
+  | Dtype _ | Drange _ | Ddata _ | Dparam _ -> acc
   | Dlogic l ->
       let fn acc (_,ld) =
         let _,e = open_ls_defn ld in
@@ -582,7 +593,7 @@ let list_rpair_map_fold fn =
   Lists.map_fold_left fn
 
 let decl_map_fold fn acc d = match d.d_node with
-  | Dtype _ | Ddata _ | Dparam _ -> acc, d
+  | Dtype _ | Drange _ | Ddata _ | Dparam _ -> acc, d
   | Dlogic l ->
       let fn acc (ls,ld) =
         let vl,e,close = open_ls_defn_cb ld in
@@ -636,21 +647,27 @@ let known_add_decl kn0 decl =
 
 let find_constructors kn ts =
   match (Mid.find ts.ts_name kn).d_node with
-  | Dtype _ -> []
+  | Dtype _ | Drange _ -> []
   | Ddata dl -> List.assq ts dl
+  | Dparam _ | Dlogic _ | Dind _ | Dprop _ -> assert false
+
+let find_range_decl kn ts =
+  match (Mid.find ts.ts_name kn).d_node with
+  | Drange ri -> Some ri
+  | Dtype _ | Ddata _ -> None
   | Dparam _ | Dlogic _ | Dind _ | Dprop _ -> assert false
 
 let find_inductive_cases kn ps =
   match (Mid.find ps.ls_name kn).d_node with
   | Dind (_, dl) -> List.assq ps dl
   | Dlogic _ | Dparam _ | Ddata _ -> []
-  | Dtype _ | Dprop _ -> assert false
+  | Dtype _ | Drange _ | Dprop _ -> assert false
 
 let find_logic_definition kn ls =
   match (Mid.find ls.ls_name kn).d_node with
   | Dlogic dl -> Some (List.assq ls dl)
   | Dparam _ | Dind _ | Ddata _ -> None
-  | Dtype _ | Dprop _ -> assert false
+  | Dtype _ | Drange _ | Dprop _ -> assert false
 
 let find_prop kn pr =
   match (Mid.find pr.pr_name kn).d_node with
@@ -658,7 +675,7 @@ let find_prop kn pr =
       let test (_,l) = List.mem_assq pr l in
       List.assq pr (snd (List.find test dl))
   | Dprop (_,_,f) -> f
-  | Dtype _ | Ddata _ | Dparam _ | Dlogic _ -> assert false
+  | Dtype _ | Drange _ | Ddata _ | Dparam _ | Dlogic _ -> assert false
 
 let find_prop_decl kn pr =
   match (Mid.find pr.pr_name kn).d_node with
@@ -666,7 +683,7 @@ let find_prop_decl kn pr =
       let test (_,l) = List.mem_assq pr l in
       Paxiom, List.assq pr (snd (List.find test dl))
   | Dprop (k,_,f) -> k,f
-  | Dtype _ | Ddata _ | Dparam _ | Dlogic _ -> assert false
+  | Dtype _ | Drange _ | Ddata _ | Dparam _ | Dlogic _ -> assert false
 
 let check_match kn d =
   let rec check () t = match t.t_node with

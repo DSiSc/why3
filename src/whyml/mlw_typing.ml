@@ -683,7 +683,7 @@ let look_for_loc tdl s =
   let look loc d =
     let loc = look_id loc d.td_ident in
     match d.td_def with
-      | TDabstract | TDalias _ -> loc
+      | TDabstract | TDalias _ | TDrange _ -> loc
       | TDalgebraic csl -> List.fold_left look_cs loc csl
       | TDrecord fl -> List.fold_left look_fl loc fl
   in
@@ -713,7 +713,7 @@ let add_types ~wp uc tdl =
           | PTtyapp (q,tyl) -> List.fold_left check (ts_seen seen q) tyl
           | PTtuple tyl -> List.fold_left check seen tyl in
         let seen = match d.td_def with
-          | TDabstract | TDalgebraic _ | TDrecord _ -> seen
+          | TDabstract | TDrange _ | TDalgebraic _ | TDrecord _ -> seen
           | TDalias ty -> check (Mstr.add x false seen) ty in
         Mstr.add x true seen in
   ignore (Mstr.fold cyc_visit def Mstr.empty);
@@ -741,7 +741,7 @@ let add_types ~wp uc tdl =
       let imp =
         let td = Mstr.find x def in
         match td.td_def with
-        | TDabstract -> false
+        | TDabstract | TDrange _ -> false
         | TDalias ty -> check ty
         | TDalgebraic csl ->
             let check (_,_,gh,ty) = gh || check ty in
@@ -780,7 +780,7 @@ let add_types ~wp uc tdl =
       let mut =
         let td = Mstr.find x def in
         match td.td_def with
-        | TDabstract -> false
+        | TDabstract | TDrange _ -> false
         | TDalias ty -> check ty
         | TDalgebraic csl ->
             let check (_,_,_,ty) = check ty in
@@ -924,7 +924,7 @@ let add_types ~wp uc tdl =
             PT (create_itysymbol id ~abst ~priv ~inv ~ghost_reg vl rl None)
         | TDalgebraic _ | TDrecord _ when Hstr.find impures x ->
             PT (create_itysymbol id ~abst ~priv ~inv:false vl [] None)
-        | TDalgebraic _ | TDrecord _ | TDabstract ->
+        | TDalgebraic _ | TDrecord _ | TDabstract | TDrange _ ->
             TS (create_tysymbol id vl None)
       in
       Hstr.add tysymbols x (Some ts);

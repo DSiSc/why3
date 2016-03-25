@@ -41,6 +41,7 @@ let add_decl_with_tuples uc d =
   add_decl_with_tuples uc d
 
 let add_ty_decl uc ts      = add_decl_with_tuples uc (create_ty_decl ts)
+let add_range_decl uc rd   = add_decl_with_tuples uc (create_range_decl rd)
 let add_data_decl uc dl    = add_decl_with_tuples uc (create_data_decl dl)
 let add_param_decl uc ls   = add_decl_with_tuples uc (create_param_decl ls)
 let add_logic_decl uc dl   = add_decl_with_tuples uc (create_logic_decl dl)
@@ -359,7 +360,18 @@ let rec dterm uc gvars denv {term_desc = desc; term_loc = loc} =
   | Ptree.Tnamed (Lstr lab, e1) ->
       DTlabel (dterm uc gvars denv e1, Slab.singleton lab)
   | Ptree.Tcast (e1, ty) ->
-      DTcast (dterm uc gvars denv e1, ty_of_pty uc ty))
+    let e2 = dterm uc gvars denv e1 in
+    let dty = ty_of_pty uc ty in
+    try
+      match e2.dt_node, dty.ty_node with
+      | DTconst (Number.ConstInt c), Tyapp (ts, []) ->
+        begin match find_range_decl (get_known uc) ts with
+        | None -> raise Not_found
+        | Some ri -> DTrange_const (c, ri)
+        end
+      | _ -> raise Not_found
+    with Not_found ->
+      DTcast (e2, dty))
 
 (** Export for program parsing *)
 
@@ -430,18 +442,10 @@ let add_types dl th =
                   apply ty
             in
             create_tysymbol id vl (Some (apply ty))
-        | TDabstract | TDalgebraic _ ->
+        | TDabstract | TDalgebraic _ | TDrange _ ->
             create_tysymbol id vl None
         | TDrecord _ ->
           assert false
-        | TDrange (_a,_b) ->
-          assert false
-(*          let a_val = Number.compute_int a  in
-          let b_val = Number.compute_int b in
-          if BigInt.lt b_val a_val then
-            Loc.error ?loc:id.pre_loc (EmptyRange id.pre_name)
-          else
-            create_tysymbol id vl (TYrange (a_val,b_val)) *)
       in
       Hstr.add tysymbols x (Some ts);
       ts
@@ -459,7 +463,7 @@ let add_types dl th =
       Loc.error ~loc:(Mstr.find s def).td_loc (ClashSymbol s)
   in
   let csymbols = Hstr.create 17 in
-  let decl d (abstr,algeb,alias) =
+  let decl d (abstr,algeb,alias,range) =
     let ts = match Hstr.find tysymbols d.td_ident.id_str with
       | None ->
           assert false
@@ -467,8 +471,8 @@ let add_types dl th =
           ts
     in
     match d.td_def with
-      | TDabstract -> ts::abstr, algeb, alias
-      | TDalias _ -> abstr, algeb, ts::alias
+      | TDabstract -> ts::abstr, algeb, alias, range
+      | TDalias _ -> abstr, algeb, ts::alias, range
       | TDalgebraic cl ->
           let ht = Hstr.create 17 in
           let constr = List.length cl in
@@ -495,18 +499,25 @@ let add_types dl th =
             Hstr.replace csymbols id.id_str loc;
             create_fsymbol ~opaque ~constr (create_user_id id) tyl ty, pjl
           in
-          abstr, (ts, List.map constructor cl) :: algeb, alias
+          abstr, (ts, List.map constructor cl) :: algeb, alias, range
       | TDrecord _ ->
         assert false
-      | TDrange (_a,_b) ->
-        assert false
-(*          abstr, algeb, alias, ts::range *)
+      | TDrange (a,b) ->
+          let a_val = Number.compute_int a  in
+          let b_val = Number.compute_int b in
+          if BigInt.lt b_val a_val then
+            Loc.error ~loc:d.td_loc (EmptyRange d.td_ident.id_str)
+          else
+            let id = id_derive "to_int" ts.ts_name  in
+            let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
+            abstr, algeb, alias, (ts,a_val,b_val,ls)::range
   in
-  let abstr,algeb,alias = List.fold_right decl dl ([],[],[]) in
+  let abstr,algeb,alias,range = List.fold_right decl dl ([],[],[],[]) in
   try
     let th = List.fold_left add_ty_decl th abstr in
     let th = if algeb = [] then th else add_data_decl th algeb in
     let th = List.fold_left add_ty_decl th alias in
+    let th = List.fold_left add_range_decl th range in
     th
   with
     | ClashSymbol s ->

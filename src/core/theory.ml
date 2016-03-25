@@ -408,7 +408,7 @@ let check_decl_opacity d = match d.d_node with
   (* All lsymbols declared in Ddata are safe, nothing to check.
      We allow arbitrary ls_opaque in Dparam, but we check that
      cloning in theories preserves opacity, see cl_init below. *)
-  | Dtype _ | Ddata _ | Dparam _ | Dprop _ -> ()
+  | Dtype _ | Drange _ | Ddata _ | Dparam _ | Dprop _ -> ()
   | Dlogic dl ->
       let check (ols,ld) =
         let check () ls args value =
@@ -453,16 +453,19 @@ let add_decl ?(warn=true) uc d =
   check_decl_opacity d; (* we don't care about tasks *)
   let uc = add_tdecl uc (create_decl d) in
   match d.d_node with
-    | Dtype ts  -> add_symbol add_ts ts.ts_name ts uc
-    | Ddata dl  -> List.fold_left add_data uc dl
-    | Dparam ls -> add_symbol add_ls ls.ls_name ls uc
-    | Dlogic dl -> List.fold_left add_logic uc dl
-    | Dind (_, dl) -> List.fold_left add_ind uc dl
-    | Dprop ((k,pr,_) as p) ->
-      if warn && should_be_conservative uc.uc_name &&
-           should_be_conservative pr.pr_name
-      then warn_dubious_axiom uc k pr.pr_name d.d_syms;
-      add_prop uc p
+  | Dtype ts  -> add_symbol add_ts ts.ts_name ts uc
+  | Drange (ts,_,_,ls) ->
+    let uc = add_symbol add_ts ts.ts_name ts uc in
+    add_symbol add_ls ls.ls_name ls uc
+  | Ddata dl  -> List.fold_left add_data uc dl
+  | Dparam ls -> add_symbol add_ls ls.ls_name ls uc
+  | Dlogic dl -> List.fold_left add_logic uc dl
+  | Dind (_, dl) -> List.fold_left add_ind uc dl
+  | Dprop ((k,pr,_) as p) ->
+    if warn && should_be_conservative uc.uc_name &&
+       should_be_conservative pr.pr_name
+    then warn_dubious_axiom uc k pr.pr_name d.d_syms;
+    add_prop uc p
 
 (** Declaration constructors + add_decl *)
 
@@ -619,6 +622,12 @@ let cl_type cl inst ts =
     else raise (CannotInstantiate ts.ts_name);
   create_ty_decl (cl_find_ts cl ts)
 
+let cl_range cl inst (ts,a,b,ls) =
+  if Mts.mem ts inst.inst_ts then
+    raise (CannotInstantiate ts.ts_name);
+  (* TODO Andrei plz check *)
+  create_range_decl (cl_find_ts cl ts, a, b, cl_find_ls cl ls)
+
 let cl_data cl inst tdl =
   let add_ls ls =
     if Mls.mem ls inst.inst_ls then
@@ -686,6 +695,7 @@ let cl_prop cl inst (k,pr,f) =
 
 let cl_decl cl inst d = match d.d_node with
   | Dtype ts -> cl_type cl inst ts
+  | Drange ri -> cl_range cl inst ri
   | Ddata tdl -> cl_data cl inst tdl
   | Dparam ls -> cl_param cl inst ls
   | Dlogic ldl -> cl_logic cl inst ldl

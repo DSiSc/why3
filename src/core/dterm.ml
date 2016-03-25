@@ -176,6 +176,7 @@ and dterm_node =
   | DTvar of string * dty
   | DTgvar of vsymbol
   | DTconst of Number.constant
+  | DTrange_const of Number.integer_constant * Decl.range_info
   | DTapp of lsymbol * dterm list
   | DTfapp of dterm * dterm
   | DTif of dterm * dterm * dterm
@@ -293,13 +294,15 @@ let dpattern ?loc node =
 let dterm ?loc node =
   let get_dty = function
     | DTvar (_,dty) ->
-        Some dty
+      Some dty
     | DTgvar vs ->
-        Some (dty_of_ty vs.vs_ty)
+      Some (dty_of_ty vs.vs_ty)
     | DTconst (Number.ConstInt _) ->
-        Some dty_int
+      Some dty_int
     | DTconst (Number.ConstReal _) ->
-        Some dty_real
+      Some dty_real
+    | DTrange_const (_c, (ts,_a,_b,_ls)) ->
+      Some (dty_of_ty (Ty.ty_app ts []))
     | DTapp (ls,dtl) ->
         let dtyl, dty = specialize_ls ls in
         dty_unify_app ls dterm_expected_type dtl dtyl;
@@ -357,13 +360,6 @@ let dterm ?loc node =
            there is no need to count these constructs as "formulas" which
            require explicit if-then-else conversion to bool *)
       Some dty_bool
-(*    | DTcast ({ dt_node = DTconst (Number.ConstInt c) },
-              ({ ty_node = Tyapp ({ ts_def = TYrange (a,b) }, []) } as ty))
-      ->
-      let v = Number.compute_int c in
-      if BigInt.le a v && BigInt.le v b
-      then Some (dty_of_ty ty)
-      else Loc.errorm "Outside@ range" *)
     | DTcast (dt,ty) ->
         let dty = dty_of_ty ty in
         dterm_expected_type dt dty;
@@ -456,20 +452,6 @@ let t_label loc labs t =
   then t else t_label ?loc labs t
 
 let rec strip uloc labs dt = match dt.dt_node with
-(*  | DTcast ({ dt_node = DTconst (Number.ConstInt c) },
-            ({ ty_node = Tyapp ({ ts_def = TYrange (a,b) }, []) } as ty))
-    ->
-    let id = Ident.id_fresh "dummy" in
-    let dty = dty_of_ty ty in
-    let df = { dt_node = DTtrue;
-               dt_dty = None;
-               dt_loc = uloc; }
-    in
-    let dt = { dt_node = DTeps (id, dty, df);
-               dt_dty = Some dty;
-               dt_loc = uloc; }
-    in
-    uloc, labs, dt *)
   | DTcast (dt,_) -> strip uloc labs dt
   | DTuloc (dt,loc) -> strip (Some loc) labs dt
   | DTlabel (dt,s) -> strip uloc (Slab.union labs s) dt
@@ -497,7 +479,16 @@ and try_term strict keep_loc uloc env prop dty node =
   | DTgvar vs ->
       t_var vs
   | DTconst c ->
-      t_const c
+    t_const c
+  | DTrange_const (c, (ts,a,b,ls)) ->
+    t_range_const c ts a b ls
+      (* | DTcast ({ dt_node = DTconst (Number.ConstInt c) },
+              ({ ty_node = Tyapp ({ ts_def = TYrange (a,b) }, []) } as ty))
+      ->
+      let v = Number.compute_int c in
+      if BigInt.le a v && BigInt.le v b
+      then Some (dty_of_ty ty)
+      else Loc.errorm "Outside@ range" *)
   | DTapp (ls,[]) when ls_equal ls fs_bool_true ->
       if prop then t_true else t_bool_true
   | DTapp (ls,[]) when ls_equal ls fs_bool_false ->

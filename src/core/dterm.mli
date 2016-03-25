@@ -57,6 +57,7 @@ and dterm_node =
   | DTvar of string * dty
   | DTgvar of vsymbol
   | DTconst of Number.constant
+  | DTrange_const of Number.integer_constant * Decl.range_info
   | DTapp of lsymbol * dterm list
   | DTfapp of dterm * dterm
   | DTif of dterm * dterm * dterm

@@ -88,6 +88,8 @@ type prop_decl = prop_kind * prsymbol * term
 
 (** {2 Declaration type} *)
 
+type range_info = tysymbol * BigInt.t * BigInt.t * Term.lsymbol
+
 type decl = private {
   d_node : decl_node;
   d_syms : Sid.t;         (** idents used in declaration *)
@@ -97,6 +99,7 @@ type decl = private {
 
 and decl_node = private
   | Dtype  of tysymbol          (** abstract types and aliases *)
+  | Drange of range_info        (** range types *)
   | Ddata  of data_decl list    (** recursive algebraic types *)
   | Dparam of lsymbol           (** abstract functions and predicates *)
   | Dlogic of logic_decl list   (** defined functions and predicates (possibly recursively) *)
@@ -114,7 +117,7 @@ val d_hash : decl -> int
 (** {2 Declaration constructors} *)
 
 val create_ty_decl : tysymbol -> decl
-(* val create_range_decl : tysymbol * BigInt.t * BigInt.t -> decl *)
+val create_range_decl : range_info -> decl
 val create_data_decl : data_decl list -> decl
 val create_param_decl : lsymbol -> decl
 val create_logic_decl : logic_decl list -> decl
@@ -175,6 +178,7 @@ exception RedeclaredIdent of ident
 exception NonFoundedTypeDecl of tysymbol
 
 val find_constructors : known_map -> tysymbol -> constructor list
+val find_range_decl : known_map -> tysymbol -> range_info option
 val find_inductive_cases : known_map -> lsymbol -> (prsymbol * term) list
 val find_logic_definition : known_map -> lsymbol -> ls_defn option
 val find_prop : known_map -> prsymbol -> term
