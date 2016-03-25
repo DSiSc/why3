@@ -39,7 +39,7 @@ and pdecl_node =
 
 let pd_equal : pdecl -> pdecl -> bool = (==)
 
-let ts_mark = create_tysymbol (id_fresh "'mark") [] TYabstract
+let ts_mark = create_tysymbol (id_fresh "'mark") [] None
 let ty_mark = ty_app ts_mark []
 let ity_mark = ity_pur ts_mark []
 
@@ -321,3 +321,4 @@ let known_add_decl lkn kn d =
   let kn = known_add_decl lkn kn d in
   check_match lkn kn d;
   kn
+

@@ -625,16 +625,15 @@ let print_type_decl ~prev info fmt ts = ignore (prev);
   if not (is_ts_tuple ts) then begin
     print_name fmt ts.ts_name;
     match ts.ts_def with
-    | TYabstract ->
+    | None ->
         fprintf fmt "@[<hov 2>%a%a: TYPE+"
           print_ts ts print_params_list ts.ts_args;
         realization fmt info prev;
         fprintf fmt "@]@\n@\n"
-    | TYalias ty ->
+    | Some ty ->
         fprintf fmt "@[<hov 2>%a%a: TYPE+ =@ %a@]@\n@\n"
           print_ts ts print_params_list ts.ts_args
           (print_ty info) ty
-    | TYrange _ -> unsupported "you must eliminate range types"
   end
 
 let print_type_decl ~prev info fmt ts =

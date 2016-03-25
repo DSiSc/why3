@@ -45,15 +45,13 @@ let tv_of_string =
 type tysymbol = {
   ts_name : ident;
   ts_args : tvsymbol list;
-  ts_def  : ty_def;
+  ts_def  : ty option;
 }
 
 and ty = {
   ty_node : ty_node;
   ty_tag  : Weakhtbl.tag;
 }
-
-and ty_def = TYabstract | TYalias of ty | TYrange of BigInt.t * BigInt.t
 
 and ty_node =
   | Tyvar of tvsymbol
@@ -158,26 +156,18 @@ let create_tysymbol name args def =
   let add s v = Stv.add_new (DuplicateTypeVar v) v s in
   let s = List.fold_left add Stv.empty args in
   let check v = Stv.mem v s || raise (UnboundTypeVar v) in
-  begin match def with
-  | TYalias ty -> ignore (ty_v_all check ty)
-  | TYabstract | TYrange _ -> ()
-  end;
+  ignore (Opt.map (ty_v_all check) def);
   mk_ts name args def
 
 let ty_app s tl = match s.ts_def with
-  | TYalias ty ->
+  | Some ty ->
       let mv = try List.fold_right2 Mtv.add s.ts_args tl Mtv.empty with
         | Invalid_argument _ -> raise (BadTypeArity (s, List.length tl)) in
       ty_full_inst mv ty
-  | TYabstract ->
+  | None ->
       if List.length s.ts_args <> List.length tl then
         raise (BadTypeArity (s, List.length tl));
       ty_app s tl
-  | TYrange _ ->
-    if List.length tl <> 0 then
-      raise (BadTypeArity (s, 0))
-    else
-      ty_app s []
 
 (* symbol-wise map/fold *)
 
@@ -218,9 +208,9 @@ let ty_match s ty1 ty2 =
 
 (* built-in symbols *)
 
-let ts_int  = create_tysymbol (id_fresh "int")  [] TYabstract
-let ts_real = create_tysymbol (id_fresh "real") [] TYabstract
-let ts_bool = create_tysymbol (id_fresh "bool") [] TYabstract
+let ts_int  = create_tysymbol (id_fresh "int")  [] None
+let ts_real = create_tysymbol (id_fresh "real") [] None
+let ts_bool = create_tysymbol (id_fresh "bool") [] None
 
 let ty_int  = ty_app ts_int  []
 let ty_real = ty_app ts_real []
@@ -229,13 +219,13 @@ let ty_bool = ty_app ts_bool []
 let ts_func =
   let tv_a = create_tvsymbol (id_fresh "a") in
   let tv_b = create_tvsymbol (id_fresh "b") in
-  create_tysymbol (id_fresh "func") [tv_a;tv_b] TYabstract
+  create_tysymbol (id_fresh "func") [tv_a;tv_b] None
 
 let ty_func ty_a ty_b = ty_app ts_func [ty_a;ty_b]
 
 let ts_pred =
   let tv_a = create_tvsymbol (id_fresh "a") in
-  let def = TYalias (ty_func (ty_var tv_a) ty_bool) in
+  let def = Some (ty_func (ty_var tv_a) ty_bool) in
   create_tysymbol (id_fresh "pred") [tv_a] def
 
 let ty_pred ty_a = ty_app ts_pred [ty_a]
@@ -245,7 +235,7 @@ let ts_tuple_ids = Hid.create 17
 let ts_tuple = Hint.memo 17 (fun n ->
   let vl = ref [] in
   for _i = 1 to n do vl := create_tvsymbol (id_fresh "a") :: !vl done;
-  let ts = create_tysymbol (id_fresh ("tuple" ^ string_of_int n)) !vl TYabstract in
+  let ts = create_tysymbol (id_fresh ("tuple" ^ string_of_int n)) !vl None in
   Hid.add ts_tuple_ids ts.ts_name n;
   ts)
 
@@ -278,3 +268,4 @@ let oty_cons = Opt.fold (fun tl t -> t::tl)
 
 let ty_equal_check ty1 ty2 =
   if not (ty_equal ty1 ty2) then raise (TypeMismatch (ty1, ty2))
+

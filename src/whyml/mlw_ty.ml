@@ -411,9 +411,8 @@ let ity_pur s tl =
   let sub = { ity_subst_tv = mv; ity_subst_reg = Mreg.empty } in
   (* every top region in def is guaranteed to be in mr *)
   match s.ts_def with
-  | TYalias ty -> ity_full_inst sub (ity_of_ty ty)
-  | TYabstract -> ity_pur_unsafe s tl
-  | TYrange _ -> assert false   (* fixme *)
+  | Some ty -> ity_full_inst sub (ity_of_ty ty)
+  | None -> ity_pur_unsafe s tl
 
 (* itysymbol creation *)
 
@@ -436,10 +435,7 @@ let create_itysymbol_unsafe, restore_its =
 let create_itysymbol name
       ?(abst=false) ?(priv=false) ?(inv=false) ?(ghost_reg=Sreg.empty)
       args regs def =
-  let puredef = match def with
-    | None -> TYabstract
-    | Some ty -> TYalias (ty_of_ity ty)
-  in
+  let puredef = Opt.map ty_of_ity def in
   let purets = create_tysymbol name args puredef in
   (* all regions *)
   let add s r = Sreg.add_new (DuplicateRegion r) r s in

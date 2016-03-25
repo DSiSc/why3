@@ -376,17 +376,10 @@ let print_ind_decls info s fmt tl =
 
 let print_type_decl info fmt ts =
   if not (Mid.mem ts.ts_name info.info_syn || is_ts_tuple ts) then
-    begin match ts.ts_def with
-    | TYabstract ->
-      (elem "typedecl" (print_ts info)
-         print_tparams fmt (ts, ts.ts_args))
-    | TYalias ty ->
-      (elem "typedecl" (print_ts info)
-         (pair print_tparams (print_ty info))
-         fmt (ts, (ts.ts_args, ty)))
-    | TYrange _ -> unsupported "you must eliminate range types"
-    end;
-  forget_tvs ()
+    (elem "typedecl" (print_ts info)
+       (pair print_tparams (print_option (print_ty info)))
+       fmt (ts, (ts.ts_args, ts.ts_def));
+     forget_tvs ())
 
 let print_param_decl info fmt ls =
   if not (Mid.mem ls.ls_name info.info_syn) then

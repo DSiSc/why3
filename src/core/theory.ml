@@ -311,8 +311,8 @@ let close_namespace uc import =
 (* Base constructors *)
 
 let known_ts kn ts = match ts.ts_def with
-  | TYalias ty -> ty_s_fold (fun () ts -> known_id kn ts.ts_name) () ty
-  | TYabstract | TYrange _ -> known_id kn ts.ts_name
+  | Some ty -> ty_s_fold (fun () ts -> known_id kn ts.ts_name) () ty
+  | None -> known_id kn ts.ts_name
 
 let known_clone kn sm =
   Mts.iter (fun _ ts -> known_ts kn ts) sm.sm_ts;
@@ -435,7 +435,7 @@ let warn_dubious_axiom uc k p syms =
         (fun id ->
           if Sid.mem id uc.uc_local then
           match (Ident.Mid.find id uc.uc_known).d_node with
-          | Dtype { ts_def = TYabstract } | Dparam _ ->
+          | Dtype { ts_def = None } | Dparam _ ->
             raise Exit
           | _ -> ())
         syms;
@@ -454,7 +454,6 @@ let add_decl ?(warn=true) uc d =
   let uc = add_tdecl uc (create_decl d) in
   match d.d_node with
     | Dtype ts  -> add_symbol add_ts ts.ts_name ts uc
-    (* | Drange (ts,_a,_b) -> add_symbol add_ts ts.ts_name ts uc *)
     | Ddata dl  -> List.fold_left add_data uc dl
     | Dparam ls -> add_symbol add_ls ls.ls_name ls uc
     | Dlogic dl -> List.fold_left add_logic uc dl
@@ -532,18 +531,12 @@ let empty_clones s = {
 
 let rec cl_find_ts cl ts =
   if not (Sid.mem ts.ts_name cl.cl_local) then
-    match ts.ts_def with
-      | TYalias ty -> let newty = cl_trans_ty cl ty in
-        if ty_equal ty newty then ts
-        else
-          create_tysymbol (id_clone ts.ts_name) ts.ts_args (TYalias newty)
-      | TYabstract | TYrange _ -> ts
+    let td = Opt.map (cl_trans_ty cl) ts.ts_def in
+    if Opt.equal ty_equal ts.ts_def td then ts else
+    create_tysymbol (id_clone ts.ts_name) ts.ts_args td
   else try Mts.find ts cl.ts_table
   with Not_found ->
-    let td' = match ts.ts_def with
-      | TYalias ty -> TYalias (cl_trans_ty cl ty)
-      | TYabstract | TYrange _ -> ts.ts_def
-    in
+    let td' = Opt.map (cl_trans_ty cl) ts.ts_def in
     let ts' = create_tysymbol (id_clone ts.ts_name) ts.ts_args td' in
     cl.ts_table <- Mts.add ts ts' cl.ts_table;
     ts'
@@ -622,7 +615,7 @@ let cl_init th inst =
 
 let cl_type cl inst ts =
   if Mts.mem ts inst.inst_ts then
-    if ts.ts_def = TYabstract then raise EmptyDecl
+    if ts.ts_def = None then raise EmptyDecl
     else raise (CannotInstantiate ts.ts_name);
   create_ty_decl (cl_find_ts cl ts)
 
@@ -722,7 +715,7 @@ let warn_clone_not_abstract loc th =
     List.iter (fun d -> match d.td_node with
       | Decl d ->
         begin match d.d_node with
-        | Dtype { ts_def = TYabstract }
+        | Dtype { ts_def = None }
         | Dparam _ -> raise Exit
         | Dprop(Paxiom, _,_) -> raise Exit
         | _ -> ()
@@ -904,7 +897,7 @@ let tuple_theory = Hint.memo 17 (fun n ->
 
 let unit_theory =
   let uc = empty_theory (id_fresh "Unit") ["why3";"Unit"] in
-  let ts = create_tysymbol (id_fresh "unit") [] (TYalias (ty_tuple [])) in
+  let ts = create_tysymbol (id_fresh "unit") [] (Some (ty_tuple [])) in
   let uc = use_export uc (tuple_theory 0) in
   let uc = add_ty_decl uc ts in
   close_theory uc

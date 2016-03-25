@@ -495,23 +495,18 @@ let rec ity_of_ty ty = match ty.ty_node with
         invalid_arg "Ity.ity_of_ty" in
       ity_pur_unsafe s (List.map ity_of_ty tl)
 
-let ity_of_ty_def tyd = match tyd with
-  | TYalias ty -> Some (ity_of_ty ty)
-  | TYabstract -> None
-  | TYrange _ -> assert false   (* fixme *)
-
 let its_of_ts ts imm =
   let tl = List.map Util.ttrue ts.ts_args in
   let il = if imm then tl else List.map Util.ffalse ts.ts_args in
   create_its ~ts ~pm:false ~mfld:[] ~regs:[] ~aimm:il ~aexp:tl ~avis:tl
-          ~afrz:tl ~rvis:[] ~rfrz:[] ~def:(ity_of_ty_def ts.ts_def)
+          ~afrz:tl ~rvis:[] ~rfrz:[] ~def:(Opt.map ity_of_ty ts.ts_def)
 
 let create_itysymbol_pure id args =
-  its_of_ts (create_tysymbol id args TYabstract) true
+  its_of_ts (create_tysymbol id args None) true
 
 let create_itysymbol_alias id args def =
   (* FIXME? should we compute [arg|reg]_[imm|exp|vis|frz]? *)
-  let ts = create_tysymbol id args (TYalias (ty_of_ity def)) in
+  let ts = create_tysymbol id args (Some (ty_of_ity def)) in
   let regs = Sreg.elements (let add_r s r = Sreg.add r s in
     match def.ity_node with
     | Ityreg reg -> reg_r_fold add_r Sreg.empty reg
@@ -524,7 +519,7 @@ let create_itysymbol_alias id args def =
 exception ImpureField of ity
 
 let create_itysymbol_rich id args pm flds =
-  let ts = create_tysymbol id args TYabstract in
+  let ts = create_tysymbol id args None in
   let collect_vis fn acc =
     Mpv.fold (fun f _ a -> if f.pv_ghost then a else fn a f.pv_ity) flds acc in
   let collect_imm fn acc =
