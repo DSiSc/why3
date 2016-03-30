@@ -294,7 +294,14 @@ type prop_decl = prop_kind * prsymbol * term
 
 (** Declaration type *)
 
-type range_info = tysymbol * BigInt.t * BigInt.t * Term.lsymbol
+type range_info = {
+  range_ts       : tysymbol;
+  range_low_val  : BigInt.t;
+  range_low_cst  : Number.integer_constant;
+  range_high_val : BigInt.t;
+  range_high_cst : Number.integer_constant;
+  range_proj     : Term.lsymbol;
+}
 
 type decl = {
   d_node : decl_node;
@@ -335,8 +342,11 @@ module Hsdecl = Hashcons.Make (struct
 
   let equal d1 d2 = match d1.d_node, d2.d_node with
     | Dtype  s1, Dtype  s2 -> ts_equal s1 s2
-    | Drange (ts1,a1,b1,ls1), Drange (ts2,a2,b2,ls2) ->
-      ts_equal ts1 ts2 && ls_equal ls1 ls2 && BigInt.eq a1 a2 && BigInt.eq b1 b2
+    | Drange ri1, Drange ri2 ->
+      ts_equal ri1.range_ts ri2.range_ts &&
+      ls_equal ri1.range_proj ri2.range_proj &&
+      BigInt.eq ri1.range_low_val ri2.range_low_val &&
+      BigInt.eq ri1.range_high_val ri2.range_high_val
     | Ddata  l1, Ddata  l2 -> Lists.equal eq_td l1 l2
     | Dparam s1, Dparam s2 -> ls_equal s1 s2
     | Dlogic l1, Dlogic l2 -> Lists.equal eq_ld l1 l2
@@ -361,7 +371,7 @@ module Hsdecl = Hashcons.Make (struct
 
   let hash d = match d.d_node with
     | Dtype  s -> ts_hash s
-    | Drange (ts,_a,_b,ls) -> Hashcons.combine (ts_hash ts) (ls_hash ls)
+    | Drange ri -> Hashcons.combine (ts_hash ri.range_ts) (ls_hash ri.range_proj)
     | Ddata  l -> Hashcons.combine_list hs_td 3 l
     | Dparam s -> ls_hash s
     | Dlogic l -> Hashcons.combine_list hs_ld 5 l
@@ -423,9 +433,9 @@ let create_ty_decl ts =
   let news = Sid.singleton ts.ts_name in
   mk_decl (Dtype ts) syms news
 
-let create_range_decl ((ts,_a,_b,ls) as ri) =
+let create_range_decl ri =
   let syms = Sid.empty in
-  let news = Sid.add ls.ls_name (Sid.singleton ts.ts_name) in
+  let news = Sid.add ri.range_proj.ls_name (Sid.singleton ri.range_ts.ts_name) in
   mk_decl (Drange ri) syms news
 
 let create_data_decl tdl =

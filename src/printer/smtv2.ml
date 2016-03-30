@@ -374,8 +374,13 @@ let rec print_term info fmt t =
             (print_branches info subject print_term) bl;
           forget_var info subject
     end
-  | Teps _ -> unsupportedTerm t
-      "smtv2: you must eliminate epsilon"
+  | Teps _ ->
+(*  | Teps _ as t ->
+    if t_is_range_lit t then
+      (* look for syntax literal ty in driver *)
+    else *)
+      unsupportedTerm t
+        "smtv2: you must eliminate epsilon"
   | Tquant _ | Tbinop _ | Tnot _ | Ttrue | Tfalse -> raise (TermExpected t)
   in
 

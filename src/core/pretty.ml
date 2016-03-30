@@ -131,15 +131,21 @@ let rec print_ty_node pri fmt ty = match ty.ty_node with
 
 let print_ty fmt ty = print_ty_node 0 fmt ty
 
+let print_integer_constant fmt = function
+  | IConstDec s -> fprintf fmt "%s" s
+  | IConstHex s -> fprintf fmt "0x%s" s
+  | IConstOct s -> fprintf fmt "0o%s" s
+  | IConstBin s -> fprintf fmt "0b%s" s
+
+let print_real_constant fmt = function
+  | RConstDec (i,f,None) -> fprintf fmt "%s.%s" i f
+  | RConstDec (i,f,Some e) -> fprintf fmt "%s.%se%s" i f e
+  | RConstHex (i,f,Some e) -> fprintf fmt "0x%s.%sp%s" i f e
+  | RConstHex (i,f,None) -> fprintf fmt "0x%s.%s" i f
+
 let print_const fmt = function
-  | ConstInt (IConstDec s) -> fprintf fmt "%s" s
-  | ConstInt (IConstHex s) -> fprintf fmt "0x%s" s
-  | ConstInt (IConstOct s) -> fprintf fmt "0o%s" s
-  | ConstInt (IConstBin s) -> fprintf fmt "0b%s" s
-  | ConstReal (RConstDec (i,f,None)) -> fprintf fmt "%s.%s" i f
-  | ConstReal (RConstDec (i,f,Some e)) -> fprintf fmt "%s.%se%s" i f e
-  | ConstReal (RConstHex (i,f,Some e)) -> fprintf fmt "0x%s.%sp%s" i f e
-  | ConstReal (RConstHex (i,f,None)) -> fprintf fmt "0x%s.%s" i f
+  | ConstInt c -> print_integer_constant fmt c
+  | ConstReal c -> print_real_constant fmt c
 
 (* can the type of a value be derived from the type of the arguments? *)
 let unambig_fs fs =
@@ -335,10 +341,10 @@ let print_ty_decl fmt ts =
     print_def ts.ts_def;
   forget_tvs ()
 
-let print_range_decl fmt (ts,a,b,_ls) =
-  fprintf fmt "@[<hov 2>type %a%a = %s .. %s@]"
-    print_ts ts print_id_labels ts.ts_name
-    (BigInt.to_string a) (BigInt.to_string b)
+let print_range_decl fmt ri =
+  fprintf fmt "@[<hov 2>type %a%a = %a .. %a@]"
+    print_ts ri.range_ts print_id_labels ri.range_ts.ts_name
+    print_integer_constant ri.range_low_cst print_integer_constant ri.range_high_cst
 
 let print_data_decl fst fmt (ts,csl) =
   fprintf fmt "@[<hov 2>%s %a%a%a =@\n@[<hov>%a@]@]"

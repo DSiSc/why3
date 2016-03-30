@@ -309,6 +309,10 @@ val t_pred_app : term -> term -> term  (* prop-typed application *)
 val t_func_app_l : term -> term list -> term  (* value-typed application *)
 val t_pred_app_l : term -> term list -> term  (* prop-typed application *)
 
+val t_is_range_lit : term -> bool
+(** [t_is_range_lit t] returns [true] if [t] is an epsilon term
+    representing a range literal. *)
+
 (** {2 Lambda-term manipulation} *)
 
 val t_lambda : vsymbol list -> trigger -> term -> term

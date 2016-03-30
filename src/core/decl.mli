@@ -88,7 +88,14 @@ type prop_decl = prop_kind * prsymbol * term
 
 (** {2 Declaration type} *)
 
-type range_info = tysymbol * BigInt.t * BigInt.t * Term.lsymbol
+type range_info = {
+  range_ts       : tysymbol;
+  range_low_val  : BigInt.t;
+  range_low_cst  : Number.integer_constant;
+  range_high_val : BigInt.t;
+  range_high_cst : Number.integer_constant;
+  range_proj     : Term.lsymbol;
+}
 
 type decl = private {
   d_node : decl_node;

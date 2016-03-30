@@ -1,5 +1,11 @@
 theory T
+  use import int.Int
+
+  type q
+
   type t = 0 .. 42
+
+  (* meta "range:keep" type t *)
 
   goal g : forall x:t. x = (12 : t)
 end

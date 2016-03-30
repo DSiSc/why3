@@ -131,6 +131,8 @@ let fold tenv taskpre task =
         | Dtype { ts_def = Some _ }
         | Dtype { ts_args = _::_ } -> task
         | Dtype ts -> add_ty_decl task ts
+        | Drange _ ->
+          Printer.unsupportedDecl d "use eliminate_range"
         | Ddata _ ->
           Printer.unsupportedDecl d "use eliminate_algebraic"
         | Dparam ls ->

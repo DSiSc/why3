@@ -510,7 +510,14 @@ let add_types dl th =
           else
             let id = id_derive "to_int" ts.ts_name  in
             let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
-            abstr, algeb, alias, (ts,a_val,b_val,ls)::range
+            let ri = { range_ts = ts;
+                       range_low_cst = a;
+                       range_low_val = a_val;
+                       range_high_cst = b;
+                       range_high_val = b_val;
+                       range_proj = ls
+            } in
+            abstr, algeb, alias, ri::range
   in
   let abstr,algeb,alias,range = List.fold_right decl dl ([],[],[],[]) in
   try

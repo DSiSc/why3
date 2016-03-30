@@ -193,7 +193,10 @@ let print_param_decl info fmt ls =
 
 let print_decl info fmt d = match d.d_node with
   | Dtype ts ->
-      print_type_decl info fmt ts
+    print_type_decl info fmt ts
+  | Drange _ ->
+    Printer.unsupportedDecl d
+      "smtv1: range types are not supported"
   | Ddata _ -> unsupportedDecl d
       "smtv1 : algebraic types are not supported"
   | Dparam ls ->

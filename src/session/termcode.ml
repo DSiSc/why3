@@ -457,6 +457,11 @@ module Checksum = struct
     | CV1 -> ident_v1 b id
     | CV2 -> ident_v2 b id
 
+  let integer_constant b c =
+      Format.fprintf Format.str_formatter "%a" Pretty.print_integer_constant c;
+      let s = Format.flush_str_formatter () in
+      string b s
+
   let const b c =
       Format.fprintf Format.str_formatter "%a" Pretty.print_const c;
       let s = Format.flush_str_formatter () in
@@ -533,12 +538,12 @@ module Checksum = struct
   let decl b d = match d.Decl.d_node with
     | Decl.Dtype ts ->
       char b 'T'; tysymbol b ts
-    | Decl.Drange (ts,a',b',ls) ->
+    | Decl.Drange ri ->
       char b 'G';
-      tysymbol b ts;
-      lsymbol b ls;
-      string b (BigInt.to_string a');
-      string b (BigInt.to_string b')
+      tysymbol b ri.Decl.range_ts;
+      lsymbol b ri.Decl.range_proj;
+      integer_constant b ri.Decl.range_low_cst;
+      integer_constant b ri.Decl.range_high_cst
     | Decl.Ddata ddl ->
         let constructor b (ls, l) = lsymbol b ls; list (option lsymbol) b l in
         let data_decl b (ts, cl) = tysymbol b ts; list constructor b cl in

@@ -454,9 +454,9 @@ let add_decl ?(warn=true) uc d =
   let uc = add_tdecl uc (create_decl d) in
   match d.d_node with
   | Dtype ts  -> add_symbol add_ts ts.ts_name ts uc
-  | Drange (ts,_,_,ls) ->
-    let uc = add_symbol add_ts ts.ts_name ts uc in
-    add_symbol add_ls ls.ls_name ls uc
+  | Drange ri ->
+    let uc = add_symbol add_ts ri.range_ts.ts_name ri.range_ts uc in
+    add_symbol add_ls ri.range_proj.ls_name ri.range_proj uc
   | Ddata dl  -> List.fold_left add_data uc dl
   | Dparam ls -> add_symbol add_ls ls.ls_name ls uc
   | Dlogic dl -> List.fold_left add_logic uc dl
@@ -622,11 +622,13 @@ let cl_type cl inst ts =
     else raise (CannotInstantiate ts.ts_name);
   create_ty_decl (cl_find_ts cl ts)
 
-let cl_range cl inst (ts,a,b,ls) =
-  if Mts.mem ts inst.inst_ts then
-    raise (CannotInstantiate ts.ts_name);
+let cl_range cl inst ri =
+  if Mts.mem ri.range_ts inst.inst_ts then
+    raise (CannotInstantiate ri.range_ts.ts_name);
   (* TODO Andrei plz check *)
-  create_range_decl (cl_find_ts cl ts, a, b, cl_find_ls cl ls)
+  create_range_decl { ri with
+                      range_ts = cl_find_ts cl ri.range_ts;
+                      range_proj = cl_find_ls cl ri.range_proj }
 
 let cl_data cl inst tdl =
   let add_ls ls =
