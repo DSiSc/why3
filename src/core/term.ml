@@ -1329,18 +1329,30 @@ let t_replace t1 t2 t =
 
 (* range litteral *)
 
-let t_is_range_lit t =
+let t_open_range_lit t =
   match t.t_node with
   | Teps tb ->
     let (v,t) = t_open_bound tb in
     begin match t.t_node with
       (* look for term of the form 'f v = const' *)
       (* fixme: check that ls' is the projection of a range type *)
-      | Tapp (ls, [ { t_node = Tapp (_ls', [ { t_node = Tvar v' } ]) }; { t_node = Tconst _c } ])
-        -> ls_equal ls ps_equ && vs_equal v v'
-      | _ -> false
+      | Tapp (ls, [ { t_node = Tapp (_ls', [ { t_node = Tvar v' } ]) };
+                    { t_node = Tconst _c } ])
+        -> if ls_equal ls ps_equ && vs_equal v v'
+        then
+          begin
+            match v.vs_ty.ty_node with
+            | Tyapp (ty, []) -> ty
+            | _ -> raise Not_found
+          end
+        else raise Not_found
+      | _ -> raise Not_found
     end
-  | _ -> false
+  | _ -> raise Not_found
+
+let t_is_range_lit t =
+  try let _ = t_open_range_lit t in true
+  with Not_found -> false
 
 (* lambdas *)
 

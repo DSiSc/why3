@@ -374,13 +374,20 @@ let rec print_term info fmt t =
             (print_branches info subject print_term) bl;
           forget_var info subject
     end
-  | Teps _ ->
-(*  | Teps _ as t ->
-    if t_is_range_lit t then
+  (* | Teps _ -> *)
+  | Teps tb ->
+    let (_vs,t) = t_open_bound tb in
+    begin try
+        let ty = t_open_range_lit t in
+        match query_syntax info.info_syn ls.ls_name with
+        | Some s -> syntax_arguments_typed s (print_term info)
+                      (print_type info) t fmt tl
       (* look for syntax literal ty in driver *)
-    else *)
-      unsupportedTerm t
-        "smtv2: you must eliminate epsilon"
+        | None -> raise Not_found
+      with Not_found ->
+        unsupportedTerm t
+          "smtv2: you must eliminate epsilon"
+    end
   | Tquant _ | Tbinop _ | Tnot _ | Ttrue | Tfalse -> raise (TermExpected t)
   in
 
@@ -626,7 +633,10 @@ let print_data_decl info fmt (ts,cl) =
 
 let print_decl vc_loc cntexample args info fmt d = match d.d_node with
   | Dtype ts ->
-      print_type_decl info fmt ts
+    print_type_decl info fmt ts
+  | Drange ri when query_syntax info.info_syn ri.range_ts.ts_name <> None -> ()
+  | Drange _ -> unsupportedDecl d
+      "smtv2 : range types are not supported"
   | Ddata [(ts,_)] when query_syntax info.info_syn ts.ts_name <> None -> ()
   | Ddata dl ->
     fprintf fmt "@[(declare-datatypes ()@ (%a))@]@\n"

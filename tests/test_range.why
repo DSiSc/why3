@@ -9,3 +9,13 @@ theory T
 
   goal g : forall x:t. x = (12 : t)
 end
+
+theory U
+  use import bv.BV8
+
+  type q
+
+  (* meta "range:keep" type t *)
+
+  goal g : forall x:t. x = (12 : t)
+end

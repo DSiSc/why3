@@ -61,6 +61,7 @@ val print_th_prelude : task -> prelude_map pp
 val meta_syntax_type : meta
 val meta_syntax_logic : meta
 val meta_syntax_converter : meta
+val meta_syntax_literal : meta
 val meta_remove_prop : meta
 val meta_remove_logic : meta
 val meta_remove_type : meta
@@ -69,6 +70,7 @@ val meta_realized_theory : meta
 val syntax_type : tysymbol -> string -> bool -> tdecl
 val syntax_logic : lsymbol -> string -> bool -> tdecl
 val syntax_converter : lsymbol -> string -> bool -> tdecl
+val syntax_literal : tysymbol -> string -> bool -> tdecl
 val remove_prop : prsymbol -> tdecl
 
 val check_syntax_type: tysymbol -> string -> unit

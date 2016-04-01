@@ -108,7 +108,7 @@ end
 theory bv.BV8
   meta "range:keep" type t
 
-  (* syntax literal t "#b%8b" ou "#x%2x" *)
+  syntax literal t "#b%8b" (* ou "#x%2x" *)
   syntax type t "(_ BitVec 8)"
 
   syntax function zeros "#x00"

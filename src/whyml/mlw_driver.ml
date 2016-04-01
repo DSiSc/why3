@@ -114,7 +114,9 @@ let load_driver env file extra_files =
         check_syntax_logic ps s;
         add_syntax ps.ls_name s b
     | Rconverter _ ->
-        Loc.errorm "Syntax converter cannot be used in pure theories"
+      Loc.errorm "Syntax converter cannot be used in pure theories"
+    | Rliteral _ ->
+        Loc.errorm "Syntax literal cannot be used in pure theories"
     | Rremovepr (q) ->
       ignore (find_pr th q)
     | Rremoveall ->

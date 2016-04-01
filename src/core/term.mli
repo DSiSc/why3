@@ -309,6 +309,10 @@ val t_pred_app : term -> term -> term  (* prop-typed application *)
 val t_func_app_l : term -> term list -> term  (* value-typed application *)
 val t_pred_app_l : term -> term list -> term  (* prop-typed application *)
 
+val t_open_range_lit : term -> tysymbol
+(** [t_open_range_lit t] returns the type of the corresponding range
+    type if term is a range literal; raises NotFound otherwise *)
+
 val t_is_range_lit : term -> bool
 (** [t_is_range_lit t] returns [true] if [t] is an epsilon term
     representing a range literal. *)

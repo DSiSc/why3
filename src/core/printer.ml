@@ -110,19 +110,26 @@ let opt_search_forward s pos =
     None
   with Exit -> Some(!b,!i)
 
-(*
-let _ = opt_search_forward "%1 + %2" 0
-let _ = opt_search_forward "%1 + %2" 2
-let _ = opt_search_forward "%1 + %2" 7
-let _ = opt_search_forward "%t1 + %v42" 0
-let _ = opt_search_forward "%t1 + %v42" 2
-
-let s = "<app><const name=\"HOL.eq\"/>%1%2</app>"
-let Some(b,e) = opt_search_forward s 0
-let t = String.sub s b (e-b)
-
-open Format
-*)
+let opt_search_forward_literal_format s pos =
+  let l = String.length s in
+  let b = ref pos in
+  let i = ref pos in
+  try
+    while !i < l-1 do
+      if s.[!i] = '%' then begin
+        incr i;
+        b := !i;
+        while !i < l && is_digit s.[!i] do incr i done;
+        begin match s.[!i] with
+        | 'b' | 'x' | 'o' | 'd' -> incr i
+        | _ -> ()
+        end;
+        raise Exit;
+      end;
+      incr i
+    done;
+    None
+  with Exit -> Some(!b,!i)
 
 let global_substitute_fmt repl_fun text fmt =
   let len = String.length text in
@@ -145,22 +152,17 @@ let () =
   fprintf std_formatter "@."
 *)
 
-let iter_group iter_fun text =
+let iter_group search_fun iter_fun text =
   let rec iter start last_was_empty =
     let startpos = if last_was_empty then start + 1 else start in
     if startpos < String.length text then
-      match opt_search_forward text startpos with
+      match search_fun text startpos with
       | None -> ()
       | Some (pos,end_pos) ->
           iter_fun text pos end_pos;
           iter end_pos (end_pos = pos)
   in
   iter 0 false
-
-(*
-let regexp_arg_pos = Str.regexp "%\\([0-9]+\\)"
-let regexp_arg_pos_typed = Str.regexp "%\\([tv]?[0-9]+\\)"
-*)
 
 exception BadSyntaxIndex of int
 exception BadSyntaxArity of int * int
@@ -178,7 +180,7 @@ let check_syntax s len =
     if i > len then raise (BadSyntaxArity (len,i));
     ()
   in
-  iter_group (*regexp_arg_pos*) arg s
+  iter_group opt_search_forward arg s
 
 let check_syntax_logic ls s =
   let len = List.length ls.ls_args in
@@ -201,14 +203,24 @@ let check_syntax_logic ls s =
       if i > len then raise (BadSyntaxArity (len,i));
     end
   in
-  iter_group (*regexp_arg_pos_typed*) arg s
+  iter_group opt_search_forward arg s
+
+let check_syntax_literal _ts s =
+  let count = ref 0 in
+  let arg _s _b _e =
+    incr count;
+  (* nothing else to check ?! *)
+  in
+  iter_group opt_search_forward_literal_format arg s;
+  if !count <> 1 then
+    raise (BadSyntaxArity (1,!count))
 
 let syntax_arguments s print fmt l =
   let args = Array.of_list l in
   let repl_fun s b e fmt =
     let i = int_of_string (String.sub s b (e-b)) in
     print fmt args.(i-1) in
-  global_substitute_fmt (*regexp_arg_pos*) repl_fun s fmt
+  global_substitute_fmt repl_fun s fmt
 
 (* return the type arguments of a symbol application, sorted according
    to their (formal) names *)
@@ -298,6 +310,11 @@ let meta_syntax_converter = register_meta "syntax_converter" [MTlsymbol; MTstrin
          Can@ be@ specified@ in@ the@ driver@ with@ the@ 'syntax converter'@ \
          rules."
 
+let meta_syntax_literal = register_meta "syntax_literal" [MTtysymbol; MTstring; MTint]
+  ~desc:"Specify@ the@ syntax@ used@ to@ pretty-print@ a@ range@ literal.@ \
+         Can@ be@ specified@ in@ the@ driver@ with@ the@ 'syntax literal'@ \
+         rules."
+
 let meta_remove_prop = register_meta "remove_prop" [MTprsymbol]
     ~desc:"Remove@ a@ logical@ proposition@ from@ proof@ obligations.@ \
            Can@ be@ specified@ in@ the@ driver@ with@ the@ 'remove prop'@ rule."
@@ -327,6 +344,10 @@ let syntax_logic ls s b =
 let syntax_converter ls s b =
   check_syntax_logic ls s;
   create_meta meta_syntax_converter [MAls ls; MAstr s; MAint (if b then 1 else 0)]
+
+let syntax_literal ts s b =
+  check_syntax_literal ts s;
+  create_meta meta_syntax_literal [MAts ts; MAstr s; MAint (if b then 1 else 0)]
 
 let remove_prop pr =
   create_meta meta_remove_prop [MApr pr]
