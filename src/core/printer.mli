@@ -85,7 +85,10 @@ val add_syntax_map : tdecl -> syntax_map -> syntax_map
 (* interprets a declaration as a syntax rule, if any *)
 
 val get_converter_map : task -> converter_map
-val add_converter_map : tdecl -> converter_map -> converter_map
+(*val add_converter_map : tdecl -> converter_map -> converter_map*)
+
+val get_rliteral_map : task -> syntax_map
+val add_rliteral_map : tdecl -> syntax_map -> syntax_map
 
 val query_syntax : syntax_map -> ident -> string option
 val query_converter : converter_map -> lsymbol -> string option
@@ -101,6 +104,9 @@ val syntax_arguments_typed :
   string -> term pp -> ty pp -> term -> term list pp
 (** (syntax_arguments templ print_arg fmt l) prints in the formatter fmt
      the list l using the template templ and the printer print_arg *)
+
+val syntax_range_literal :
+  string -> Number.integer_constant pp
 
 (** {2 pretty-printing transformations (useful for caching)} *)
 

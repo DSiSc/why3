@@ -264,6 +264,36 @@ let () = Exn_printer.register
   | _ -> raise exn
   end
 
+let char_of_int i =
+  if i < 10 then
+    Char.chr (i + Char.code '0')
+  else
+    Char.chr (i + Char.code 'A' - 10)
+
+open BigInt
+
+let print_zeros fmt n =
+  for _i = 0 to n - 1 do
+    pp_print_char fmt '0'
+  done
+
+let rec print_in_base_aux radix digits fmt i =
+  if lt i radix then begin
+    begin match digits with
+      | Some n -> print_zeros fmt (n - 1)
+      | None -> ()
+    end;
+    fprintf fmt "%c" (char_of_int (to_int i))
+  end
+  else
+    let d,m = computer_div_mod i radix in
+    let digits = Opt.map ((+) (-1)) digits in
+    print_in_base_aux radix digits fmt d;
+    fprintf fmt "%c" (char_of_int (to_int m))
+
+let print_in_base radix digits fmt i =
+  print_in_base_aux (of_int radix) digits fmt i
+
 (*
 Local Variables:
 compile-command: "unset LANG; make -C ../.. byte"

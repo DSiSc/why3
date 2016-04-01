@@ -399,7 +399,10 @@ let print_prop_decl info fmt (k, pr, f) =
 let print_decl info fmt d =
   match d.d_node with
   | Dtype ts ->
-      print_type_decl info fmt ts
+    print_type_decl info fmt ts
+  | Drange ri ->
+    if not (Mid.mem ri.range_ts.ts_name info.info_syn) then
+      unsupportedDecl d "Isabelle does not support range types"
   | Ddata tl -> print_data_decls info fmt tl
   | Dparam ls ->
       print_param_decl info fmt ls

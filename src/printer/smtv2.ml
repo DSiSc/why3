@@ -122,6 +122,7 @@ module S = Set.Make(TermCmp)
 type info = {
   info_syn        : syntax_map;
   info_converters : converter_map;
+  info_rliteral   : syntax_map;
   mutable info_model : S.t;
   mutable info_in_goal : bool;
   info_vc_term : vc_term_info;
@@ -375,14 +376,13 @@ let rec print_term info fmt t =
           forget_var info subject
     end
   (* | Teps _ -> *)
-  | Teps tb ->
-    let (_vs,t) = t_open_bound tb in
+  | Teps _ ->
     begin try
-        let ty = t_open_range_lit t in
-        match query_syntax info.info_syn ls.ls_name with
-        | Some s -> syntax_arguments_typed s (print_term info)
-                      (print_type info) t fmt tl
-      (* look for syntax literal ty in driver *)
+        let ts,_p,c = t_projection_lit t in
+        (* fixme, check that _p is the correct projection *)
+        (* look for syntax literal ty in driver *)
+        match query_syntax info.info_rliteral ts.ts_name with
+        | Some s -> syntax_range_literal s fmt c
         | None -> raise Not_found
       with Not_found ->
         unsupportedTerm t
@@ -663,6 +663,7 @@ let print_task args ?old:_ fmt task =
   let info = {
     info_syn = Discriminate.get_syntax_map task;
     info_converters = Printer.get_converter_map task;
+    info_rliteral = Printer.get_rliteral_map task;
     info_model = S.empty;
     info_in_goal = false;
     info_vc_term = vc_info;

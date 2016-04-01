@@ -934,7 +934,7 @@ let add_types ~wp uc tdl =
 
   (* create predefinitions for immutable types *)
 
-  let def_visit d (abstr,algeb,alias) =
+  let def_visit d (abstr,algeb,alias,range) =
     let x = d.td_ident.id_str in
     let ts = Opt.get (Hstr.find tysymbols x) in
     let vl = match ts with
@@ -969,11 +969,33 @@ let add_types ~wp uc tdl =
     in
     match d.td_def with
       | TDabstract ->
-          ts :: abstr, algeb, alias
+          ts :: abstr, algeb, alias, range
       | TDalias _ ->
-          abstr, algeb, ts :: alias
+        abstr, algeb, ts :: alias, range
+      | TDrange (a,b) ->
+        let ts = match ts with
+          | TS ts -> ts
+          | PT _ -> assert false
+        in
+        let a_val = Number.compute_int a  in
+        let b_val = Number.compute_int b in
+        if BigInt.lt b_val a_val then
+          Loc.error ~loc:d.td_loc (Typing.EmptyRange d.td_ident.id_str)
+        else
+          let id =
+            id_derive (ts.ts_name.id_string ^ "_to_int") ts.ts_name
+          in
+          let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
+          let ri = { range_ts = ts;
+                     range_low_cst = a;
+                     range_low_val = a_val;
+                     range_high_cst = b;
+                     range_high_val = b_val;
+                     range_proj = ls
+                   } in
+        abstr, algeb, alias, ri :: range
       | (TDalgebraic _ | TDrecord _) when Hstr.find mutables x ->
-          abstr, (ts, Hstr.find predefs x) :: algeb, alias
+          abstr, (ts, Hstr.find predefs x) :: algeb, alias, range
       | TDalgebraic csl ->
           let projs = Hstr.create 5 in
           let mk_proj (_loc,id,gh,pty) =
@@ -994,16 +1016,16 @@ let add_types ~wp uc tdl =
           in
           let mk_constr (_loc,cid,pjl) =
             Typing.create_user_id cid, List.map mk_proj pjl in
-          abstr, (ts, List.map mk_constr csl) :: algeb, alias
+          abstr, (ts, List.map mk_constr csl) :: algeb, alias, range
       | TDrecord fl ->
           let mk_field f =
             let fid = Typing.create_user_id f.f_ident in
             Some fid, mk_field (parse f.f_pty) f.f_ghost None in
           let cid = { d.td_ident with id_str = "mk " ^ d.td_ident.id_str } in
           let csl = [Typing.create_user_id cid, List.map mk_field fl] in
-          abstr, (ts, csl) :: algeb, alias
+          abstr, (ts, csl) :: algeb, alias, range
   in
-  let abstr,algeb,alias = List.fold_right def_visit tdl ([],[],[]) in
+  let abstr,algeb,alias,range = List.fold_right def_visit tdl ([],[],[],[]) in
 
   (* create pure type declarations *)
 
@@ -1041,6 +1063,9 @@ let add_types ~wp uc tdl =
     | PT ts -> add_pdecl_with_tuples ~wp uc (create_ty_decl ts)
     | TS ts -> add_decl_with_tuples uc (Decl.create_ty_decl ts)
   in
+  let add_range_decl uc rd =
+    add_decl_with_tuples uc (Decl.create_range_decl rd)
+  in
   let add_invariant uc d = if d.td_inv = [] then uc else
     add_type_invariant d.td_loc uc d.td_ident d.td_params d.td_inv in
   try
@@ -1050,6 +1075,7 @@ let add_types ~wp uc tdl =
     let uc = if alg_pur = [] then uc else
       add_decl_with_tuples uc (Decl.create_data_decl alg_pur) in
     let uc = List.fold_left add_type_decl uc alias in
+    let uc = List.fold_left add_range_decl uc range in
     let uc = List.fold_left add_invariant uc tdl in
     uc
   with

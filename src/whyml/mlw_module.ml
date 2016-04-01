@@ -279,6 +279,8 @@ let add_decl uc d =
   let add_logic uc (ls,_) = add_ls uc ls in
   let uc = match d.Decl.d_node with
     | Decl.Dtype ts -> add_ts uc ts
+    | Decl.Drange ri ->
+      add_ls (add_ts uc ri.Decl.range_ts) ri.Decl.range_proj
     | Decl.Ddata dl -> List.fold_left add_data uc dl
     | Decl.Dparam ls -> add_ls uc ls
     | Decl.Dlogic dl -> List.fold_left add_logic uc dl

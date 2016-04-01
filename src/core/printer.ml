@@ -121,20 +121,19 @@ let opt_search_forward_literal_format s pos =
         b := !i;
         while !i < l && is_digit s.[!i] do incr i done;
         begin match s.[!i] with
-        | 'b' | 'x' | 'o' | 'd' -> incr i
+        | 'b' | 'x' | 'o' | 'd' -> incr i; raise Exit
         | _ -> ()
         end;
-        raise Exit;
       end;
       incr i
     done;
     None
   with Exit -> Some(!b,!i)
 
-let global_substitute_fmt repl_fun text fmt =
+let global_substitute_fmt search_fun repl_fun text fmt =
   let len = String.length text in
   let rec replace start =
-    match opt_search_forward text start with
+    match search_fun text start with
     | None ->
       pp_print_string fmt (String.sub text start (len - start))
     | Some(pos,end_pos) ->
@@ -143,14 +142,6 @@ let global_substitute_fmt repl_fun text fmt =
       replace end_pos
   in
   replace 0
-
-(*
-let repl s e b fmt = fprintf fmt "A"
-
-let () =
-  global_substitute_fmt repl "(LAMBDA (x:%v0): %1)" std_formatter;
-  fprintf std_formatter "@."
-*)
 
 let iter_group search_fun iter_fun text =
   let rec iter start last_was_empty =
@@ -220,7 +211,7 @@ let syntax_arguments s print fmt l =
   let repl_fun s b e fmt =
     let i = int_of_string (String.sub s b (e-b)) in
     print fmt args.(i-1) in
-  global_substitute_fmt repl_fun s fmt
+  global_substitute_fmt opt_search_forward repl_fun s fmt
 
 (* return the type arguments of a symbol application, sorted according
    to their (formal) names *)
@@ -252,10 +243,30 @@ let gen_syntax_arguments_typed ty_of tys_of s print_arg print_type t fmt l =
       let grp = String.sub s b (e-b) in
       let i = int_of_string grp in
       print_arg fmt args.(i-1) in
-  global_substitute_fmt (*regexp_arg_pos_typed*) repl_fun s fmt
+  global_substitute_fmt opt_search_forward repl_fun s fmt
 
 let syntax_arguments_typed =
   gen_syntax_arguments_typed t_type get_type_arguments
+
+let syntax_range_literal s fmt c =
+  let f s b e fmt =
+    let base = match s.[e-1] with
+      | 'x' -> 16
+      | 'd' -> 10
+      | 'o' -> 8
+      | 'b' -> 2
+      | _ -> assert false
+    in
+    let digits =
+      if e > b + 1 then
+        Some (int_of_string (String.sub s b (e-b-1)))
+      else
+        None
+    in
+    let v = Number.compute_int c in
+    Number.print_in_base base digits fmt v
+  in
+  global_substitute_fmt opt_search_forward_literal_format f s fmt
 
 (** {2 use printers} *)
 
@@ -407,15 +418,27 @@ let get_syntax_map task =
 let get_converter_map task =
   Task.on_meta meta_syntax_converter cm_add_ls Mls.empty task
 
+let get_rliteral_map task =
+  Task.on_meta meta_syntax_literal sm_add_ts Mid.empty task
+
 let add_syntax_map td sm = match td.td_node with
-  | Meta (m, args) when meta_equal m meta_syntax_type      -> sm_add_ts sm args
-  | Meta (m, args) when meta_equal m meta_syntax_logic     -> sm_add_ls sm args
-  | Meta (m, args) when meta_equal m meta_remove_prop      -> sm_add_pr sm args
+  | Meta (m, args) when meta_equal m meta_syntax_type
+    -> sm_add_ts sm args
+  | Meta (m, args) when meta_equal m meta_syntax_logic
+    -> sm_add_ls sm args
+  | Meta (m, args) when meta_equal m meta_remove_prop
+    -> sm_add_pr sm args
   | _ -> sm
 
-let add_converter_map td cm = match td.td_node with
-  | Meta (m, args) when meta_equal m meta_syntax_converter -> cm_add_ls cm args
-  | _ -> cm
+(*let add_converter_map td cm = match td.td_node with
+  | Meta (m, args) when meta_equal m meta_syntax_converter ->
+    cm_add_ls cm args
+  | _ -> cm*)
+
+let add_rliteral_map td sm = match td.td_node with
+  | Meta (m, args) when meta_equal m meta_syntax_literal ->
+    sm_add_ts sm args
+  | _ -> sm
 
 let query_syntax sm id =
   try Some (fst (Mid.find id sm)) with Not_found -> None

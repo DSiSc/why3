@@ -124,6 +124,9 @@ and print_triggers info fmt = function
 
 let print_decl info fmt d = match d.d_node with
   | Dtype _ | Dparam _ -> ()
+  | Drange ri ->
+    if not (Mid.mem ri.range_ts.Ty.ts_name info.info_syn) then
+      unsupportedDecl d "Simplify does not support range types"
   | Ddata _ ->
       unsupportedDecl d "Algebraic datatypes are not supported"
   | Dlogic _ ->

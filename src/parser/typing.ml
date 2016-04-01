@@ -508,7 +508,9 @@ let add_types dl th =
           if BigInt.lt b_val a_val then
             Loc.error ~loc:d.td_loc (EmptyRange d.td_ident.id_str)
           else
-            let id = id_derive "to_int" ts.ts_name  in
+            let id =
+              id_derive (ts.ts_name.id_string ^ "_to_int") ts.ts_name
+            in
             let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
             let ri = { range_ts = ts;
                        range_low_cst = a;

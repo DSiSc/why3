@@ -116,7 +116,11 @@ let to_elim el t = match el with
   | NonRangeLit tss ->
     match t.t_ty with
     | Some { Ty.ty_node = Ty.Tyapp (ts,[]) } when Ty.Sts.mem ts tss ->
-      not (t_is_range_lit t)
+      (* fixme: check that the projection is the projection of ts *)
+      begin try
+          let _ = t_projection_lit t in false
+        with Not_found -> true
+      end
     | _ -> true
 
 let rec lift_f el acc t0 = match t0.t_node with

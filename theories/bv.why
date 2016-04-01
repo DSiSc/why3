@@ -399,7 +399,13 @@ theory BV64
   constant two_power_size : int = 0x1_0000_0000_0000_0000
   constant max_int        : int = 0xFFFF_FFFF_FFFF_FFFF
 
+  type t = 0x0000_0000_0000_0000 .. 0xFFFF_FFFF_FFFF_FFFF
+
+  function to_int (x : t) : int = t_to_int x
+
   clone export BV_Gen with
+    type t = t,
+    function to_int = to_int,
     constant size = size,
     constant two_power_size = two_power_size,
     constant max_int = max_int,
@@ -414,7 +420,13 @@ theory BV32
   constant two_power_size : int = 0x1_0000_0000
   constant max_int        : int = 0xFFFF_FFFF
 
+  type t = 0x0000_0000 .. 0xFFFF_FFFF
+
+  function to_int (x : t) : int = t_to_int x
+
   clone export BV_Gen with
+    type t = t,
+    function to_int = to_int,
     constant size = size,
     constant two_power_size = two_power_size,
     constant max_int = max_int,
@@ -429,7 +441,13 @@ theory BV16
   constant two_power_size : int = 0x1_0000
   constant max_int : int = 0xFFFF
 
+  type t = 0x0000 .. 0xFFFF
+
+  function to_int (x : t) : int = t_to_int x
+
   clone export BV_Gen with
+    type t = t,
+    function to_int = to_int,
     constant size = size,
     constant two_power_size = two_power_size,
     constant max_int = max_int,
@@ -445,6 +463,8 @@ theory BV8
   constant max_int        : int = 0xFF
 
   type t = 0x00 .. 0xFF
+
+  function to_int (x : t) : int = t_to_int x
 
   clone export BV_Gen with
     type t = t,
