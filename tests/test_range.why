@@ -3,7 +3,7 @@ theory T
 
   type q
 
-  type t = 0 .. 42
+  type t is range 0 .. 42
 
   (* meta "range:keep" type t *)
 

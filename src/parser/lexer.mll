@@ -42,6 +42,7 @@
         "if", IF;
         "import", IMPORT;
         "in", IN;
+        "is", IS;
         "inductive", INDUCTIVE;
         "lemma", LEMMA;
         "let", LET;
@@ -51,6 +52,7 @@
         "not", NOT;
         "predicate", PREDICATE;
         "prop", PROP;
+        "range", RANGE;
         "so", SO;
         "then", THEN;
         "theory", THEORY;
@@ -250,4 +252,3 @@ Local Variables:
 compile-command: "unset LANG; make -C ../.. test"
 End:
 *)
-

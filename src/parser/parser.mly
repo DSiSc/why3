@@ -161,7 +161,7 @@ end
 %token AS AXIOM BY CLONE COINDUCTIVE CONSTANT
 %token ELSE END EPSILON EXISTS EXPORT FALSE FORALL FUNCTION
 %token GOAL IF IMPORT IN INDUCTIVE LEMMA
-%token LET MATCH META NAMESPACE NOT PROP PREDICATE
+%token LET MATCH META NAMESPACE NOT PROP PREDICATE IS RANGE
 %token SO THEN THEORY TRUE TYPE USE WITH
 
 (* program keywords *)
@@ -345,8 +345,8 @@ typedefn:
 | model abstract ty invariant*
     { $1, $2, TDalias $3, $4 }
 (* fixme : allow negative bounds *)
-| EQUAL INTEGER DOTDOT INTEGER
-    { false, Public, TDrange ($2, $4), [] }
+| IS RANGE INTEGER DOTDOT INTEGER
+    { false, Public, TDrange ($3, $5), [] }
 
 model:
 | EQUAL         { false }
@@ -939,6 +939,7 @@ lident:
 
 lident_keyword:
 | MODEL           { "model" }
+| RANGE           { "range" }
 
 quote_uident:
 | QUOTE_UIDENT  { mk_id ("'" ^ $1) $startpos $endpos }

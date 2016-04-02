@@ -980,7 +980,7 @@ let add_types ~wp uc tdl =
         let a_val = Number.compute_int a  in
         let b_val = Number.compute_int b in
         if BigInt.lt b_val a_val then
-          Loc.error ~loc:d.td_loc (Typing.EmptyRange d.td_ident.id_str)
+          Loc.error ~loc:d.td_loc Typing.EmptyRange
         else
           let id =
             id_derive (ts.ts_name.id_string ^ "_to_int") ts.ts_name

@@ -32,7 +32,7 @@ let debug_type_only  = Debug.register_flag "type_only"
 exception UnboundTypeVar of string
 exception DuplicateTypeVar of string
 exception ClashTheory of string
-exception EmptyRange of string
+exception EmptyRange
 
 (** lazy declaration of tuples *)
 
@@ -503,23 +503,23 @@ let add_types dl th =
       | TDrecord _ ->
         assert false
       | TDrange (a,b) ->
-          let a_val = Number.compute_int a  in
-          let b_val = Number.compute_int b in
-          if BigInt.lt b_val a_val then
-            Loc.error ~loc:d.td_loc (EmptyRange d.td_ident.id_str)
-          else
-            let id =
-              id_derive (ts.ts_name.id_string ^ "_to_int") ts.ts_name
-            in
-            let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
-            let ri = { range_ts = ts;
-                       range_low_cst = a;
-                       range_low_val = a_val;
-                       range_high_cst = b;
-                       range_high_val = b_val;
-                       range_proj = ls
-            } in
-            abstr, algeb, alias, ri::range
+         let a_val = Number.compute_int a  in
+         let b_val = Number.compute_int b in
+         if BigInt.lt b_val a_val then
+           Loc.error ~loc:d.td_loc EmptyRange
+         else
+           let id =
+             id_derive (ts.ts_name.id_string ^ "_to_int") ts.ts_name
+           in
+           let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
+           let ri = { range_ts = ts;
+                      range_low_cst = a;
+                      range_low_val = a_val;
+                      range_high_cst = b;
+                      range_high_val = b_val;
+                      range_proj = ls
+                    } in
+           abstr, algeb, alias, ri::range
   in
   let abstr,algeb,alias,range = List.fold_right decl dl ([],[],[],[]) in
   try
@@ -901,6 +901,8 @@ let () = Exn_printer.register (fun fmt e -> match e with
       Format.fprintf fmt "duplicate type parameter '%s" s
   | ClashTheory s ->
       Format.fprintf fmt "clash with previous theory %s" s
+  | EmptyRange ->
+      Format.fprintf fmt "empty range"
   | _ -> raise e)
 
 (*
