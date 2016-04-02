@@ -14,9 +14,7 @@ outofmemory "Out of memory\\|std::bad_alloc\\|GNU MP: Cannot allocate memory"
 timeout "self-timeout"
 time "why3cpulimit time : %s s"
 
-(* À discuter *)
 transformation "inline_trivial"
-
 transformation "eliminate_builtin"
 transformation "eliminate_definition"
 transformation "eliminate_inductive"

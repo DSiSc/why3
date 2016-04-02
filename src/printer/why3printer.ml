@@ -262,7 +262,7 @@ let print_type_decl fmt ts =
 
 let print_range_decl fmt ri =
   if not (query_remove ri.range_ts.ts_name) then begin
-    fprintf fmt "@[<hov 2>type %a%a = %a .. %a@]"
+    fprintf fmt "@[<hov 2>type %a%a = %a .. %a@]@\n@\n"
       print_ts ri.range_ts print_ident_labels ri.range_ts.ts_name
       Pretty.print_integer_constant ri.range_low_cst Pretty.print_integer_constant ri.range_high_cst;
     forget_tvs ()

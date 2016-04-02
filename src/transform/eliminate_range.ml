@@ -35,6 +35,7 @@ let elim le_sym prs d = match d.d_node with
   | _ -> [d]
 
 let eliminate_range env =
+  (* FIXME: int.Int.le_sym should be imported in the task *)
   let th = Env.read_theory env ["int"] "Int" in
   let le_sym = Theory.ns_find_ls th.Theory.th_export ["infix <="] in
   Trans.on_tagged_ts meta_keep_range
