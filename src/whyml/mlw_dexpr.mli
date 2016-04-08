@@ -107,6 +107,7 @@ and dexpr_node =
   | DElsapp of lsymbol * dexpr list
   | DEapply of dexpr * dexpr
   | DEconst of Number.constant
+  | DErange_const of Number.integer_constant * Decl.range_info
   | DElam of dbinder list * dexpr * dspec later
   | DElet of dlet_defn * dexpr
   | DEfun of dfun_defn * dexpr

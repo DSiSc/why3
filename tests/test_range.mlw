@@ -19,3 +19,13 @@ theory U
 
   goal g : forall x:t. x = (12 : t)
 end
+
+module M
+  use import bv.BV16
+  use import int.Int
+
+  let f (x : t) : t
+  ensures { ule result (1 : t) }
+  = bw_and x (1200000 : t)
+
+end

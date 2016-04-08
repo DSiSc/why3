@@ -399,6 +399,7 @@ and dexpr_node =
   | DElsapp of lsymbol * dexpr list
   | DEapply of dexpr * dexpr
   | DEconst of Number.constant
+  | DErange_const of Number.integer_constant * Decl.range_info
   | DElam of dbinder list * dexpr * dspec later
   | DElet of dlet_defn * dexpr
   | DEfun of dfun_defn * dexpr
@@ -677,9 +678,11 @@ let dexpr ?loc node =
         dity_unify_app fs_func_app dexpr_expected_type [de1;de2] argl;
         [], res
     | DEconst (Number.ConstInt _) ->
-        dvty_int
+      dvty_int
     | DEconst (Number.ConstReal _) ->
-        dvty_real
+      dvty_real
+    | DErange_const (_c, ri) ->
+      [], Dpur (ri.Decl.range_ts, [])
     | DEfun ((_,_,[],_,_),_) ->
         invalid_arg "Mlw_dexpr.dexpr: empty argument list in DEfun"
     | DElet (_,de)
@@ -1204,7 +1207,10 @@ and try_expr keep_loc uloc env ({de_dvty = argl,res} as de0) =
   | DEapply (de1,de2) ->
       e_lapp fs_func_app [get env de1; get env de2] (ity_of_dity res)
   | DEconst c ->
-      e_const c
+    e_const c
+  | DErange_const (c,ri) ->
+    e_range_const c ri.Decl.range_ts ri.Decl.range_low_val
+      ri.Decl.range_high_val ri.Decl.range_proj
   | DElet ((id,gh,de1),de2) ->
       let e1 = get env de1 in
       let mk_expr e1 =

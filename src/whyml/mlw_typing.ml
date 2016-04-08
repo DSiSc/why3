@@ -624,6 +624,18 @@ let rec dexpr ({uc = uc} as lenv) denv {expr_desc = desc; expr_loc = loc} =
   | Ptree.Enamed (Lstr lab, e1) ->
       DElabel (dexpr lenv denv e1, Slab.singleton lab)
   | Ptree.Ecast (e1, pty) ->
+    let e2 = dexpr lenv denv e1 in
+    let dty = ity_of_pty uc pty in
+    try
+      match e2.de_node, dty.ity_node with
+      | DEconst (Number.ConstInt c), Itypur (ts, []) ->
+        begin match find_range_decl
+                      (Theory.get_known (get_theory uc)) ts with
+        | None -> raise Not_found
+        | Some ri -> DErange_const (c, ri)
+        end
+      | _ -> raise Not_found
+    with Not_found ->
       DEcast (dexpr lenv denv e1, ity_of_pty uc pty))
 
 and drec_defn ~top lenv denv fdl =
