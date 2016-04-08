@@ -502,15 +502,13 @@ let add_types dl th =
           abstr, (ts, List.map constructor cl) :: algeb, alias, range
       | TDrecord _ ->
         assert false
-      | TDrange (a,b) ->
+      | TDrange (a,b,proj) ->
          let a_val = Number.compute_int a  in
          let b_val = Number.compute_int b in
          if BigInt.lt b_val a_val then
            Loc.error ~loc:d.td_loc EmptyRange
          else
-           let id =
-             id_derive (ts.ts_name.id_string ^ "_to_int") ts.ts_name
-           in
+           let id = create_user_id proj in
            let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
            let ri = { range_ts = ts;
                       range_low_cst = a;

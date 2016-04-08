@@ -3,7 +3,7 @@ theory T
 
   type q
 
-  type t is range 0 .. 42
+  type t is range t2int: 0 .. 42
 
   (* meta "range:keep" type t *)
 
@@ -25,7 +25,7 @@ module M
   use import int.Int
 
   let f (x : t) : t
-  ensures { ule result (1 : t) }
-  = bw_and x (1200000 : t)
+  ensures { ule result (12 : t) }
+  = bw_and x (12 : t)
 
 end

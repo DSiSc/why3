@@ -984,7 +984,7 @@ let add_types ~wp uc tdl =
           ts :: abstr, algeb, alias, range
       | TDalias _ ->
         abstr, algeb, ts :: alias, range
-      | TDrange (a,b) ->
+      | TDrange (a,b,proj) ->
         let ts = match ts with
           | TS ts -> ts
           | PT _ -> assert false
@@ -994,9 +994,7 @@ let add_types ~wp uc tdl =
         if BigInt.lt b_val a_val then
           Loc.error ~loc:d.td_loc Typing.EmptyRange
         else
-          let id =
-            id_derive (ts.ts_name.id_string ^ "_to_int") ts.ts_name
-          in
+          let id = create_user_id proj in
           let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
           let ri = { range_ts = ts;
                      range_low_cst = a;

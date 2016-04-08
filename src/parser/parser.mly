@@ -345,8 +345,8 @@ typedefn:
 | model abstract ty invariant*
     { $1, $2, TDalias $3, $4 }
 (* fixme : allow negative bounds *)
-| IS RANGE INTEGER DOTDOT INTEGER
-    { false, Public, TDrange ($3, $5), [] }
+| IS RANGE labels(lident) COLON INTEGER DOTDOT INTEGER
+    { false, Public, TDrange ($5, $7, $3), [] }
 
 model:
 | EQUAL         { false }

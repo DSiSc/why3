@@ -401,9 +401,7 @@ theory BV64
 
   use int.Int (* needed to use range types *)
 
-  type t is range 0x0000_0000_0000_0000 .. 0xFFFF_FFFF_FFFF_FFFF
-
-  function to_int (x : t) : int = t_to_int x
+  type t is range to_int: 0x0000_0000_0000_0000 .. 0xFFFF_FFFF_FFFF_FFFF
 
   clone export BV_Gen with
     type t = t,
@@ -424,9 +422,7 @@ theory BV32
 
   use int.Int (* needed to use range types *)
 
-  type t is range 0x0000_0000 .. 0xFFFF_FFFF
-
-  function to_int (x : t) : int = t_to_int x
+  type t is range to_int: 0x0000_0000 .. 0xFFFF_FFFF
 
   clone export BV_Gen with
     type t = t,
@@ -447,9 +443,7 @@ theory BV16
 
   use int.Int (* needed to use range types *)
 
-  type t is range 0x0000 .. 0xFFFF
-
-  function to_int (x : t) : int = t_to_int x
+  type t is range to_int: 0x0000 .. 0xFFFF
 
   clone export BV_Gen with
     type t = t,
@@ -470,9 +464,7 @@ theory BV8
 
   use int.Int (* needed to use range types *)
 
-  type t is range 0x00 .. 0xFF
-
-  function to_int (x : t) : int = t_to_int x
+  type t is range to_int: 0x00 .. 0xFF
 
   clone export BV_Gen with
     type t = t,
