@@ -48,6 +48,11 @@ let ps_sort =
 let rec collect svs t = match t.t_node with
   | Tvar v -> Svs.add v svs
   | Tapp _ | Tconst _ -> svs
+  | Teps _ ->
+    begin try
+        let _ = t_projection_lit t in svs
+      with Not_found -> assert false
+    end
   | Tif (_,t1,t2) ->
       collect (collect svs t1) t2
   | Tlet (t1, b) ->
@@ -97,6 +102,13 @@ let rec expl_term info svs sign t = match t.t_node with
       let t1 = expl_term info svs sign t1 in
       let t2 = expl_term info svs sign t2 in
       t_label_copy t (t_if f1 t1 t2)
+  | Teps _ ->
+    begin try
+        let _ = t_projection_lit t in t
+      with Not_found ->
+        Printer.unsupportedTerm t
+      "epsilon are not supported, run eliminate_epsilon"
+    end
   | _ ->
       t_map_sign (expl_term info svs) sign t
 
@@ -115,8 +127,8 @@ let ls_desc info ls =
 
 let decl info d = match d.d_node with
   | Dtype { ts_def = Some _ } -> []
-  | Dtype ts | Drange { range_ts = ts } ->
-      [d; lsdecl_of_ts ts]
+  | Dtype ts -> [d; lsdecl_of_ts ts]
+  | Drange { range_ts = ts } -> [d; lsdecl_of_ts ts]
   | Ddata _ -> Printer.unsupportedDecl d
       "Algebraic types are not supported, run eliminate_algebraic"
   | Dparam ls ->

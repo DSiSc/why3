@@ -40,7 +40,7 @@ module BitCount8bit_fact
     requires { x1 = sub n (bw_and (lsr_bv n (1 : t)) (0x55 : t)) }
     requires { x2 = add
                (bw_and x1 (0x33 : t))
-               (bw_and (lsr_bv x1 (2 : t)) (of_int (0x33))) }
+               (bw_and (lsr_bv x1 (2 : t)) (0x33 : t)) }
     ensures  { to_uint (bw_and (lsr x2 (4*i)) (0x0F : t))
              = numof (nth n) (4*i) (4*i+4) }
     ensures  { ule (bw_and (lsr_bv x2 (of_int (4*i))) (0x0F : t))
@@ -57,15 +57,15 @@ module BitCount8bit_fact
                   to_uint (bw_and (lsr x2 (4*i)) (0x0F : t))
                 = to_uint (bw_and (lsr_bv x2 (mul (4 : t) i')) (0x0F : t))
                 = to_uint (add (bw_and (lsr_bv x1 (mul (4 : t) i')) (0x03 : t))
-                           (bw_and (lsr_bv x1 (add (mul (4 : t) i') (2 : t))) (of_int (0x03))))
+                           (bw_and (lsr_bv x1 (add (mul (4 : t) i') (2 : t))) (0x03 : t)))
                 = to_uint (add (bw_and (lsr x1 (4*i)) (0x03 : t))
-                               (bw_and (lsr x1 ((4*i)+2)) (of_int (0x03))))}
+                               (bw_and (lsr x1 ((4*i)+2)) (0x03 : t)))}
 
   let ghost prove (n x1 x2 x3 : t) : unit
     requires { x1 = sub n (bw_and (lsr_bv n (1 : t)) (0x55 : t)) }
     requires { x2 = add
                (bw_and x1 (0x33 : t))
-               (bw_and (lsr_bv x1 (2 : t)) (of_int (0x33))) }
+               (bw_and (lsr_bv x1 (2 : t)) (0x33 : t)) }
     requires { x3 = bw_and (add x2 (lsr_bv x2 (4 : t))) (0x0F : t) }
     ensures { to_uint x3 = numof (nth n) 0 8 }
   =
@@ -127,7 +127,7 @@ module BitCounting32
 
   predicate step1 (x1 x2 : t) =
     x2 = add (bw_and x1 (0x33333333 : t))
-             (bw_and (lsr_bv x1 (2 : t)) (of_int (0x33333333)))
+             (bw_and (lsr_bv x1 (2 : t)) (0x33333333 : t))
 
   let ghost proof1 (n x1 x2 : t) (i : int) : unit
     requires { 0 <= i < 8 }
@@ -145,9 +145,9 @@ module BitCounting32
               = bw_and (lsr_bv x2 (mul (4 : t) i')) (0x07 : t)
               = add (bw_and (lsr_bv x1 (mul (4 : t) i')) (0x03 : t))
                       (bw_and (lsr_bv x1 (add (mul (4 : t) i') (2 : t)))
-                              (of_int (0x03)))
+                              (0x03 : t))
               = add (bw_and (lsr x1 (4*i)) (0x03 : t))
-                      (bw_and (lsr x1 ((4*i)+2)) (of_int (0x03))) }
+                      (bw_and (lsr x1 ((4*i)+2)) (0x03 : t)) }
 
   predicate step2 (x2:t) (x3:t) =
     x3 = bw_and (add x2 (lsr_bv x2 (4 : t))) (0x0F0F0F0F : t)
@@ -169,9 +169,9 @@ module BitCounting32
     assert { bw_and (lsr x3 (8*i)) (0x0F : t)
              = bw_and (lsr_bv x3 (mul (8 : t) i')) (0x0F : t)
              = add (bw_and (lsr_bv x2 (mul (8 : t) i')) (0x07 : t))
-                   (bw_and (lsr_bv x2 (add (mul (8 : t) i') (4 : t))) (of_int (0x07)))
+                   (bw_and (lsr_bv x2 (add (mul (8 : t) i') (4 : t))) (0x07 : t))
              = add (bw_and (lsr x2 (8*i)) (0x07 : t))
-                   (bw_and (lsr x2 ((8*i)+4)) (of_int (0x07))) }
+                   (bw_and (lsr x2 ((8*i)+4)) (0x07 : t)) }
 
   predicate step3 (x3:t) (x4:t) =
     x4 = add x3 (lsr_bv x3 (8 : t))
@@ -194,9 +194,9 @@ module BitCounting32
     assert { bw_and (lsr x4 (16*i)) (0x1F : t)
              = bw_and (lsr_bv x4 (mul (16 : t) i')) (0x1F : t)
              = add (bw_and (lsr_bv x3 (mul (16 : t) i')) (0x0F : t))
-                   (bw_and (lsr_bv x3 (add (mul (16 : t) i') (8 : t))) (of_int (0x0F)))
+                   (bw_and (lsr_bv x3 (add (mul (16 : t) i') (8 : t))) (0x0F : t))
              = add (bw_and (lsr x3 (16*i)) (0x0F : t))
-                   (bw_and (lsr x3 ((16*i)+8)) (of_int (0x0F))) }
+                   (bw_and (lsr x3 ((16*i)+8)) (0x0F : t)) }
 
   predicate step4 (x4:t) (x5:t) =
     x5 = add x4 (lsr_bv x4 (16 : t))
@@ -229,7 +229,7 @@ module BitCounting32
     let ghost x1 = !x in
     (* x = (x & 0x33333333) + ((x >> 2) & 0x33333333) *)
     x := add (bw_and !x (0x33333333 : t))
-             (bw_and (lsr_bv !x (2 : t)) (of_int (0x33333333)));
+             (bw_and (lsr_bv !x (2 : t)) (0x33333333 : t));
     let ghost x2 = !x in
     (* x = (x + (x >> 4)) & 0x0F0F0F0F *)
     x := bw_and (add !x (lsr_bv !x (4 : t))) (0x0F0F0F0F : t);
@@ -305,7 +305,7 @@ module AsciiCode
   use import mach.bv.BVCheck32
   use import BitCounting32
 
-  constant one : t = of_int 1
+  constant one : t = 1 : t
   constant lastbit : t = sub size_bv one
 
   (* let lastbit () = (sub_check size_bv one) : t *)
@@ -418,7 +418,7 @@ module GrayCode
   use import BitCounting32
   use Hamming
 
-  constant one : t = of_int 1
+  constant one : t = 1 : t
   constant lastbit : t = sub size_bv one
 
   (** {2 Gray code}
@@ -458,7 +458,7 @@ module GrayCode
     assert { b <> ones -> toGray (add b one) = bw_xor (toGray b) (bw_and (bw_not b) (add b one)) };
     assert { b <> ones -> exists k. (bw_and (bw_not b) (add b one)) = lsl one k };
     assert { b <> ones -> count_logic (bw_and (bw_not b) (add b one)) = 1 };
-    assert { b = ones -> (toGray b) = of_int 0x80000000 /\ (toGray (add b one)) = zeros }
+    assert { b = ones -> (toGray b) = 0x80000000 : t /\ (toGray (add b one)) = zeros }
 
   (** Now, a couple of property between the Gray code and the binary
       representation.

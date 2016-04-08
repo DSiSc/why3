@@ -940,6 +940,7 @@ lident:
 lident_keyword:
 | MODEL           { "model" }
 | RANGE           { "range" }
+| IS              { "is" }
 
 quote_uident:
 | QUOTE_UIDENT  { mk_id ("'" ^ $1) $startpos $endpos }

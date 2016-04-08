@@ -949,6 +949,29 @@ let t_range_const c ts a b ls =
 
 (** Term library *)
 
+(* range litteral *)
+
+let t_projection_lit t =
+  match t.t_node with
+  | Teps tb ->
+    let (v,t) = t_open_bound tb in
+    begin match t.t_node with
+      (* look for term of the form 'f v = const' *)
+      (* fixme: check that ls' is the projection of a range type *)
+      | Tapp (ls, [ { t_node = Tapp (ls', [ { t_node = Tvar v' } ]) };
+                    { t_node = Tconst (Number.ConstInt c) } ])
+        -> if ls_equal ls ps_equ && vs_equal v v'
+        then
+          begin
+            match v.vs_ty.ty_node with
+            | Tyapp (ty, []) -> ty,ls',c
+            | _ -> raise Not_found
+          end
+        else raise Not_found
+      | _ -> raise Not_found
+    end
+  | _ -> raise Not_found
+
 (* generic map over types, symbols and variables *)
 
 let gen_fresh_vsymbol fnT v =
@@ -1206,7 +1229,12 @@ let t_map_sign fn sign f = t_label_copy f (match f.t_node with
         then t_and (t_implies f1n f2) (t_implies (t_not f1p) f3)
         else t_or (t_and f1p f2) (t_and (t_not f1n) f3)
   | Tif _
-  | Teps _ -> failwith "t_map_sign: cannot determine polarity"
+  | Teps _ ->
+        begin try
+            let _ = t_projection_lit f in t_map (fn sign) f
+          with Not_found ->        failwith "t_map_sign: cannot determine polarity"
+        end
+
   | _ -> t_map (fn sign) f)
 
 (* continuation-passing traversal *)
@@ -1326,29 +1354,6 @@ let rec t_replace t1 t2 t =
 let t_replace t1 t2 t =
   t_ty_check t2 t1.t_ty;
   t_replace t1 t2 t
-
-(* range litteral *)
-
-let t_projection_lit t =
-  match t.t_node with
-  | Teps tb ->
-    let (v,t) = t_open_bound tb in
-    begin match t.t_node with
-      (* look for term of the form 'f v = const' *)
-      (* fixme: check that ls' is the projection of a range type *)
-      | Tapp (ls, [ { t_node = Tapp (ls', [ { t_node = Tvar v' } ]) };
-                    { t_node = Tconst (Number.ConstInt c) } ])
-        -> if ls_equal ls ps_equ && vs_equal v v'
-        then
-          begin
-            match v.vs_ty.ty_node with
-            | Tyapp (ty, []) -> ty,ls',c
-            | _ -> raise Not_found
-          end
-        else raise Not_found
-      | _ -> raise Not_found
-    end
-  | _ -> raise Not_found
 
 (* lambdas *)
 
