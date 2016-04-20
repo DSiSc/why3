@@ -44,6 +44,7 @@ class type editSession =
     method removeMarker : int -> unit Js.meth
     method setMode : Js.js_string Js.t -> unit Js.meth
     method setAnnotations : annotation Js.t Js.js_array Js.t -> unit Js.meth
+    method setUseSoftTabs : bool Js.t -> unit Js.meth
   end
 class type editor =
   object

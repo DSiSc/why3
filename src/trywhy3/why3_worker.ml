@@ -22,6 +22,7 @@ open Worker_proto
 
 let () = log_time ("Initialising why3 worker: start ")
 
+let temp_file_name = "/input.mlw"
 
 (* reads the config file *)
 let config : Whyconf.config = Whyconf.read_config (Some why3_conf_file)
@@ -112,7 +113,10 @@ module Task =
       (* from why 3 ide *)
       let locs = ref [] in
       let rec get_locs kind f =
-        Opt.iter (fun loc -> locs := (kind, mk_loc (Loc.get loc)) :: !locs) f.Term.t_loc;
+        Opt.iter (fun loc ->
+                  let file, a,b,c = Loc.get loc in
+                  if file = temp_file_name then
+                    locs := (kind, (a,b,c)) :: !locs) f.Term.t_loc;
         Term.t_fold (fun () t -> get_locs kind t ) () f
       in
       let rec get_t_locs f =
@@ -382,7 +386,6 @@ let why3_execute (modules,_theories) =
   in
   W.send result
 
-let temp_file_name = "/input.mlw"
 
 let () = Sys_js.register_file ~name:temp_file_name ~content:""
 

@@ -53,6 +53,7 @@ class type editSession =
     method setAnnotations : annotation t js_array t -> unit meth
     method setMode : js_string t -> unit meth
     method on : js_string t -> (< .. > t -> unit) callback -> unit meth
+    method setUseSoftTabs : bool Js.t -> unit Js.meth
   end
 
 class type editor =

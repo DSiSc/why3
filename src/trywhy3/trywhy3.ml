@@ -132,6 +132,7 @@ module Editor =
       List.iter (fun e ->
                  e ## setTheme (editor_theme);
                  e ## getSession () ## setMode (editor_mode);
+                 e ## getSession () ## setUseSoftTabs(Js._true);
 		 JSU.(set e (Js.string "$blockScrolling") _Infinity)
 		) [ editor; task_viewer ];
       task_viewer ## setReadOnly (Js._true)
@@ -167,12 +168,10 @@ module Editor =
       saved_markers := []
 
     let why3_loc_to_range  (line, col, e) =
-      let pos1 = Ace.mk_position (line-1) col in
       let doc = editor ## getSession () ## getDocument ()  in
-      let i = doc ## positionToIndex (pos1, 0) in
-      let j = i + (e-col) in
-      let pos2 = doc ## indexToPosition (j, 0) in
-      jsnew Ace._Range (pos1 ## row , pos1 ## column, pos2 ## row, pos2 ## column)
+      let pos2 = doc ## indexToPosition (e, line-1) in
+      jsnew Ace._Range (line - 1 , col, pos2 ## row, pos2 ## column)
+
 
       let editor_bg = getElement AsHtml.div "why3-editor-bg"
 
@@ -182,7 +181,7 @@ module Editor =
 
 
       let enable () =
-        editor ## setReadOnly(Js._true);
+        editor ## setReadOnly(Js._false);
         editor_bg ## style ## display <- Js.string "none"
 
       let confirm_unsaved () =
@@ -191,7 +190,6 @@ module Editor =
             (Dom_html.window ## confirm (Js.string "You have unsaved changes in your editor, proceed anyway ?"))
         else
           true
-
   end
 
 module Tabs =
