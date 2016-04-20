@@ -1,6 +1,8 @@
 Instructions to build TryWhy3
 -----------------------------
 
+* Run the script prepare.sh, or alternatively :
+
 * in subdirectory src/trywhy3/ do
 
   ** install 'ace'
