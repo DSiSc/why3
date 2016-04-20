@@ -1483,6 +1483,9 @@ JSOCAMLC=ocamlfind ocamlc -package js_of_ocaml -package js_of_ocaml.syntax \
 	-I $(ALTERGODIR)/src/sat \
 	-I $(ALTERGODIR)/src/main
 
+JSOCAMLDEP=ocamlfind ocamldep -package js_of_ocaml -package js_of_ocaml.syntax \
+        -syntax camlp4o -I src/trywhy3
+
 ALTERGOMODS=util/numsNumbers util/numbers \
 	util/version util/myUnix util/config util/options \
 	util/hashcons util/hstring util/lists util/loc \
@@ -1504,8 +1507,7 @@ ALTERGOMODS=util/numsNumbers util/numbers \
 	instances/matching \
 	sat/sat_solvers \
 	main/frontend
-ALTERGOCMO=$(addprefix $(ALTERGODIR)/src/, $(addsuffix .cmo,$(ALTERGOMODS)))
-TRYWHY3CMO=lib/why3/why3.cma
+
 TRYWHY3FILES=trywhy3.js why3_worker.js alt_ergo_worker.js trywhy3.html trywhy3.css \
 	README examples/ \
 	trywhy3_custom.css gen_index.sh fontawesome/css/font-awesome.min.css \
@@ -1515,17 +1517,20 @@ TRYWHY3FILES=trywhy3.js why3_worker.js alt_ergo_worker.js trywhy3.html trywhy3.c
 	 ace-builds/src-min-noconflict/ace.js ace-builds/src-min-noconflict/mode-why3.js \
 	ace-builds/src-min-noconflict/theme-chrome.js
 
+TRYWHY3_COMMON_CMO=src/trywhy3/worker_proto.cmo
+ALTERGO_WORKER_CMO=$(addprefix $(ALTERGODIR)/src/, $(addsuffix .cmo,$(ALTERGOMODS))) \
+			$(TRYWHY3_COMMON_CMO) src/trywhy3/alt_ergo_worker.cmo
+WHY3_WORKER_CMO=lib/why3/why3.cma $(TRYWHY3_COMMON_CMO) src/trywhy3/why3_worker.cmo
+
+TRY_WHY3_CMO=$(TRYWHY3_COMMON_CMO) src/trywhy3/ace.cmo src/trywhy3/trywhy3.cmo
+
 trywhy3_package: trywhy3
 	tar czf trywhy3.tar.gz -C src $(addprefix trywhy3/, $(TRYWHY3FILES))
 
 trywhy3: src/trywhy3/trywhy3.js src/trywhy3/why3_worker.js src/trywhy3/alt_ergo_worker.js
 
-src/trywhy3/trywhy3.js: src/trywhy3/trywhy3.byte
-	js_of_ocaml +weak.js +nat.js $^
-
-src/trywhy3/trywhy3.byte: src/trywhy3/worker_proto.cmo src/trywhy3/trywhy3.cmo
-	$(JSOCAMLC) $(BFLAGS) -o $@ -linkpkg $(BLINKFLAGS) $^
-
+src/trywhy3/%.js: src/trywhy3/%.byte
+	js_of_ocaml +weak.js +nat.js +dynlink.js +toplevel.js $^
 
 src/trywhy3/why3_worker.js: src/trywhy3/why3_worker.byte
 	js_of_ocaml --extern-fs -I . -I src/trywhy3 --file=trywhy3.conf:/ \
@@ -1533,25 +1538,25 @@ src/trywhy3/why3_worker.js: src/trywhy3/why3_worker.byte
 		`find theories modules \( -name "*.mlw" -o -name "*.why" \) -printf " --file=%p:/"` \
 	+weak.js +nat.js $^
 
-src/trywhy3/why3_worker.byte: $(TRYWHY3CMO) src/trywhy3/worker_proto.cmo src/trywhy3/why3_worker.cmo
-	$(JSOCAMLC) $(BFLAGS) -o $@ -linkpkg $(BLINKFLAGS) $^
+src/trywhy3/trywhy3.byte: $(TRY_WHY3_CMO)
+	$(JSOCAMLC) $(BFLAGS) -o $@ -linkpkg $(BLINKFLAGS) $(TRY_WHY3_CMO)
 
+src/trywhy3/alt_ergo_worker.byte: $(ALT_ERGO_WORKER_CMO)
+	$(JSOCAMLC) $(BFLAGS) -o $@ -linkpkg $(BLINKFLAGS) $(ALT_ERGO_WORKER_CMO)
 
-src/trywhy3/alt_ergo_worker.js: src/trywhy3/alt_ergo_worker.byte
-	js_of_ocaml +weak.js +nat.js +dynlink.js +toplevel.js $^
-
-src/trywhy3/alt_ergo_worker.byte: $(ALTERGOCMO) src/trywhy3/worker_proto.cmo src/trywhy3/alt_ergo_worker.cmo
-	$(JSOCAMLC) $(BFLAGS) -o $@ -linkpkg $(BLINKFLAGS) $^
-
-src/trywhy3/alt_ergo_worker.cmo: src/trywhy3/worker_proto.cmo
-src/trywhy3/why3_worker.cmo: src/trywhy3/worker_proto.cmo
-src/trywhy3/trywhy3.cmo: src/trywhy3/worker_proto.cmo
+src/trywhy3/why3_worker.byte: $(WHY3_WORKER_CMO)
+	$(JSOCAMLC) $(BFLAGS) -o $@ -linkpkg $(BLINKFLAGS) $(WHY3_WORKER_CMO)
 
 src/trywhy3/%.cmo: src/trywhy3/%.ml
 	$(JSOCAMLC) $(BFLAGS) -c $<
 
 src/trywhy3/%.cmi: src/trywhy3/%.mli
 	$(JSOCAMLC) $(BFLAGS) -c $<
+
+src/trywhy3/depend:
+	$(JSOCAMLDEP) src/trywhy3/*.ml > $@
+
+-include src/trywhy3/depend
 
 clean::
 	rm -f src/trywhy3/trywhy3.js src/trywhy3/trywhy3.byte src/trywhy3/trywhy3.cm* \

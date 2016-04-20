@@ -11,8 +11,8 @@
 
 (* simple helpers *)
 open Worker_proto
-
 module JSU = Js.Unsafe
+
 let get_opt o = Js.Opt.get o (fun () -> assert false)
 
 let check_def s o =
@@ -99,142 +99,91 @@ let addMouseEventListener prevent o e f =
 			   inject cb;
 			   inject Js._false |])
 
-
-
-
 module Editor =
   struct
-    type range
-    type marker
+
     let name = ref (Js.string "")
     let saved = ref false
-    let ace = get_global "ace"
 
-    let _Range : (int -> int -> int -> int -> range Js.t) Js.constr =
-      let r =
-	JSU.(get (meth_call ace "require" [| inject (Js.string "ace/range") |])
-		 (Js.string "Range"))
-      in
-      check_def "Range" r
+    let editor = Ace.ace ## edit (Js.string "why3-editor")
+    let task_viewer = Ace.ace ## edit (Js.string "why3-task-viewer")
 
-    let editor =
-      let e =
-	JSU.(meth_call ace "edit" [| inject (Js.string "why3-editor") |])
-      in
-      check_def "why3-editor" e
-
-    let task_viewer =
-      let e =
-	JSU.(meth_call ace "edit" [| inject (Js.string "why3-task-viewer") |])
-      in
-      check_def "why3-task-viewer" e
-
-    let get_session ed =
-      JSU.(meth_call ed "getSession" [| |])
-
-
-    let mk_annotation row col text kind =
-      JSU.(obj [| "row", inject row; "column", inject col;
-		  "text", inject text; "type", inject kind |])
 
     let set_annotations l =
       let a =
-	Array.map (fun (r,c,t,k) -> mk_annotation r c t k) (Array.of_list l)
+	Array.map (fun (r,c,t,k) -> Ace.mk_annotation r c t k) (Array.of_list l)
       in
       let a = Js.array a in
-      JSU.(meth_call (get_session editor) "setAnnotations" [| inject a |])
+      editor ## getSession () ## setAnnotations (a)
 
     let clear_annotations () =
-      ignore (JSU.(meth_call (get_session editor) "clearAnnotations" [| |]))
+      editor ## getSession () ## clearAnnotations ()
 
-    let _Infinity = get_global "Infinity"
+    let _Infinity : float = get_global "Infinity"
 
     let scroll_to_end e =
-      let len : int  = JSU.(meth_call (get_session e) "getLength" [| |]) in
+      let len : int  = e ## getSession () ## getDocument() ## getLength () in
       let last_line = len - 1 in
-      ignore JSU.(meth_call e "gotoLine" [| inject last_line; inject _Infinity; inject Js._false |])
+      e ## gotoLine (last_line, _Infinity, Js._false)
 
     let () =
       let editor_theme : Js.js_string Js.t = get_global "editor_theme" in
       let editor_mode : Js.js_string Js.t = get_global "editor_mode" in
-
       List.iter (fun e ->
-		 ignore (JSU.(meth_call e "setTheme" [| inject editor_theme |]));
-		 ignore (JSU.(meth_call (get_session e) "setMode" [| inject editor_mode |]));
+                 e ## setTheme (editor_theme);
+                 e ## getSession () ## setMode (editor_mode);
 		 JSU.(set e (Js.string "$blockScrolling") _Infinity)
 		) [ editor; task_viewer ];
-      JSU.(meth_call task_viewer "setReadOnly" [| inject Js._true|])
+      task_viewer ## setReadOnly (Js._true)
 
     let undo () =
-      ignore JSU.(meth_call editor "undo" [| |])
+      ignore editor ##getSession() ## getUndoManager() ## undo (Js._false)
 
     let redo () =
-      ignore JSU.(meth_call editor "redo" [| |])
+      editor ##getSession()##getUndoManager()##redo (Js._false)
 
     let get_value ?(editor=editor) () : Js.js_string Js.t =
-      JSU.meth_call editor "getValue" [| |]
+      editor ## getSession () ## getDocument () ## getValue ()
+
 
     let set_value ?(editor=editor) (str : Js.js_string Js.t) =
-      ignore JSU.(meth_call editor "setValue" [| inject (str); inject ~-1 |])
+      editor ## getSession () ## getDocument () ## setValue (str)
 
-    let mk_range l1 c1 l2 c2 =
-      jsnew _Range (l1, c1, l2, c2)
 
-    let set_selection_range r =
-      let selection = JSU.meth_call editor "getSelection" [| |] in
-      ignore JSU.(meth_call selection "setSelectionRange" [| inject r |])
+    let saved_markers : int list ref = ref []
 
-    let add_marker cls r : marker =
-      JSU.(meth_call (get_session editor) "addMarker"
-                     [| inject r;
-			inject (Js.string cls);
-			inject (Js.string "text") |])
+    let add_marker cls r : int =
+      let m = editor ## getSession () ## addMarker (r, Js.string cls, Js.string "text") in
+      saved_markers := m :: !saved_markers; m
 
     let remove_marker m =
-      ignore JSU.(meth_call  (get_session editor) "removeMarker" [| inject  m|])
+      saved_markers := List.filter (fun n -> n != m) !saved_markers;
+      editor ## getSession () ## removeMarker (m)
 
-    let get_char buffer i = int_of_float (buffer ## charCodeAt(i))
-    let why3_loc_to_range buffer loc =
-      let goto_line lstop =
-        let rec loop lcur i =
-          if lcur == lstop then i
-          else
-            let c = get_char buffer i in
-            loop (if c == 0 then lcur+1 else lcur) (i+1)
-        in
-        loop 1 0
-      in
-      let rec convert_range l c i n =
-        if n == 0 then (l, c) else
-          if (get_char buffer i) == 10
-          then convert_range (l+1) 0 (i+1) (n-1)
-          else convert_range l (c+1) (i+1) (n-1)
-      in
-      let l1, b, e = loc in
-      let c1 = b in
-      let i = goto_line l1 in
-      let l2, c2 = convert_range l1 b (i+b) (e-b) in
-      mk_range (l1-1) c1 (l2-1) c2
+    let clear_markers () =
+      List.iter
+        (fun m -> editor ## getSession () ## removeMarker (m) )
+        !saved_markers;
+      saved_markers := []
 
-    let focus e =
-      ignore JSU.(meth_call e "focus" [| |])
-
-      let set_on_event e f =
-	ignore JSU.(meth_call editor "on" [| inject (Js.string e);
-					   inject f|])
-
+    let why3_loc_to_range  (line, col, e) =
+      let pos1 = Ace.mk_position (line-1) col in
+      let doc = editor ## getSession () ## getDocument ()  in
+      let i = doc ## positionToIndex (pos1, 0) in
+      let j = i + (e-col) in
+      let pos2 = doc ## indexToPosition (j, 0) in
+      jsnew Ace._Range (pos1 ## row , pos1 ## column, pos2 ## row, pos2 ## column)
 
       let editor_bg = getElement AsHtml.div "why3-editor-bg"
 
       let disable () =
-        ignore JSU.(meth_call editor "setReadOnly" [| inject Js._true|]);
+        editor ## setReadOnly(Js._true);
         editor_bg ## style ## display <- Js.string "block"
 
 
       let enable () =
-        ignore JSU.(meth_call editor "setReadOnly" [| inject Js._false|]);
+        editor ## setReadOnly(Js._true);
         editor_bg ## style ## display <- Js.string "none"
-
 
       let confirm_unsaved () =
         if not !saved then
@@ -295,7 +244,7 @@ module ContextMenu =
       b ## onclick <- Dom.handler (fun _ ->
 				   hide ();
 				   f ();
-				   Editor.(focus editor);
+                                   Editor.editor ## focus ();
 				   Js._false)
     let () = addMouseEventListener false task_menu "mouseleave"
 	(fun _ -> hide())
@@ -435,7 +384,7 @@ module TaskList =
       with
         Not_found -> ()
 
-    let clear_task_selection () =
+    let clear_task_selection _ =
       let l = Hashtbl.fold (fun id _ acc -> id :: acc) task_selection [] in
       List.iter deselect_task l
 
@@ -447,20 +396,19 @@ module TaskList =
 
     let error_marker = ref None
     let () =
-      Editor.set_on_event
-        "change"
-        (Js.wrap_callback (fun () -> clear ();
-                                  Editor.saved := false;
-                                  ExampleList.unselect ();
-				  Editor.clear_annotations ();
-                                  match !error_marker with
-                                    None -> ()
-                                  | Some (m, _) -> Editor.remove_marker m;error_marker := None))
+      Editor.editor ## on
+                    (Js.string "change",
+                     Js.wrap_callback (fun _ -> clear ();
+                                               Editor.saved := false;
+                                               ExampleList.unselect ();
+				               Editor.clear_annotations ();
+                                               match !error_marker with
+                                                 None -> ()
+                                               | Some (m, _) -> Editor.remove_marker m;
+                                                               error_marker := None))
 
     let () =
-      Editor.set_on_event
-        "focus"
-        (Js.wrap_callback  clear_task_selection )
+      Editor.editor ## on (Js.string "focus", Js.wrap_callback  clear_task_selection )
 
 
     let print_why3_output o =
@@ -478,7 +426,7 @@ module TaskList =
       | Error s -> print_error s
 
       | ErrorLoc ((l1, b, l2, e), s) ->
-         let r = Editor.mk_range l1 b l2 e in
+         let r = jsnew Ace._Range (l1, b, l2, e) in
          error_marker := Some (Editor.add_marker "why3-error" r, r);
          print_error s;
 	 Editor.set_annotations [ (l1, b, Js.string s, Js.string "error") ]
@@ -502,9 +450,8 @@ module TaskList =
 	   with Not_found ->
 		attach_to_parent id (parent_id ^ "_ul") expl locs;
 		let span = getElement AsHtml.span (id ^ "_container") in
-                let buffer = Editor.get_value () in
                 let locs =
-		  List.map (fun (k, loc) -> k, Editor.why3_loc_to_range buffer loc) locs
+		  List.map (fun (k, loc) -> k, Editor.why3_loc_to_range  loc) locs
 		in
 		span ## onclick <-
 		  Dom.handler
@@ -581,7 +528,7 @@ module ToolBar =
     let add_action b f =
       let cb = fun _ ->
 	f ();
-	Editor.(focus editor);
+        Editor.editor ## focus ();
 	Js._false
       in
       b ## onclick <- Dom.handler cb
@@ -1059,7 +1006,7 @@ let () =
                    Session.save_num_steps !Controller.alt_ergo_steps;
                    Session.save_view_mode (if Panel.is_wide () then Js.string "wide"
                                            else Js.string "column");
-                   
+
                    (Js.string "Do you wish to quit TryWhy3 (your current session will be saved to your browser local storage) ?"))
                 )
 
