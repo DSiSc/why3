@@ -11,6 +11,7 @@
 
 open Format
 open Worker_proto
+open AltErgo
 
 module SAT = (val (Sat_solvers.get_current ()) : Sat_solvers.S)
 module FE = Frontend.Make (SAT)
@@ -61,6 +62,7 @@ let () =
   Worker.set_onmessage (fun msg ->
 			match unmarshal msg with
 			  Goal (id, text, steps) ->
+                          log (Printf.sprintf "Received task %s" id);
 			  let old_steps = Options.steps_bound () in
 			  if steps > 0 then Options.set_steps_bound steps;
 			  let result = run_alt_ergo_on_task text in

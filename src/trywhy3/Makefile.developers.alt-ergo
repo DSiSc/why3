@@ -1,0 +1,24 @@
+ALTERGOMODS=util/numsNumbers util/numbers \
+	util/version util/myUnix util/config util/options \
+	util/hashcons util/hstring util/lists util/loc \
+	util/profiling_default util/profiling \
+	util/util \
+	structures/parsed structures/symbols \
+	structures/ty structures/errors \
+	structures/term structures/literal structures/formula \
+	structures/explanation structures/exception \
+	parsing/why_parser parsing/why_lexer \
+	preprocess/existantial preprocess/triggers \
+	preprocess/why_typing preprocess/cnf \
+	theories/polynome theories/ac \
+	theories/intervals theories/inequalities \
+	theories/intervalCalculus \
+	theories/arith theories/records theories/bitv \
+	theories/arrays theories/sum theories/uf theories/use \
+	theories/combine theories/ccx theories/theory \
+	instances/matching \
+	sat/sat_solvers \
+	main/frontend
+
+$(LIBNAME).cmo: $(addprefix src/, $(addsuffix .cmo,$(ALTERGOMODS)))
+	$(OCAMLC) $(BFLAGS) -pack -o $(LIBNAME).cmo $^

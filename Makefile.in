@@ -1473,40 +1473,12 @@ install_local:: bin/why3doc
 ALTERGODIR=src/trywhy3/alt-ergo-1.00-private-2015-01-29
 
 JSOCAMLC=ocamlfind ocamlc -package js_of_ocaml -package js_of_ocaml.syntax \
-        -syntax camlp4o -I src/trywhy3 \
-	-I $(ALTERGODIR)/src/util \
-	-I $(ALTERGODIR)/src/structures \
-	-I $(ALTERGODIR)/src/parsing \
-	-I $(ALTERGODIR)/src/preprocess \
-	-I $(ALTERGODIR)/src/theories \
-	-I $(ALTERGODIR)/src/instances \
-	-I $(ALTERGODIR)/src/sat \
-	-I $(ALTERGODIR)/src/main
+        -syntax camlp4o -I src/trywhy3 	-I $(ALTERGODIR)/
 
 JSOCAMLDEP=ocamlfind ocamldep -package js_of_ocaml -package js_of_ocaml.syntax \
         -syntax camlp4o -I src/trywhy3
 
-ALTERGOMODS=util/numsNumbers util/numbers \
-	util/version util/myUnix util/config util/options \
-	util/hashcons util/hstring util/lists util/loc \
-	util/profiling_default util/profiling \
-	util/util \
-	structures/parsed structures/symbols \
-	structures/ty structures/errors \
-	structures/term structures/literal structures/formula \
-	structures/explanation structures/exception \
-	parsing/why_parser parsing/why_lexer \
-	preprocess/existantial preprocess/triggers \
-	preprocess/why_typing preprocess/cnf \
-	theories/polynome theories/ac \
-	theories/intervals theories/inequalities \
-	theories/intervalCalculus \
-	theories/arith theories/records theories/bitv \
-	theories/arrays theories/sum theories/uf theories/use \
-	theories/combine theories/ccx theories/theory \
-	instances/matching \
-	sat/sat_solvers \
-	main/frontend
+ALTERGOMODS=altErgo
 
 TRYWHY3FILES=trywhy3.js why3_worker.js alt_ergo_worker.js trywhy3.html trywhy3.css \
 	README examples/ \
@@ -1518,7 +1490,7 @@ TRYWHY3FILES=trywhy3.js why3_worker.js alt_ergo_worker.js trywhy3.html trywhy3.c
 	ace-builds/src-min-noconflict/theme-chrome.js
 
 TRYWHY3_COMMON_CMO=src/trywhy3/worker_proto.cmo
-ALTERGO_WORKER_CMO=$(addprefix $(ALTERGODIR)/src/, $(addsuffix .cmo,$(ALTERGOMODS))) \
+ALT_ERGO_WORKER_CMO=$(addprefix $(ALTERGODIR)/, $(addsuffix .cmo,$(ALTERGOMODS))) \
 			$(TRYWHY3_COMMON_CMO) src/trywhy3/alt_ergo_worker.cmo
 WHY3_WORKER_CMO=lib/why3/why3.cma $(TRYWHY3_COMMON_CMO) src/trywhy3/why3_worker.cmo
 
