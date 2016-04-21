@@ -18,7 +18,7 @@ check_cmd "ace-builds/src-min-noconflict/mode-why3.js" "cp mode-why3.js ace-buil
 check_cmd "fontawesome" "git clone https://github.com/FortAwesome/Font-Awesome.git fontawesome"
 check_cmd "alt-ergo" "git clone https://github.com/OCamlPro/alt-ergo.git"
 check_cmd "" "patch -d alt-ergo -i ../alt-ergo.patch -p1"
-check_cmd "alt-ergo/Makefile.developers" "cp Makefile.developers.alt-ergo alt-ergo/"
+check_cmd "alt-ergo/Makefile.developers" "cp Makefile.developers.alt-ergo alt-ergo/Makefile.developers"
 check_cmd "" "cd alt-ergo"
 check_cmd "" "./configure"
 check_cmd "" "make altErgo.cmo"
