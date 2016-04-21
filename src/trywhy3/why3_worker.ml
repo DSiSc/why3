@@ -101,7 +101,7 @@ module Task =
     let clear_warnings () = warnings := []
     let () =
       Warning.set_hook (fun ?(loc=(Loc.user_position "" 1 0 0)) msg ->
-                        let _, a,b,c = Loc.get loc in
+                        let _, a,b,_ = Loc.get loc in
                         warnings := ((a-1,b), msg) :: !warnings)
 
 
@@ -263,11 +263,13 @@ let rec why3_prove ?(steps= ~-1) id =
   let t = get_info id in
   match t.subtasks with
     [] ->  t.status <- `Unknown;
-	  let task = get_task t.task in
-	  let msg = Task (id, t.parent_id, t.expl, task_to_string task, t.loc, steps) in
-	  W.send msg;
-	  let l = set_status id `New in
-          List.iter W.send l
+	   let task = get_task t.task in
+	   let msg = Task (id, t.parent_id, t.expl, task_to_string task, t.loc, steps) in
+	   W.send msg;
+	   let l = set_status id `New in
+	   List.iter W.send l
+
+
   | l -> List.iter (why3_prove ~steps) l
 
 
@@ -281,6 +283,8 @@ let why3_split id =
 	[], _ -> ()
       | [ child ], `Task(orig) when Why3.Task.task_equal child orig -> ()
       | subtasks, _ ->
+	 let l = set_status id `New in
+	 List.iter W.send l;
 	 t.subtasks <- List.fold_left (fun acc t ->
 				       let tid = register_task id t in
 				       why3_prove tid;
