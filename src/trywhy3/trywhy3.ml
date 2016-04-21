@@ -771,7 +771,7 @@ module Controller =
       loop 0 (Array.length a)
 
     let first_task = ref true
-    type 'a status = Free of 'a | Busy of 'a | Absent
+    type 'a status = Free of 'a | Busy of (id *  'a) | Absent
     let num_workers = Session.load_num_threads ()
     let alt_ergo_steps = ref (Session.load_num_steps ())
     let alt_ergo_workers = ref (Array.make num_workers Absent)
@@ -791,12 +791,12 @@ module Controller =
       alt_ergo_not_running () && Queue.is_empty task_queue && not (!why3_busy)
 
 
-
     let rec init_alt_ergo_worker i =
       let worker = Worker.create "alt_ergo_worker.js" in
       worker ## onmessage <-
 	(Dom.handler (fun ev ->
                       let (id, result) as res = unmarshal (ev ## data) in
+                      log (Printf.sprintf "Received result %s from alt-ergo" id);
                       TaskList.print_alt_ergo_output id result;
 		      let status_update = status_of_result res in
 		      let () = match status_update with
@@ -811,6 +811,7 @@ module Controller =
       Free (worker)
 
     and process_task () =
+      log ("In process task");
       let rec find_free_worker_slot i =
 	if i < num_workers then
 	  match !alt_ergo_workers.(i) with
@@ -821,26 +822,32 @@ module Controller =
       let idx, w = find_free_worker_slot 0 in
       match w with
 	Free w when not (Queue.is_empty task_queue) ->
-	let task = Queue.take task_queue in
-	!alt_ergo_workers.(idx) <- Busy (w);
+	let (id, code, steps) = Queue.pop task_queue in
+	!alt_ergo_workers.(idx) <- Busy (id, w);
 	w ## postMessage (marshal (OptionSteps !alt_ergo_steps));
-	w ## postMessage (marshal task)
+	w ## postMessage (marshal (Goal(id, code, steps)));
+        log (Printf.sprintf "sending task %s to alt-ergo" id);
+        process_task ()
       | _ -> if is_idle () then ToolBar.enable_compile ()
+
+
+    let push_task task =
+      Queue.add  task task_queue
+      (*process_task () *)
 
     let reset_workers () =
       Array.iteri
 	(fun i w ->
 	 match w with
-	   Busy (w)  ->
+	   Busy (id, w)  ->
+           (get_why3_worker ()) ## postMessage (marshal(UpdateStatus( `Unknown, id)));
            w ## terminate ();
            !alt_ergo_workers.(i) <- init_alt_ergo_worker i
 	 | Absent -> !alt_ergo_workers.(i) <- init_alt_ergo_worker i
 	 | Free _ -> ()
 	) !alt_ergo_workers
 
-    let push_task task =
-      Queue.add  task task_queue;
-      process_task ()
+
 
     let init_why3_worker () =
       let worker = Worker.create "why3_worker.js" in
@@ -855,8 +862,8 @@ module Controller =
                       let () =
 			match msg with
 			  Task (id,_,_,code,_, _, steps) ->
-			  push_task (Goal (id,code, steps))
-			| Idle -> why3_busy := false; if is_idle () then ToolBar.enable_compile ()
+			  push_task (id,code, steps)
+			| Idle -> why3_busy := false; process_task ()
 			| _ -> ()
                       in Js._false));
       worker
@@ -913,7 +920,13 @@ module Controller =
       ToolBar.enable_compile ()
 
     let stop () =
-      if not (is_idle ()) then force_stop ();
+      if not (is_idle ()) then begin
+          if !why3_busy then
+            force_stop ()
+          else begin reset_workers ();
+                     ToolBar.enable_compile();
+               end
+        end
 
 
 end
