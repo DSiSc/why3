@@ -184,8 +184,17 @@ module Editor =
         editor ## setReadOnly(Js._false);
         editor_bg ## style ## display <- Js.string "none"
 
+      let has_content =
+        let non_space = jsnew Js.regExp(Js.string "\\S") in
+        fun () ->
+        Js.to_bool
+          (editor ## getSession ()
+                  ## getDocument ()
+                  ## getAllLines()
+                  ## some (Js.wrap_callback (fun str _ _ ->
+                                             non_space ## test(str))))
       let confirm_unsaved () =
-        if not !saved then
+        if not !saved && has_content () then
           Js.to_bool
             (Dom_html.window ## confirm (Js.string "You have unsaved changes in your editor, proceed anyway ?"))
         else
@@ -363,32 +372,51 @@ module TaskList =
       appendChild ul li;
       li ## innerHTML <- mk_li_content id expl
 
+    (* It's ok to use a list here, there are few selected tasks at the same time
+     and it allows us to preserve order *)
+    let task_selection = ref []
 
-    let task_selection = Hashtbl.create 17
-    let is_selected id = Hashtbl.mem task_selection id
-    let select_task id span loc pretty =
+    let is_selected id = List.mem_assoc id !task_selection
+
+    let pretty_table = Hashtbl.create 17
+
+    let set_pretty id  =
+      let pretty = try
+          Hashtbl.find pretty_table id
+        with
+          Not_found -> "(* The task is being processed, please wait ... *)"
+      in
+      begin match !task_selection with
+              (id_sel, _) :: _ when id_sel = id ->
+              Editor.set_value ~editor:Editor.task_viewer (Js.string pretty);
+              Editor.scroll_to_end Editor.task_viewer
+            | _ -> ()
+      end
+
+    let select_task id span loc =
       (span ## classList) ## add (Js.string "why3-task-selected");
       let markers = List.map (fun (cls, range) -> Editor.add_marker cls range) loc in
-      Hashtbl.add task_selection id (span, loc, markers);
-      Editor.set_value ~editor:Editor.task_viewer (Js.string pretty);
-      Editor.scroll_to_end Editor.task_viewer
+      if not (is_selected id) then
+        task_selection := (id,(span, loc, markers)) :: !task_selection;
+      set_pretty id
 
     let deselect_task id =
       try
-        let span, _loc, markers = Hashtbl.find task_selection id in
+        let span, _loc, markers = List.assoc id !task_selection in
         (span ## classList) ## remove (Js.string "why3-task-selected");
         List.iter Editor.remove_marker markers;
-        Hashtbl.remove task_selection id
+        task_selection := List.remove_assoc id !task_selection
       with
         Not_found -> ()
 
     let clear_task_selection _ =
-      let l = Hashtbl.fold (fun id _ acc -> id :: acc) task_selection [] in
-      List.iter deselect_task l
+      List.iter (fun (id, _) -> deselect_task id) !task_selection;
+      task_selection := []
 
 
     let clear () =
       clear_task_selection ();
+      Hashtbl.clear pretty_table;
       task_list ## innerHTML <- Js.string "";
       Editor.set_value ~editor:Editor.task_viewer (Js.string "")
 
@@ -409,7 +437,7 @@ module TaskList =
       Editor.editor ## on (Js.string "focus", Js.wrap_callback  clear_task_selection )
 
 
-    let print_why3_output o =
+    let print_why3_output ?(defer=(fun () -> ())) o =
       let doc = Dom_html.document in
       (* see why3_worker.ml *)
       match o with
@@ -440,37 +468,41 @@ module TaskList =
 
       | Theory (th_id, th_name) ->
 	 attach_to_parent th_id "why3-theory-list" th_name []
+      | Pretty (id, pretty) ->
+         Hashtbl.replace pretty_table id pretty;
+         set_pretty id
 
-      | Task (id, parent_id, expl, _code, locs, pretty, _) ->
+      | Task (id, parent_id, expl, _code, locs, _) ->
 	 begin
 	   try
 	     ignore (Dom_html.getElementById id)
 	   with Not_found ->
-		attach_to_parent id (parent_id ^ "_ul") expl locs;
-		let span = getElement AsHtml.span (id ^ "_container") in
-                let locs =
-		  List.map (fun (k, loc) -> k, Editor.why3_loc_to_range  loc) locs
-		in
-		span ## onclick <-
-		  Dom.handler
-		    (fun ev ->
-		     let ctrl = Js.to_bool (ev ## ctrlKey) in
-		     if is_selected id then
-                       if ctrl then deselect_task id else
-			 clear_task_selection ()
-		     else begin
-			 if not ctrl then clear_task_selection ();
-                         select_task id span locs pretty
-                       end;
-		     Js._false);
-		addMouseEventListener
-		  true span "contextmenu"
-		  (fun e ->
-		   clear_task_selection ();
-                   select_task id span locs pretty;
-		   let x = max 0 ((e ##clientX) - 2) in
-		   let y = max 0 ((e ##clientY) - 2) in
-		   ContextMenu.show_at x y)
+             defer ();
+	     attach_to_parent id (parent_id ^ "_ul") expl locs;
+	     let span = getElement AsHtml.span (id ^ "_container") in
+             let locs =
+	       List.map (fun (k, loc) -> k, Editor.why3_loc_to_range  loc) locs
+	     in
+	     span ## onclick <-
+	       Dom.handler
+		 (fun ev ->
+		  let ctrl = Js.to_bool (ev ## ctrlKey) in
+		  if is_selected id then
+                    if ctrl then deselect_task id else
+		      clear_task_selection ()
+		  else begin
+		      if not ctrl then clear_task_selection ();
+                      select_task id span locs
+                    end;
+		  Js._false);
+	     addMouseEventListener
+	       true span "contextmenu"
+	       (fun e ->
+		clear_task_selection ();
+                select_task id span locs;
+		let x = max 0 ((e ##clientX) - 2) in
+		let y = max 0 ((e ##clientY) - 2) in
+		ContextMenu.show_at x y)
 	 end
 
 
@@ -858,13 +890,18 @@ module Controller =
 			  first_task := false;
 			  TaskList.clear ()
 			end;
-                      TaskList.print_why3_output msg;
                       let () =
 			match msg with
-			  Task (id,_,_,code,_, _, steps) ->
+			  Task (id,_,_,code,_, steps) ->
+                          TaskList.print_why3_output
+                            ~defer:(fun () -> worker ##postMessage(marshal (GetPretty(id))))
+                            msg;
 			  push_task (id,code, steps)
-			| Idle -> why3_busy := false; process_task ()
-			| _ -> ()
+			| Idle ->
+                           TaskList.print_why3_output msg;
+                           why3_busy := false; process_task ()
+			| _ ->
+                           TaskList.print_why3_output msg
                       in Js._false));
       worker
 
@@ -897,11 +934,11 @@ module Controller =
 	begin
           why3_busy := true;
           ToolBar.disable_compile ();
-	  Hashtbl.iter
-            (fun id _ ->
+          List.iter
+            (fun (id,_) ->
 	     f id;
 	     (get_why3_worker()) ## postMessage (marshal (Transform(tr, id))))
-	    TaskList.task_selection;
+	    !TaskList.task_selection;
 	  TaskList.clear_task_selection ()
 	end
 

@@ -14,6 +14,7 @@ class type position =
 class type document =
   object
     method getLength : int Js.meth
+    method getAllLines : Js.js_string Js.t Js.js_array Js.t Js.meth
     method getValue : Js.js_string Js.t Js.meth
     method indexToPosition :
       int -> int -> position Js.t Js.meth

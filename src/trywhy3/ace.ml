@@ -20,16 +20,17 @@ class type position =
 
 class type document =
   object
-    method getLength : int Js.meth
-    method getValue : Js.js_string Js.t Js.meth
+    method getLength : int meth
+    method getValue : js_string t meth
+    method getAllLines : js_string t js_array t meth
     method indexToPosition :
-      int -> int -> position Js.t Js.meth
+      int -> int -> position t meth
     method on :
-      Js.js_string Js.t -> (< .. > Js.t -> unit) Js.callback -> unit Js.meth
+      js_string t -> (< .. > t -> unit) callback -> unit meth
     method positionToIndex :
-             position Js.t -> int -> int Js.meth
-    method setNewlineMode : Js.js_string Js.t -> unit Js.meth
-    method setValue : Js.js_string Js.t -> unit Js.meth
+             position t -> int -> int meth
+    method setNewlineMode : js_string t -> unit meth
+    method setValue : js_string t -> unit meth
   end
 
 
@@ -53,7 +54,7 @@ class type editSession =
     method setAnnotations : annotation t js_array t -> unit meth
     method setMode : js_string t -> unit meth
     method on : js_string t -> (< .. > t -> unit) callback -> unit meth
-    method setUseSoftTabs : bool Js.t -> unit Js.meth
+    method setUseSoftTabs : bool t -> unit meth
   end
 
 class type editor =
@@ -63,7 +64,7 @@ class type editor =
     method resize : bool t -> unit meth
     method setReadOnly : bool t -> unit meth
     method gotoLine : int -> float -> bool t -> unit meth
-    method setTheme : Js.js_string Js.t -> unit meth
+    method setTheme : js_string t -> unit meth
     method on : js_string t -> (< .. > t -> unit) callback -> unit meth
   end
 
@@ -73,33 +74,33 @@ class type ace =
     method edit : js_string t -> editor t meth
   end
 
-let log s = Firebug.console ## log (Js.string s)
+let log s = Firebug.console ## log (string s)
 
 let check_def s o =
-  Js.Optdef.get o (fun () -> log ("Property " ^ s ^ " is undefined or null");
+  Optdef.get o (fun () -> log ("Property " ^ s ^ " is undefined or null");
 			  assert false)
 
 let get o ident =
-  let res : 'a Js.optdef = Js.Unsafe.(get o) (Js.string ident) in
+  let res : 'a optdef = Unsafe.(get o) (string ident) in
   check_def ident res
 
 let global ident =
-  get Js.Unsafe.global ident
+  get Unsafe.global ident
 
 let ace : ace t = global "ace"
 
 let _Range : (int -> int -> int -> int -> range t) constr =
-  let r = ace ## require (Js.string "ace/range") in
+  let r = ace ## require (string "ace/range") in
   get r "Range"
 
 
 let _Document : (js_string -> document) constr =
-  let d = ace ## require (Js.string "ace/document") in
+  let d = ace ## require (string "ace/document") in
   get d "Document"
 
 let mk_annotation (row : int) (col : int) (text : js_string t) (kind : js_string t) : annotation t =
-  Js.Unsafe.(obj [| "row", inject row; "column", inject col;
+  Unsafe.(obj [| "row", inject row; "column", inject col;
 	            "text", inject text; "type", inject kind |])
 
 let mk_position (row : int) (col : int) : position t =
-    Js.Unsafe.(obj [| "row", inject row; "column", inject col |])
+    Unsafe.(obj [| "row", inject row; "column", inject col |])

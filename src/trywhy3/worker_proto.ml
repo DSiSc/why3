@@ -19,11 +19,13 @@ type why3_command =  ParseBuffer of string
 		   | ProveAll
 		   | Transform of [ `Prove of int | `Split | `Clean ] * id
 		   | SetStatus of status * id
+                   | GetPretty of id
 
 type why3_output = Error of string (* msg *)
                  | ErrorLoc of (loc * string) (* loc * msg *)
                  | Theory of id * string (* Theory (id, name) *)
-                 | Task of (id * id * string * string * why3_loc list * string * int)
+                 | Task of (id * id * string * string * why3_loc list * int)
+                 | Pretty of id * string
                  (* id, parent id, expl, code, location list, pretty, steps*)
                  | Result of string list
                  | UpdateStatus of status * id

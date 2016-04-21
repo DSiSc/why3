@@ -79,7 +79,7 @@ module Task =
 	mutable subtasks : id list;
 	loc : why3_loc list;
 	expl : string;
-        pretty : string;
+        mutable pretty : string option;
       }
 
     let task_table : (id, task_info) Hashtbl.t = Hashtbl.create 17
@@ -171,11 +171,24 @@ module Task =
 	  subtasks = [];
 	  loc = id_loc @  (collect_locs task);
 	  expl = expl;
-          pretty = task_text (Trans.apply intro_trans task);
+          pretty = None; (*task_text (Trans.apply intro_trans task); *)
         }
       in
       Hashtbl.add task_table id task_info;
       id
+
+    let get_pretty id =
+      try
+        let info = get_info id in
+        match info.task, info.pretty with
+          _, Some s -> s
+        | `Task task, None ->
+           let s = task_text (Trans.apply intro_trans task) in
+           info.pretty <- Some s;
+           s
+        | _ -> raise Not_found
+      with
+        Not_found -> log ("Invalid task request for id" ^ id);""
 
     let register_theory th_name th =
       let th_id = gen_id () in
@@ -189,7 +202,7 @@ module Task =
 				      subtasks = task_ids;
 				      loc = [];
 				      expl = th_name;
-                                      pretty = "";
+                                      pretty = None;
                                     };
       th_id
 
@@ -251,7 +264,7 @@ let rec why3_prove ?(steps= ~-1) id =
   match t.subtasks with
     [] ->  t.status <- `Unknown;
 	  let task = get_task t.task in
-	  let msg = Task (id, t.parent_id, t.expl, task_to_string task, t.loc, t.pretty, steps) in
+	  let msg = Task (id, t.parent_id, t.expl, task_to_string task, t.loc, steps) in
 	  W.send msg;
 	  let l = set_status id `New in
           List.iter W.send l
@@ -420,6 +433,10 @@ let () =
        | Transform (`Prove(steps), id) -> why3_prove ~steps id
        | Transform (`Clean, id) -> why3_clean id
        | ProveAll -> why3_prove_all ()
+       | GetPretty (id) ->
+          let pretty = Task.get_pretty id in
+          log (Printf.sprintf "Sending back pretty for task %s" id);
+          W.send (Pretty(id, pretty))
        | ParseBuffer code ->
           Task.clear_warnings ();
           Task.clear_table ();
