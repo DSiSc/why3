@@ -108,7 +108,6 @@ module Editor =
     let editor = Ace.ace ## edit (Js.string "why3-editor")
     let task_viewer = Ace.ace ## edit (Js.string "why3-task-viewer")
 
-
     let set_annotations l =
       let a =
 	Array.map (fun (r,c,t,k) -> Ace.mk_annotation r c t k) (Array.of_list l)
@@ -150,22 +149,24 @@ module Editor =
     let set_value ?(editor=editor) (str : Js.js_string Js.t) =
       editor ## getSession () ## getDocument () ## setValue (str)
 
-
-    let saved_markers : int list ref = ref []
+    let active_markers = Hashtbl.create 17
 
     let add_marker cls r : int =
-      let m = editor ## getSession () ## addMarker (r, Js.string cls, Js.string "text") in
-      saved_markers := m :: !saved_markers; m
+      let m =
+	editor ## getSession () ## addMarker (r, Js.string cls, Js.string "text")
+      in
+      Hashtbl.replace active_markers m m;
+      m
 
     let remove_marker m =
-      saved_markers := List.filter (fun n -> n != m) !saved_markers;
-      editor ## getSession () ## removeMarker (m)
+      editor ## getSession () ## removeMarker (m);
+      Hashtbl.remove active_markers m
 
     let clear_markers () =
-      List.iter
-        (fun m -> editor ## getSession () ## removeMarker (m) )
-        !saved_markers;
-      saved_markers := []
+      Hashtbl.iter
+	(fun m _ -> editor ## getSession () ## removeMarker (m))
+	active_markers;
+      Hashtbl.clear active_markers
 
     let why3_loc_to_range  (line, col, e) =
       let doc = editor ## getSession () ## getDocument ()  in
@@ -199,7 +200,64 @@ module Editor =
             (Dom_html.window ## confirm (Js.string "You have unsaved changes in your editor, proceed anyway ?"))
         else
           true
+
+
+
+
+      let mk_save =
+	let _Blob  = get_global "Blob" in
+	fun () ->
+	let blob =
+          jsnew _Blob (Js.array [| get_value () |],
+                       JSU.(obj [| "type", inject (Js.string "application/octet-stream") |]))
+      in
+      let filename =
+	if !name ## length == 0 then Js.string "test.mlw" else !name
+      in
+      blob, filename
+
+      let save_default  =
+	let real_save = getElement AsHtml.a "why3-save-as" in
+	let _URL = JSU.(get Dom_html.window (Js.string "URL")) in
+	fun () ->
+	let blob, name = mk_save () in
+	let url = JSU.(meth_call _URL "createObjectURL" [| inject blob |]) in
+	real_save ## href <- url;
+	JSU.(set real_save (Js.string "download") name);
+	ignore JSU.(meth_call real_save "click" [| |])
+
+      let save =
+	match Js.Optdef.to_option JSU.(get (Dom_html.window ## navigator) (Js.string "msSaveBlob"))
+	with
+          None -> save_default
+	| Some _f ->
+           fun () ->
+           let blob, name = mk_save () in
+           ignore JSU.(meth_call (Dom_html.window ## navigator) "msSaveBlob" [| inject blob; inject name |])
+
+    let open_ = getElement AsHtml.input "why3-open"
+    let () =
+      open_ ## onchange <-
+	Dom.handler
+	  (fun _e ->
+	   match Js.Optdef.to_option (open_ ## files) with
+	     None -> Js._false
+	   | Some (f) -> match Js.Opt.to_option (f ## item (0)) with
+			  None -> Js._false
+			| Some f ->
+			   ignore (
+			       Lwt.bind (File.readAsText f)
+					(fun str ->
+					 name := File.filename f;
+					 set_value str;
+					 Lwt.return_unit));
+			       Js._true
+          )
+    let load () = if confirm_unsaved () then open_ ## click ()
+
+
   end
+
 
 module Tabs =
   struct
@@ -247,12 +305,9 @@ module ContextMenu =
       if !enabled then
         task_menu ## style ## display <- Js.string "none"
 
-    let add_action b f =
-      b ## onclick <- Dom.handler (fun _ ->
-				   hide ();
-				   f ();
-                                   Editor.editor ## focus ();
-				   Js._false)
+    let connect b f =
+      b ## onclick <-
+	Dom.handler (fun _ -> hide (); f (); Js._false)
     let () = addMouseEventListener false task_menu "mouseleave"
 	(fun _ -> hide())
 
@@ -329,8 +384,7 @@ module TaskList =
 
     let print cls msg =
       task_list ## innerHTML <-
-        (Js.string ("<p class='" ^ cls ^ "'>" ^
-                      msg ^ "</p>"))
+        (Js.string ("<p class='" ^ cls ^ "'>" ^ msg ^ "</p>"))
 
     let print_error = print "why3-error"
 
@@ -342,6 +396,7 @@ module TaskList =
         Valid -> span_msg ## innerHTML <- Js.string ""
       | Unknown msg -> span_msg ## innerHTML <- (Js.string (" (" ^ msg ^ ")"))
       | Invalid msg -> span_msg ## innerHTML <- (Js.string (" (" ^ msg ^ ")"))
+
 
     let mk_li_content id expl =
       Js.string (Format.sprintf
@@ -420,7 +475,6 @@ module TaskList =
       task_list ## innerHTML <- Js.string "";
       Editor.set_value ~editor:Editor.task_viewer (Js.string "")
 
-    let error_marker = ref None
     let () =
       Editor.editor ## on
                     (Js.string "change",
@@ -428,10 +482,7 @@ module TaskList =
                                                Editor.saved := false;
                                                ExampleList.unselect ();
 				               Editor.clear_annotations ();
-                                               match !error_marker with
-                                                 None -> ()
-                                               | Some (m, _) -> Editor.remove_marker m;
-                                                               error_marker := None))
+					       Editor.clear_markers ()))
 
     let () =
       Editor.editor ## on (Js.string "focus", Js.wrap_callback  clear_task_selection )
@@ -444,18 +495,18 @@ module TaskList =
       | Idle | Warning [] -> ()
       | Warning lst ->
          let annot =
-           List.map (fun ((l1, c1), msg) ->
-                     (l1,c1, Js.string msg, Js.string "warning")) lst
+           List.map (fun ((l1, c1, _), msg) ->
+                     (l1 - 1, c1, Js.string msg, Js.string "warning")) lst
          in
          Editor.set_annotations annot
 
       | Error s -> print_error s
 
-      | ErrorLoc ((l1, b, l2, e), s) ->
-         let r = jsnew Ace._Range (l1, b, l2, e) in
-         error_marker := Some (Editor.add_marker "why3-error" r, r);
+      | ErrorLoc ((l, c, _) as loc, s) ->
+         let r = Editor.why3_loc_to_range loc in
+         ignore Editor.(add_marker "why3-error" r);
          print_error s;
-	 Editor.set_annotations [ (l1, b, Js.string s, Js.string "error") ]
+	 Editor.set_annotations [ (l - 1, c, Js.string s, Js.string "error") ]
 
       | Result sl ->
          clear ();
@@ -500,9 +551,7 @@ module TaskList =
 	       (fun e ->
 		clear_task_selection ();
                 select_task id span locs;
-		let x = max 0 ((e ##clientX) - 2) in
-		let y = max 0 ((e ##clientY) - 2) in
-		ContextMenu.show_at x y)
+		ContextMenu.show_at e##clientX e##clientY)
 	 end
 
 
@@ -524,23 +573,54 @@ module TaskList =
 
   end
 
-
-module ToolBar =
+module KeyBinding =
   struct
-    let button_open = getElement AsHtml.button "why3-button-open"
-    let real_save = getElement AsHtml.a "why3-save-as"
-    let button_save = getElement AsHtml.button "why3-button-save"
 
-    let button_undo = getElement AsHtml.button "why3-button-undo"
-    let button_redo = getElement AsHtml.button "why3-button-redo"
+    let callbacks = Array.init 255 (fun _ -> Array.make 16 None)
+    let bool_to_int b =
+      if Js.to_bool b then 1 else 0
+    let pack a b c d =
+      ((bool_to_int a) lsl 3) lor
+        ((bool_to_int b) lsl 2) lor
+          ((bool_to_int c) lsl 1) lor
+            (bool_to_int d)
 
-    let button_execute = getElement AsHtml.button "why3-button-execute"
-    let button_compile = getElement AsHtml.button "why3-button-compile"
-    let button_stop = getElement AsHtml.button "why3-button-stop"
+    let () =
+      Dom_html.document ## onkeydown <-
+        Dom.handler
+          (fun ev ->
+           let i = min (Array.length callbacks) (max 0 ev ## keyCode) in
+           let t = callbacks.(i) in
+           match t.(pack (ev ## ctrlKey) (ev ## shiftKey) (ev ## metaKey) (ev ## altKey)) with
+             None -> Js._true
+           | Some f ->
+              ignore JSU.(meth_call ev "preventDefault" [| |]);
+              f ())
 
-    let button_settings = getElement AsHtml.button "why3-button-settings"
-    let button_help = getElement AsHtml.button "why3-button-help"
-    let button_about = getElement AsHtml.button "why3-button-about"
+    let add ?(ctrl=Js._false) ?(shift=Js._false) ?(alt=Js._false)
+		   ?(meta=Js._false) keycode f =
+      let i = min (Array.length callbacks) (max 0 keycode) in
+      let t = callbacks.(i) in
+      t.(pack ctrl shift meta alt) <- Some f
+
+  end
+
+module Button =
+  struct
+    let open_ = getElement AsHtml.button "why3-button-open"
+    let save = getElement AsHtml.button "why3-button-save"
+
+    let undo = getElement AsHtml.button "why3-button-undo"
+    let redo = getElement AsHtml.button "why3-button-redo"
+
+    let execute = getElement AsHtml.button "why3-button-execute"
+    let compile = getElement AsHtml.button "why3-button-compile"
+    let stop = getElement AsHtml.button "why3-button-stop"
+
+    let settings = getElement AsHtml.button "why3-button-settings"
+    let help = getElement AsHtml.button "why3-button-help"
+    let about = getElement AsHtml.button "why3-button-about"
+    let close = getElement AsHtml.button "why3-close-dialog-button"
 
     let disable b  =
       b ## disabled <- Js._true;
@@ -555,91 +635,40 @@ module ToolBar =
       if Js.to_bool (b##disabled) then enable b else disable b
 
 
-    let add_action b f =
+    let connect ?(ctrl=Js._false) ?(shift=Js._false) ?(alt=Js._false)
+		   ?(meta=Js._false) ?(key= ~-1) b f =
       let cb = fun _ ->
 	f ();
         Editor.editor ## focus ();
 	Js._false
       in
-      b ## onclick <- Dom.handler cb
+      b ## onclick <- Dom.handler cb;
+      if key >= 0 then
+	KeyBinding.add ~ctrl ~shift ~alt ~meta key cb
 
 
     let disable_compile () =
       Editor.disable ();
       ContextMenu.disable ();
       ExampleList.disable ();
-      disable button_open;
-      disable button_undo;
-      disable button_redo;
-      disable button_execute;
-      disable button_compile
+      disable open_;
+      disable undo;
+      disable redo;
+      disable execute;
+      disable compile
 
     let enable_compile () =
       Editor.enable ();
       ContextMenu.enable ();
       ExampleList.enable ();
-      enable button_open;
-      enable button_undo;
-      enable button_redo;
-      enable button_execute;
-      enable button_compile
+      enable open_;
+      enable undo;
+      enable redo;
+      enable execute;
+      enable compile
 
 
 
-
-    let mk_save =
-      let _Blob  = get_global "Blob" in
-      fun () ->
-      let blob =
-        jsnew _Blob (Js.array [| (Editor.get_value ()) |],
-                     JSU.(obj [| "type", inject (Js.string "application/octet-stream") |]))
-      in
-      let name =
-	if !Editor.name ## length == 0 then Js.string "test.mlw" else !Editor.name
-      in
-      blob, name
-
-    let save_default  =
-      let _URL = JSU.(get Dom_html.window (Js.string "URL")) in
-      fun () ->
-      let blob, name = mk_save () in
-      let url = JSU.(meth_call _URL "createObjectURL" [| inject blob |]) in
-      real_save ## href <- url;
-      JSU.(set real_save (Js.string "download") name);
-      ignore JSU.(meth_call real_save "click" [| |])
-    (* does not work with firefox *)
-    (*ignore JSU.(meth_call _URL "revokeObjectURL" [| inject url |]) *)
-
-
-    let save =
-      match Js.Optdef.to_option JSU.(get (Dom_html.window ## navigator) (Js.string "msSaveBlob"))
-      with
-        None -> save_default
-      | Some _f ->
-         fun () ->
-         let blob, name = mk_save () in
-         ignore JSU.(meth_call (Dom_html.window ## navigator) "msSaveBlob" [| inject blob; inject name |])
-
-    let open_ = getElement AsHtml.input "why3-open"
-    let () =
-      open_ ## onchange <-
-	Dom.handler
-	  (fun _e ->
-           ExampleList.unselect ();
-	   match Js.Optdef.to_option (open_ ## files) with
-	     None -> Js._false
-	   | Some (f) -> match Js.Opt.to_option (f ## item (0)) with
-			  None -> Js._false
-			| Some f ->
-			   ignore (
-			       Lwt.bind (File.readAsText f)
-					(fun str ->
-					 Editor.name := File.filename f;
-					 Editor.set_value str;
-					 Lwt.return_unit));
-			       Js._true
-          )
-    let open_ () = if Editor.confirm_unsaved () then open_ ## click ()
 
   end
 
@@ -692,7 +721,7 @@ module Dialogs =
     let dialog_panel = getElement AsHtml.div "why3-dialog-panel"
     let setting_dialog = getElement AsHtml.div "why3-setting-dialog"
     let about_dialog = getElement AsHtml.div "why3-about-dialog"
-    let button_close = getElement AsHtml.button "why3-close-dialog-button"
+
     let input_num_threads = getElement AsHtml.input "why3-input-num-threads"
     let input_num_steps = getElement AsHtml.input "why3-input-num-steps"
     let radio_wide = getElement AsHtml.input "why3-radio-wide"
@@ -712,37 +741,6 @@ module Dialogs =
       o ## onchange <- Dom.handler (fun _ -> f o; Js._false)
   end
 
-module KeyBinding =
-  struct
-
-    let callbacks = Array.init 255 (fun _ -> Array.make 16 None)
-    let bool_to_int b =
-      if Js.to_bool b then 1 else 0
-    let pack a b c d =
-      ((bool_to_int a) lsl 3) lor
-        ((bool_to_int b) lsl 2) lor
-          ((bool_to_int c) lsl 1) lor
-            (bool_to_int d)
-
-    let () =
-      Dom_html.document ## onkeydown <-
-        Dom.handler
-          (fun ev ->
-           let i = min (Array.length callbacks) (max 0 ev ## keyCode) in
-           let t = callbacks.(i) in
-           match t.(pack (ev ## ctrlKey) (ev ## shiftKey) (ev ## metaKey) (ev ## altKey)) with
-             None -> Js._true
-           | Some f ->
-              ignore JSU.(meth_call ev "preventDefault" [| |]);
-              f ();
-              Js._false)
-
-    let add_global ?(ctrl=Js._false) ?(shift=Js._false) ?(alt=Js._false) ?(meta=Js._false) keycode f =
-      let i = min (Array.length callbacks) (max 0 keycode) in
-      let t = callbacks.(i) in
-      t.(pack ctrl shift meta alt) <- Some f
-
-  end
 
 
 module Session =
@@ -854,13 +852,12 @@ module Controller =
       let idx, w = find_free_worker_slot 0 in
       match w with
 	Free w when not (Queue.is_empty task_queue) ->
-	let (id, code, steps) = Queue.pop task_queue in
+	let (id, _, _) as task = Queue.pop task_queue in
 	!alt_ergo_workers.(idx) <- Busy (id, w);
-	w ## postMessage (marshal (OptionSteps !alt_ergo_steps));
-	w ## postMessage (marshal (Goal(id, code, steps)));
+	w ## postMessage (marshal task);
         log (Printf.sprintf "sending task %s to alt-ergo" id);
         process_task ()
-      | _ -> if is_idle () then ToolBar.enable_compile ()
+      | _ -> if is_idle () then Button.enable_compile ()
 
 
     let push_task task =
@@ -908,7 +905,7 @@ module Controller =
     let () = why3_worker := Some (init_why3_worker ())
 
     let why3_parse () =
-      ToolBar.disable_compile ();
+      Button.disable_compile ();
       why3_busy := true;
       TaskList.clear ();
       TaskList.print_msg "<span class='fa fa-cog fa-spin'></span> Generating tasks … ";
@@ -919,7 +916,7 @@ module Controller =
       (get_why3_worker()) ## postMessage (msg)
 
     let why3_execute () =
-      ToolBar.disable_compile ();
+      Button.disable_compile ();
       why3_busy := true;
       TaskList.clear ();
       TaskList.print_msg "<span class='fa fa-cog fa-spin'></span> Compiling buffer … ";
@@ -933,7 +930,7 @@ module Controller =
       if is_idle () then
 	begin
           why3_busy := true;
-          ToolBar.disable_compile ();
+          Button.disable_compile ();
           List.iter
             (fun (id,_) ->
 	     f id;
@@ -954,14 +951,14 @@ module Controller =
       why3_worker := Some (init_why3_worker ());
       reset_workers ();
       TaskList.clear ();
-      ToolBar.enable_compile ()
+      Button.enable_compile ()
 
     let stop () =
       if not (is_idle ()) then begin
           if !why3_busy then
             force_stop ()
           else begin reset_workers ();
-                     ToolBar.enable_compile();
+                     Button.enable_compile();
                end
         end
 
@@ -970,37 +967,31 @@ end
 
 (* Initialisation *)
 let () =
-  ToolBar.(add_action button_open open_);
-  KeyBinding.add_global ~ctrl:Js._true 79 ToolBar.open_;
+  Button.connect ~ctrl:Js._true ~key:79 Button.open_ Editor.load;
+  Button.connect ~ctrl:Js._true ~key:83 Button.save Editor.save;
+  Button.connect ~ctrl:Js._true ~key:90 Button.undo Editor.undo;
+  Button.connect ~ctrl:Js._true ~key:89 Button.redo Editor.redo;
+  Button.connect Button.execute Controller.why3_execute;
+  Button.connect Button.compile Controller.why3_parse;
+  Button.connect Button.stop Controller.stop;
+  Button.connect Button.settings Dialogs.(show setting_dialog);
+  Button.connect Button.help
+		 (fun () ->
+                  Dom_html.window ## open_ (Js.string "trywhy3_help.html",
+                                            Js.string "_blank",
+                                            Js.null));
+  Button.connect Button.about Dialogs.(show about_dialog);
+  Button.connect ~key:Keycode.esc Button.close (fun _ ->Dialogs.close (); Js._false);
 
-  ToolBar.(add_action button_save save);
-  KeyBinding.add_global ~ctrl:Js._true 83 ToolBar.save;
-
-  ToolBar.(add_action button_undo Editor.undo);
-  KeyBinding.add_global ~ctrl:Js._true 90 Editor.undo;
-
-  ToolBar.(add_action button_redo Editor.redo);
-  KeyBinding.add_global ~ctrl:Js._true 89 Editor.redo;
-
-
-  ToolBar.(add_action button_execute Controller.why3_execute);
-  ToolBar.(add_action button_compile Controller.why3_parse);
-  ToolBar.(add_action button_stop Controller.stop);
-  ToolBar.(add_action button_settings Dialogs.(show setting_dialog));
-  ToolBar.(add_action button_help (fun () ->
-                                   Dom_html.window ## open_ (Js.string "trywhy3_help.html",
-                                                             Js.string "_blank",
-                                                             Js.null)));
-  ToolBar.(add_action button_about Dialogs.(show about_dialog));
-  ContextMenu.(add_action split_menu_entry
+  ContextMenu.(connect split_menu_entry
 			  Controller.(why3_transform `Split ignore));
-  ContextMenu.(add_action prove_menu_entry
-			  Controller.(why3_transform (`Prove(-1)) ignore));
-  ContextMenu.(add_action prove100_menu_entry
+  ContextMenu.(connect prove_menu_entry
+			  Controller.(why3_transform (`Prove(!alt_ergo_steps)) ignore));
+  ContextMenu.(connect prove100_menu_entry
 			  Controller.(why3_transform (`Prove(100)) ignore));
-  ContextMenu.(add_action prove1000_menu_entry
+  ContextMenu.(connect prove1000_menu_entry
 			  Controller.(why3_transform (`Prove(1000)) ignore));
-  ContextMenu.(add_action clean_menu_entry
+  ContextMenu.(connect clean_menu_entry
 			  Controller.(why3_transform (`Clean) TaskList.clean_task));
   Dialogs.(set_onchange input_num_threads
 			 (fun o ->
@@ -1013,11 +1004,9 @@ let () =
 			 (fun o ->
 			  let steps = int_of_js_string (o ## value) in
                           Controller.alt_ergo_steps := steps;
-			  Controller.force_stop ()
+			  Controller.stop ()
 	                 ));
 
-  ToolBar.add_action Dialogs.button_close Dialogs.close;
-  KeyBinding.add_global Keycode.esc  Dialogs.close;
 
   Dialogs.(set_onchange radio_wide (fun _ -> Panel.set_wide true));
   Dialogs.(set_onchange radio_column (fun _ -> Panel.set_wide false))

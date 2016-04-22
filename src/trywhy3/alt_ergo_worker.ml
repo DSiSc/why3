@@ -58,17 +58,14 @@ let run_alt_ergo_on_task text =
 
 
 let () =
-  Options.set_steps_bound 100;
-  Worker.set_onmessage (fun msg ->
-			match unmarshal msg with
-			  Goal (id, text, steps) ->
-                          log (Printf.sprintf "Received task %s" id);
-			  let old_steps = Options.steps_bound () in
-			  if steps > 0 then Options.set_steps_bound steps;
-			  let result = run_alt_ergo_on_task text in
-			  Options.set_steps_bound old_steps;
-			  Worker.post_message (marshal (id,result))
-			| OptionSteps i -> Options.set_steps_bound i)
+  Worker.set_onmessage
+    (fun msg ->
+     let id, text, steps = unmarshal msg in
+     log (Printf.sprintf "Received task %s" id);
+     Options.set_steps_bound steps;
+     let result = run_alt_ergo_on_task text in
+     Worker.post_message (marshal (id,result))
+    )
 
 (*
 Local Variables:

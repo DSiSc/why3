@@ -10,8 +10,8 @@
 (********************************************************************)
 
 type id = string
-type loc = int * int * int * int
-type why3_loc = string * (int * int * int) (* kind, line, column, length *)
+type loc = (int * int * int) (*line, column, length *)
+type annot_loc = string * loc (* kind, line, column, length *)
 type status = [`New | `Valid | `Unknown ]
 
 type why3_command =  ParseBuffer of string
@@ -24,15 +24,15 @@ type why3_command =  ParseBuffer of string
 type why3_output = Error of string (* msg *)
                  | ErrorLoc of (loc * string) (* loc * msg *)
                  | Theory of id * string (* Theory (id, name) *)
-                 | Task of (id * id * string * string * why3_loc list * int)
+                 | Task of (id * id * string * string * annot_loc list * int)
                  | Pretty of id * string
                  (* id, parent id, expl, code, location list, pretty, steps*)
                  | Result of string list
                  | UpdateStatus of status * id
-                 | Warning of ((int*int) * string) list
+                 | Warning of (loc * string) list
                  | Idle
 
-type prover_command = OptionSteps of int | Goal of id * string * int
+type prover_command = id * string * int (* task id, string, number of stes *)
 type prover_output = Valid | Unknown of string | Invalid of string
 
 let marshal a =

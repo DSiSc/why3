@@ -37,6 +37,7 @@ class type editSession =
   object
     method addMarker :
       range Js.t -> Js.js_string Js.t -> Js.js_string Js.t -> int Js.meth
+    method getMarkers :  int Js.js_array Js.t Js.meth
     method clearAnnotations : unit Js.meth
     method getDocument : document Js.t Js.meth
     method getUndoManager : undoManager Js.t Js.meth

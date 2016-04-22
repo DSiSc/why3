@@ -47,6 +47,7 @@ class type undoManager =
 class type editSession =
   object
     method addMarker : range t -> js_string t -> js_string t -> int meth
+    method getMarkers : int js_array t meth
     method clearAnnotations : unit meth
     method getDocument : document t meth
     method getUndoManager : undoManager t meth
