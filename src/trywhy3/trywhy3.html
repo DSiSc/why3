@@ -19,9 +19,8 @@
   </head>
   <body>
     <div id="why3-main-container" class="why3-container">
-      <div id="why3-top-button-bar" class="why3-widget why3-button-bar">
+      <div id="why3-top-button-bar" class="why3-button-bar">
 
-	<div class="why3-separator" style="width:0.1em;"></div>
  	<div class="why3-button-group">
 	  <button id="why3-button-open"  class="why3-button"
                   title="Open file (ctrl-o)">
@@ -33,7 +32,6 @@
 	  </button>
  	</div>
 
-	<div class="why3-separator" style="width:2em;"></div>
  	<div class="why3-button-group">
 	  <button id="why3-button-undo"  class="why3-button"
                   title="Undo edit (ctrl-z)">
@@ -45,17 +43,15 @@
 	  </button>
  	</div>
 
-	<div class="why3-separator" style="width:2em;"></div>
 
 	<div class="why3-button-group">
 	  <span id="why3-example-label" class="fa fa-spin fa-refresh why3-icon"></span>
-	  <select  id="why3-select-example"
+	  <select  id="why3-select-example" class="why3-button"
 		   title="Choose a predefined example">
 	    <option disabled="disabled" selected="selected">&nbsp;</option>
 	  </select>
 	</div>
 
-	<div class="why3-separator" style="width:2em;"></div>
 
 	<div class="why3-button-group">
           <button id="why3-button-compile" class="why3-button" title="Compile buffer">
@@ -87,19 +83,19 @@
 
       </div>
 
-      <div id="why3-main-panel" class="why3-wide-view">
+      <div id="why3-main-panel" class="why3-wide-view why3-split-panel">
 	<div id="why3-editor-container" class="why3-container">
           <div id="why3-editor-bg" class="why3-widget"> </div>
 	  <div id="why3-editor" tabindex="-1" ></div>
 	</div>
-	<div id="why3-resize-bar" class="why3-widget" ></div>
+	<div id="why3-resize-bar" class="why3-resize-bar" ></div>
 	<div id="why3-tab-container" class="why3-container">
 	  <div id="why3-tab-panel" class="why3-tab-group">
-	    <span class="why3-tab-label why3-widget" >Task list</span>
+	    <span class="why3-tab-label" >Task list</span>
 	    <div class="why3-widget why3-tab">
 	      <div id="why3-task-list" class="why3-widget"></div>
 	    </div>
-	    <span class="why3-tab-label why3-widget why3-inactive" >Task view</span>
+	    <span class="why3-tab-label why3-inactive" >Task view</span>
 	    <div class="why3-widget why3-tab"><div  id="why3-task-viewer"></div></div>
 	  </div>
 	</div>
@@ -129,7 +125,7 @@
       </ul>
     </div>
     <!-- dialogs -->
-    <div id="why3-dialog-panel" class="why3-container" >
+    <div id="why3-dialog-panel" class="why3-dialog-container" >
       <div id="why3-dialog-bg" class="why3-widget"> </div>
       <div class="why3-widget why3-dialog">
 	<div id="why3-setting-dialog" class="why3-widget" >
@@ -186,7 +182,7 @@
 	  </ul>
 	</div>
 	<button id="why3-close-dialog-button"
-		style="float:right;"
+		style="float:right"
 		class="why3-button"
 		title="Close"><span class="fa-times"></span></button>
       </div>

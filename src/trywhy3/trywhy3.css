@@ -5,13 +5,179 @@
     font-family: 'FontAwesome', sans-serif;
 }
 
-/****** GLOBAL LAYOUT *********/
+/* GENERAL PROPERTIES The rules below define general CSS properties
+   that are necessary for complex widget (toolbar, tabs, resizable
+   panel) to work.
+
+   Element should only be accessed by (pseudo-)class selectors,
+   never by id.
+
+*/
+
 body {
     padding:0;
     margin:0;
     font-family: sans-serif;
 }
+:root {
+    /* All size should be computed using border-box (i.e. including border
+  and padding in the size calculation) */
+  box-sizing: border-box;
+}
 
+*, *:before, *:after {
+  /* to have the intuitive behaviour that changing the box-sizing: of a parent
+     changes the one of its descendant */
+  box-sizing: inherit;
+}
+
+.why3-hidden {
+    /* hidden elements that still need to be "rendered" (i.e. display:none is not an option) */
+    z-index:-10;
+    position:absolute;
+    top:0;
+    left:0;
+    height:0;
+    width:0;
+}
+
+.why3-container {
+    /* Element that contain other UI elements */
+    padding:0;
+    margin:0;
+}
+
+.why3-widget {
+    /* No generic property, mainly used for styling UI elements */
+}
+
+.why3-split-panel {
+    /* A split panel with two containers and one resize bar in the middle.
+       Can be vertical or horizontal */
+    display:flex;
+    align-items:stretch;
+}
+.why3-split-panel.why3-wide-view {
+    /* in wide-view mode, panels are side by side */
+    flex-direction: row;
+}
+.why3-split-panel.why3-column-view {
+    /* in column mode, panels are one above the other */
+    flex-direction: column;
+}
+.why3-split-panel > * {
+    flex-grow:1;
+    width: auto;
+    height: auto;
+}
+
+.why3-split-panel > .why3-resize-bar {
+    flex-grow: 0;
+    flex-basis: 3pt; /* some default width that can be overriden */
+}
+
+.why3-split-panel.why3-wide-view > .why3-resize-bar {
+    cursor: ew-resize;
+}
+.why3-split-panel.why3-column-view > .why3-resize-bar {
+    cursor: ns-resize;
+}
+
+.why3-tab-group {
+    position: relative;
+}
+.why3-tab-group > .why3-tab-label:before {
+    content: "";
+    height: 100%;
+    display: inline-block;
+    vertical-align:middle;
+}
+
+.why3-tab-group > .why3-tab-label {
+    display: inline-block;
+    vertical-align:middle;
+    height: 20pt;
+    z-index:2;
+    position: relative;
+    top:1pt;
+}
+
+.why3-tab-group > .why3-tab-label.why3-inactive {
+    z-index:0;
+}
+
+.why3-tab-group > .why3-tab {
+    position:absolute;
+    left: 0;
+    top: 20pt; /** should match the height of .why3-tab-label **/
+    bottom:0;
+    right: 0;
+    z-index:1;
+
+}
+.why3-tab-label.why3-inactive + .why3-tab {
+    z-index:0;
+}
+.why3-contextmenu {
+    /* hiddent by default, should be a child of the body element */
+    display:none;
+    position: absolute;
+    z-index: 500; /* in front of everything */
+}
+.why3-contextmenu ul {
+    list-style-type:none;
+    padding:0;
+    margin:0;
+}
+
+.why3-dialog-container {
+    display:none; /* should become flex */
+    z-index: 500;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    justify-content: center;
+    align-items: center;
+    align-content: center;
+    position:absolute;
+}
+
+.why3-dialog-container:before {
+    content: "";
+    display:block;
+    position:absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 501;
+    opacity: 0.75; /* can be customized */
+}
+
+.why3-dialog {
+    position:relative;
+    z-index:502;
+    flex-grow:0;
+}
+.why3-dialog > .why3-widget {
+    display:none;
+}
+
+.why3-button-bar {
+    width: 100%;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+.why3-button-bar > .why3-button-group {
+    float:left;
+    display: inline-block;
+}
+
+/* SPECIFIC PAGE LAYOUT : The rules below define the page layout. Element should
+   be accessed by at least one specific ID along the selector path.
+
+*/
 #why3-main-container {
     /* Fills the whole window */
     display: flex; /* tells the children with flex:i
@@ -26,119 +192,47 @@ body {
     right:0;
     bottom:0;
 }
-.why3-widget, .why3-container {
-    /* Make the test non selectable */
-  -webkit-touch-callout: none; /* iOS Safari */
-  -webkit-user-select: none;   /* Chrome/Safari/Opera */
-  -khtml-user-select: none;    /* Konqueror */
-  -moz-user-select: none;      /* Firefox */
-  -ms-user-select: none;       /* IE/Edge */
-  user-select: none;           /* non-prefixed version, currently
-                                  not supported by any browser */
-  cursor:default;
-}
 
 #why3-top-button-bar {
-    width:100%;
+    flex-grow: 0;
+    flex-basis: 24pt;
+    box-sizing: content-box;
+}
+#why3-top-button-bar * {
+    box-sizing: border-box;
+}
+#why3-top-button-bar > .why3-button-group {
+    height: 24pt; /* flex-basis above; */
 }
 
+#why3-top-button-bar .why3-button,
+.why3-dialog .why3-button {
+    font-size:12pt;
+    height: 20pt;
+    width: 20pt;
+    margin-top: 2pt;
+    padding: 0;
+
+}
+#why3-top-button-bar #why3-select-example {
+
+    width: 8em;
+}
 #why3-main-panel {
     width:100%;
     padding:0;
     margin:0;
     flex: 1;
 }
-
-.why3-hidden {
-    z-index:-10;
-    position:absolute;
-    top:0;
-    left:0;
-    height:0;
-    width:0;
+#why3-top-button-bar > .why3-button-group {
+    padding-left: 1em;
+    padding-right: 1em;
 }
-/**** BUTTON BAR *****/
-/* GENERIC PART */
-
-.why3-button-bar {
-    box-sizing:border-box;
-    padding:0;
-    margin:0;
-}
-
-.why3-button-bar > .why3-button-group {
-    position:relative;
-    margin:0;
-    box-sizing:border-box;
-    display:inline-block;
-    vertical-align:top;
-    padding:0;
-}
-
-.why3-button-bar .why3-separator {
-    display:inline-block;
-}
-.why3-flushright {
-    position:relative;
+#why3-top-button-bar > .why3-button-group:last-child {
     float:right;
+    padding-left: 1em;
+    padding-right: 1em;
 }
-
-/* SPECIFIC PART */
-#why3-select-example {
-    width:20em;
-}
-
-#why3-top-button-bar {
-    height:2em;
-    font-size:14pt;
-    line-height:1.8em;
-}
-#why3-top-button-bar .why3-button {
-    font-size:14pt;
-    width:1.8em;
-    display:inline-block;
-    height:1.6em;
-}
-
-/**** END BUTTON BAR ****/
-
-/**** Main view ****/
-
-#why3-main-panel {
-    display:flex;
-    align-items:stretch;
-}
-
-#why3-main-panel.why3-wide-view {
-    flex-direction:raw;
-}
-#why3-main-panel.why3-column-view {
-    flex-direction:column;
-}
-
-#why3-main-panel > * {
-    flex-grow: 1;
-    width:auto;
-    height:auto;
-}
-#why3-resize-bar {
-    flex-basis:3pt;
-    flex-grow:0;
-
-}
-
-#why3-main-panel.why3-wide-view #why3-resize-bar:hover {
-    cursor: ew-resize;
-    opacity:0.5;
-    border-style:solid;
-    border-width: 2pt;
-    box-sizing:border-box;
-}
-#why3-main-panel.why3-column-view #why3-resize-bar:hover {
-    cursor: ns-resize;
-}
-
-/*** MAIN EDITOR ***/
 #why3-editor-container {
     position:relative;
     flex-grow:2;
@@ -148,14 +242,17 @@ body {
     position:relative;
     margin:0;
     padding:0;
+
 }
 
 #why3-editor {
     position:absolute;
     top:0;
     left:0;
-    bottom:0;
-    right:0;
+    bottom: 0;
+    right: 0;
+    width:100%;
+    height:100%;
     padding:0;
     margin:0;
 }
@@ -172,131 +269,102 @@ body {
 #why3-editor-bg:hover {
     cursor:progress;
 }
-
-/*** TABS ***/
-
 #why3-tab-panel {
-
+    position: absolute;
     top:0;
     bottom:0;
     left:0;
     right:0;
     padding:0;
     margin:0;
-
-
-}
-
-.why3-tab-label {
-    display:inline-block;
-    position:relative;
-    top:1pt;
-    border-radius: 3pt 3pt 0 0;
-    border-width: 1pt 1pt 0 1pt;
-    border-style: solid;
-    height:2em;
-    box-sizing:border-box;
-    line-height:2em;
-    margin: 0.5em 0.5em 0 0.5em;
-    padding: 0 0.5em;
-    z-index:2;
-}
-
-.why3-tab {
-    position:absolute;
-    top:2.5em;
-    bottom:1pt;
-    left:0;
-    right:0;
-    margin:0;
-    padding:0;
-    z-index: 1;
-    padding-top:0.5em;
-    box-sizing:border-box;
-    border-top-style:solid;
-    border-top-width:1pt;
-}
-.why3-tab-label.why3-inactive,
-.why3-tab-label.why3-inactive + .why3-tab {
-    z-index:0;
 }
 
 #why3-task-viewer {
     width:100%;
     height:100%;
 }
-#why3-task-list {
-    overflow:auto;
-    width:100%;
-    height:100%;
-}
-/******* CONTEXT MENU *********/
+
+/* STYLE : The rules below define the visual style (colors, background, borders, effects, …)
+   They can be customized in trywhy3_custom.css
+*/
+
+
+.why3-button-bar,
+.why3-tab-label,
+.why3-tab,
+.why3-button,
+.why3-button-group,
 .why3-contextmenu {
-    display:none;
-    position:absolute;
-    border-style:solid;
-    border-width:1pt;
-    box-shadow:0pt 0pt 5pt #333;
+    border-color:  #aaa;
+    border-width: 1pt;
+    color: #555;
+}
+.why3-button {
+    border-style:hidden;
+    background: transparent;
+}
+.why3-button-group {
+    vertical-align: middle;
+    border-right-style: solid;
+}
+.why3-button:hover,
+#why3-top-button-bar #why3-select-example {
+    border-style: solid;
+    border-radius: 2pt;
 }
 
-.why3-contextmenu {
-    z-index:100;
+.why3-button-group:last-child {
+
+    border-right-style: none;
+    border-left-style: solid;
 }
-.why3-contextmenu ul {
+.why3-button-bar {
+    background-image: linear-gradient(to bottom, #fff 2%, #eee);
+    border-bottom-style:solid;
+    border-top-style:solid;
+    margin-top: 2pt;
+    margin-bottom: 2pt;
+}
+.why3-tab-label {
+    border-style: solid;
+    border-bottom-style: none;
+    border-radius: 2pt 2pt 0 0;
+    padding-left: 1em;
+    padding-right: 1em;
+    margin-right: 1em;
+}
+.why3-tab-label:not(.why3-inactive),
+.why3-tab
+{
+    background:#fff;
+    border-top-style:solid;
+}
+
+.why3-tab-label.why3-inactive,
+.why3-tab-label.why3-inactive + .why3-tab,
+.why3-container,
+.why3-contextmenu,
+.why3-dialog,
+.why3-dialog-container:before {
+    background: #eee;
+}
+.why3-contextmenu, .why3-dialog {
+    box-shadow: 0pt 0pt 3pt #555;
+}
+.why3-contextmenu ul,
+.why3-dialog ul
+{
+    padding: 0.1em;
     list-style-type:none;
-    padding:0;
-    margin:0;
 }
-.why3-contextmenu li {
-    padding: 0.5em 1em 0.5em 1em;
-}
-
-/******* DIALOGS ****/
-#why3-dialog-panel {
-    position:absolute;
-    z-index:100;
-    display:none;
-    top:0;
-    left:0;
-    right:0;
-    bottom:0;
-    justify-content:center;
-    align-items:center;
-}
-#why3-dialog-bg {
-    position:absolute;
-    opacity:0.75;
-    top:0;
-    left:0;
-    width:100%;
-    height:100%;
-    z-index:101;
+.why3-contextmenu li:hover {
+    background: #555;
+    color: #fff;
 }
 .why3-dialog {
-    z-index:102;
-    flex-grow:0;
-    box-shadow:0pt 0pt 5pt #333;
     padding: 1em;
 }
 
-#why3-dialog-panel .why3-dialog div.why3-widget {
-    display:none;
-}
-
-#why3-setting-dialog ul {
-    list-style-type:none;
-}
-#why3-setting-dialog li {
-    padding:0.5em;
-}
-/********** THEMABLE PART, SEE trywhy3_custom.css *************/
-
-#why3-editor {
-    font-size:large;
-}
-#why3-task-viewer {
-    font-size:large;
-}
 #why3-task-list ul {
     list-style-type:none;
 }
@@ -366,38 +434,7 @@ body {
     z-index:40;
 }
 
-.why3-widget {
-    background: #eee;
-    color: #666;
-    border-color: #888;
+#why3-editor,
+#why3-task-viewer {
+    font-size: large;
 }
-.why3-widget.why3-inactive {
-    background:#eee;
-    border-color:#eee;
-    color:#aaa;
-}
-
-.why3-button {
-    background-image: linear-gradient(to bottom, #eee, #ccc);
-    border-radius:3pt;
-    border: solid 1pt #aaa;
-}
-
-.why3-button,
-.why3-icon  {
-    color:#333;
-}
-.why3-button.why3-inactive,
-.why3-inactive .why3-icon  {
-    color:#aaa;
-}
-
-
-
-.why3-contextmenu li:hover,
-.why3-contextmenu li:hover .why3-icon
-{
-    color: #eee;
-    background: #222;
-}
-
