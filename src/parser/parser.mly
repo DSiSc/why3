@@ -151,7 +151,7 @@ end
 %token <string> LIDENT UIDENT
 %token <Ptree.integer_constant> INTEGER
 %token <string> OP1 OP2 OP3 OP4 OPPREF
-%token <Ptree.real_constant> FLOAT
+%token <Ptree.real_constant> REAL
 %token <string> STRING
 %token <Loc.position> POSITION
 %token <string> QUOTE_UIDENT QUOTE_LIDENT OPAQUE_QUOTE_LIDENT
@@ -161,7 +161,7 @@ end
 %token AS AXIOM BY CLONE COINDUCTIVE CONSTANT
 %token ELSE END EPSILON EXISTS EXPORT FALSE FORALL FUNCTION
 %token GOAL IF IMPORT IN INDUCTIVE LEMMA
-%token LET MATCH META NAMESPACE NOT PROP PREDICATE IS RANGE
+%token LET MATCH META NAMESPACE NOT PROP PREDICATE IS RANGE FLOAT
 %token SO THEN THEORY TRUE TYPE USE WITH
 
 (* program keywords *)
@@ -346,7 +346,9 @@ typedefn:
     { $1, $2, TDalias $3, $4 }
 (* fixme : allow negative bounds *)
 | IS RANGE labels(lident) COLON INTEGER DOTDOT INTEGER
-    { false, Public, TDrange ($5, $7, $3), [] }
+     { false, Public, TDrange ($5, $7, $3), [] }
+| IS FLOAT labels(lident) COLON INTEGER COMMA INTEGER
+     { false, Public, TDfloat ($5, $7, $3), [] }
 
 model:
 | EQUAL         { false }
@@ -638,7 +640,7 @@ quant:
 
 numeral:
 | INTEGER { Number.ConstInt $1 }
-| FLOAT   { Number.ConstReal $1 }
+| REAL   { Number.ConstReal $1 }
 
 (* Program declarations *)
 
@@ -940,6 +942,7 @@ lident:
 lident_keyword:
 | MODEL           { "model" }
 | RANGE           { "range" }
+| FLOAT           { "float" }
 | IS              { "is" }
 
 quote_uident:

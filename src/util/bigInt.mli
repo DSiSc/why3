@@ -60,6 +60,7 @@ val abs : t -> t
 
 (** power of small integers. Second arg must be non-negative *)
 val pow_int_pos : int -> int -> t
+val pow_int_pos_bigint : int -> t -> t
 
 (** conversions *)
 val of_string : string -> t

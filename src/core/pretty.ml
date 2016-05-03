@@ -342,9 +342,16 @@ let print_ty_decl fmt ts =
   forget_tvs ()
 
 let print_range_decl fmt ri =
-  fprintf fmt "@[<hov 2>type %a%a = %a .. %a@]"
+  fprintf fmt "@[<hov 2>type %a%a is range %a : %a .. %a@]"
     print_ts ri.range_ts print_id_labels ri.range_ts.ts_name
+    print_ls ri.range_proj
     print_integer_constant ri.range_low_cst print_integer_constant ri.range_high_cst
+
+let print_float_decl fmt fi =
+  fprintf fmt "@[<hov 2>type %a%a is float %a : %a, %a@]"
+    print_ts fi.float_ts print_id_labels fi.float_ts.ts_name
+    print_ls fi.float_proj
+    print_integer_constant fi.float_eb_cst print_integer_constant fi.float_sb_cst
 
 let print_data_decl fst fmt (ts,csl) =
   fprintf fmt "@[<hov 2>%s %a%a%a =@\n@[<hov>%a@]@]"
@@ -416,6 +423,7 @@ let print_list_next sep print fmt = function
 let print_decl fmt d = match d.d_node with
   | Dtype ts  -> print_ty_decl fmt ts
   | Drange ri -> print_range_decl fmt ri
+  | Dfloat fi -> print_float_decl fmt fi
   | Ddata tl  -> print_list_next newline print_data_decl fmt tl
   | Dparam ls -> print_param_decl fmt ls
   | Dlogic ll -> print_list_next newline print_logic_decl fmt ll

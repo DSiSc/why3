@@ -177,6 +177,7 @@ and dterm_node =
   | DTgvar of vsymbol
   | DTconst of Number.constant
   | DTrange_const of Number.integer_constant * Decl.range_info
+  | DTfloat_const of Number.real_constant * Decl.float_info
   | DTapp of lsymbol * dterm list
   | DTfapp of dterm * dterm
   | DTif of dterm * dterm * dterm
@@ -303,6 +304,8 @@ let dterm ?loc node =
       Some dty_real
     | DTrange_const (_c, ri) ->
       Some (dty_of_ty (Ty.ty_app ri.Decl.range_ts []))
+    | DTfloat_const (_c, fi) ->
+      Some (dty_of_ty (Ty.ty_app fi.Decl.float_ts []))
     | DTapp (ls,dtl) ->
         let dtyl, dty = specialize_ls ls in
         dty_unify_app ls dterm_expected_type dtl dtyl;
@@ -482,7 +485,10 @@ and try_term strict keep_loc uloc env prop dty node =
     t_const c
   | DTrange_const (c, ri) ->
     t_range_const c ri.Decl.range_ts ri.Decl.range_low_val
-                  ri.Decl.range_high_val ri.Decl.range_proj
+      ri.Decl.range_high_val ri.Decl.range_proj
+  | DTfloat_const (c, fi) ->
+    t_float_const c fi.Decl.float_ts fi.Decl.float_eb_val
+      fi.Decl.float_sb_val fi.Decl.float_proj
   | DTapp (ls,[]) when ls_equal ls fs_bool_true ->
       if prop then t_true else t_bool_true
   | DTapp (ls,[]) when ls_equal ls fs_bool_false ->

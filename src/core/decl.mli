@@ -97,6 +97,15 @@ type range_info = {
   range_proj     : Term.lsymbol;
 }
 
+type float_info = {
+  float_ts     : tysymbol;
+  float_eb_cst : Number.integer_constant;
+  float_eb_val : BigInt.t;
+  float_sb_cst : Number.integer_constant;
+  float_sb_val : BigInt.t;
+  float_proj   : Term.lsymbol;
+}
+
 type decl = private {
   d_node : decl_node;
   d_syms : Sid.t;         (** idents used in declaration *)
@@ -107,6 +116,7 @@ type decl = private {
 and decl_node = private
   | Dtype  of tysymbol          (** abstract types and aliases *)
   | Drange of range_info        (** range types *)
+  | Dfloat of float_info        (** float types *)
   | Ddata  of data_decl list    (** recursive algebraic types *)
   | Dparam of lsymbol           (** abstract functions and predicates *)
   | Dlogic of logic_decl list   (** defined functions and predicates (possibly recursively) *)
@@ -125,6 +135,7 @@ val d_hash : decl -> int
 
 val create_ty_decl : tysymbol -> decl
 val create_range_decl : range_info -> decl
+val create_float_decl : float_info -> decl
 val create_data_decl : data_decl list -> decl
 val create_param_decl : lsymbol -> decl
 val create_logic_decl : logic_decl list -> decl
@@ -186,6 +197,7 @@ exception NonFoundedTypeDecl of tysymbol
 
 val find_constructors : known_map -> tysymbol -> constructor list
 val find_range_decl : known_map -> tysymbol -> range_info option
+val find_float_decl : known_map -> tysymbol -> float_info option
 val find_inductive_cases : known_map -> lsymbol -> (prsymbol * term) list
 val find_logic_definition : known_map -> lsymbol -> ls_defn option
 val find_prop : known_map -> prsymbol -> term

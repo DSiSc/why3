@@ -61,6 +61,7 @@ let max = max_big_int
 let abs = abs_big_int
 
 let pow_int_pos = power_int_positive_int
+let pow_int_pos_bigint = power_int_positive_big_int
 
 let to_string = string_of_big_int
 let of_string = big_int_of_string

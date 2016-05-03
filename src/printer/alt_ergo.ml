@@ -329,6 +329,9 @@ let print_decl info fmt d = match d.d_node with
   | Drange _ ->
     unsupportedDecl d
       "alt-ergo: range types are not supported"
+  | Dfloat _ ->
+    unsupportedDecl d
+      "alt-ergo: floats are not supported"
   | Ddata dl ->
       print_list nothing (print_data_decl info) fmt dl
   | Dparam ls ->

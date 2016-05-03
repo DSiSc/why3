@@ -127,6 +127,9 @@ let print_decl info fmt d = match d.d_node with
   | Drange ri ->
     if not (Mid.mem ri.range_ts.Ty.ts_name info.info_syn) then
       unsupportedDecl d "Simplify does not support range types"
+  | Dfloat fi ->
+    if not (Mid.mem fi.float_ts.Ty.ts_name info.info_syn) then
+      unsupportedDecl d "Simplify does not support floats"
   | Ddata _ ->
       unsupportedDecl d "Algebraic datatypes are not supported"
   | Dlogic _ ->

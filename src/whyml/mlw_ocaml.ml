@@ -397,6 +397,8 @@ module Translate = struct
       type_decl info ts
     | Drange ri ->
       type_decl info ri.range_ts
+    | Dfloat fi ->
+      type_decl info fi.float_ts
     | Ddata tl ->
         begin match List.flatten (List.map (data_decl info) tl) with
           | [] -> []

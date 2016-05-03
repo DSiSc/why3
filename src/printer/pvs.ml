@@ -778,6 +778,7 @@ let print_decl ~old info fmt d =
   let name = match d.d_node with
     | Dtype ts
     | Drange { range_ts = ts }
+    | Dfloat { float_ts = ts }
     | Ddata ((ts, _) :: _) -> id_unique iprinter ts.ts_name
     | Dparam ls
     | Dlogic ((ls, _) :: _)
@@ -793,6 +794,9 @@ let print_decl ~old info fmt d =
   | Drange ri ->
     if not (Mid.mem ri.range_ts.ts_name info.info_syn) then
       unsupportedDecl d "PVS does not support range types"
+  | Dfloat fi ->
+    if not (Mid.mem fi.float_ts.ts_name info.info_syn) then
+      unsupportedDecl d "PVS does not support floats"
   | Ddata tl ->
       print_list nothing (print_data_decl info) fmt tl
   | Dparam ls ->

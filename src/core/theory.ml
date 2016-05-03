@@ -408,7 +408,7 @@ let check_decl_opacity d = match d.d_node with
   (* All lsymbols declared in Ddata are safe, nothing to check.
      We allow arbitrary ls_opaque in Dparam, but we check that
      cloning in theories preserves opacity, see cl_init below. *)
-  | Dtype _ | Drange _ | Ddata _ | Dparam _ | Dprop _ -> ()
+  | Dtype _ | Drange _ | Dfloat _ | Ddata _ | Dparam _ | Dprop _ -> ()
   | Dlogic dl ->
       let check (ols,ld) =
         let check () ls args value =
@@ -457,6 +457,9 @@ let add_decl ?(warn=true) uc d =
   | Drange ri ->
     let uc = add_symbol add_ts ri.range_ts.ts_name ri.range_ts uc in
     add_symbol add_ls ri.range_proj.ls_name ri.range_proj uc
+  | Dfloat fi ->
+    let uc = add_symbol add_ts fi.float_ts.ts_name fi.float_ts uc in
+    add_symbol add_ls fi.float_proj.ls_name fi.float_proj uc
   | Ddata dl  -> List.fold_left add_data uc dl
   | Dparam ls -> add_symbol add_ls ls.ls_name ls uc
   | Dlogic dl -> List.fold_left add_logic uc dl
@@ -630,6 +633,14 @@ let cl_range cl inst ri =
                       range_ts = cl_find_ts cl ri.range_ts;
                       range_proj = cl_find_ls cl ri.range_proj }
 
+let cl_float cl inst fi =
+  if Mts.mem fi.float_ts inst.inst_ts then
+    raise (CannotInstantiate fi.float_ts.ts_name);
+  (* TODO Andrei plz check *)
+  create_float_decl { fi with
+                      float_ts = cl_find_ts cl fi.float_ts;
+                      float_proj = cl_find_ls cl fi.float_proj }
+
 let cl_data cl inst tdl =
   let add_ls ls =
     if Mls.mem ls inst.inst_ls then
@@ -698,6 +709,7 @@ let cl_prop cl inst (k,pr,f) =
 let cl_decl cl inst d = match d.d_node with
   | Dtype ts -> cl_type cl inst ts
   | Drange ri -> cl_range cl inst ri
+  | Dfloat fi -> cl_float cl inst fi
   | Ddata tdl -> cl_data cl inst tdl
   | Dparam ls -> cl_param cl inst ls
   | Dlogic ldl -> cl_logic cl inst ldl

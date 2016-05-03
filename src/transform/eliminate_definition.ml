@@ -52,7 +52,7 @@ let () = Trans.register_transform "eliminate_builtin" eliminate_builtin
     that@ are@ builtin@ in@ the@ prover@ (see@ 'syntax'@ and@ \
     'remove'@ clauses@ in@ the@ prover's@ driver)."
 
-(** compute the meta_remove_* given two task one included in the other *)
+(** compute the meta_remove_* given two tasks one included in the other *)
 let compute_diff t1 t2 =
   let km = Mid.set_diff (Task.task_known t1) (Task.task_known t2) in
   let hdone = Hdecl.create 10 in
@@ -68,7 +68,8 @@ let compute_diff t1 t2 =
       Hdecl.replace hdone decl ();
       match decl.d_node with
       | Dtype ts -> remove_ts acc ts
-      | Drange ri -> remove_ts acc ri.range_ts
+      | Drange ri -> remove_ls (remove_ts acc ri.range_ts) ri.range_proj
+      | Dfloat fi -> remove_ls (remove_ts acc fi.float_ts) fi.float_proj
       | Ddata l -> List.fold_left (fun acc (ts,_) -> remove_ts acc ts) acc l
       | Dparam ls -> remove_ls acc ls
       | Dlogic l -> List.fold_left (fun acc (ls,_) -> remove_ls acc ls) acc l
@@ -233,7 +234,8 @@ let add_rem rem decl =
     { rem with rem_pr = Spr.add pr rem.rem_pr} in
   match decl.d_node with
   | Dtype ts -> remove_ts rem ts
-  | Drange ri -> remove_ts rem ri.range_ts
+  | Drange ri -> remove_ls (remove_ts rem ri.range_ts) ri.range_proj
+  | Dfloat fi -> remove_ls (remove_ts rem fi.float_ts) fi.float_proj
   | Ddata l -> List.fold_left (fun rem (ts,_) -> remove_ts rem ts) rem l
   | Dparam ls -> remove_ls rem ls
   | Dlogic l -> List.fold_left (fun rem (ls,_) -> remove_ls rem ls) rem l

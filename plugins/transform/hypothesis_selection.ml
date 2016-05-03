@@ -514,7 +514,7 @@ module Select = struct
       This is the function directly used to filter axioms. *)
   let filter fTbl tTbl symTbl goal_clauses (gc,gp) decl =
     match decl.d_node with
-    | Dtype _ | Drange _ | Ddata _ | Dparam _ | Dlogic _ | Dind _ ->
+    | Dtype _ | Drange _ | Dfloat _ | Ddata _ | Dparam _ | Dlogic _ | Dind _ ->
       [decl]
     | Dprop (Paxiom,_,fmla) -> (* filter only axioms *)
       Format.eprintf "filter : @[%a@]@." Pretty.print_term fmla;

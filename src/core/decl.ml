@@ -303,6 +303,15 @@ type range_info = {
   range_proj     : Term.lsymbol;
 }
 
+type float_info = {
+  float_ts     : tysymbol;
+  float_eb_cst : Number.integer_constant;
+  float_eb_val : BigInt.t;
+  float_sb_cst : Number.integer_constant;
+  float_sb_val : BigInt.t;
+  float_proj   : Term.lsymbol;
+}
+
 type decl = {
   d_node : decl_node;
   d_syms : Sid.t;         (* idents used in declaration *)
@@ -313,6 +322,7 @@ type decl = {
 and decl_node =
   | Dtype  of tysymbol          (* abstract types and aliases *)
   | Drange of range_info        (* range types *)
+  | Dfloat of float_info        (* float types *)
   | Ddata  of data_decl list    (* recursive algebraic types *)
   | Dparam of lsymbol           (* abstract functions and predicates *)
   | Dlogic of logic_decl list   (* recursive functions and predicates *)
@@ -371,7 +381,10 @@ module Hsdecl = Hashcons.Make (struct
 
   let hash d = match d.d_node with
     | Dtype  s -> ts_hash s
-    | Drange ri -> Hashcons.combine (ts_hash ri.range_ts) (ls_hash ri.range_proj)
+    | Drange ri ->
+      Hashcons.combine (ts_hash ri.range_ts) (ls_hash ri.range_proj)
+    | Dfloat fi ->
+      Hashcons.combine (ts_hash fi.float_ts) (ls_hash fi.float_proj)
     | Ddata  l -> Hashcons.combine_list hs_td 3 l
     | Dparam s -> ls_hash s
     | Dlogic l -> Hashcons.combine_list hs_ld 5 l
@@ -437,6 +450,11 @@ let create_range_decl ri =
   let syms = Sid.empty in
   let news = Sid.add ri.range_proj.ls_name (Sid.singleton ri.range_ts.ts_name) in
   mk_decl (Drange ri) syms news
+
+let create_float_decl fi =
+  let syms = Sid.empty in
+  let news = Sid.add fi.float_proj.ls_name (Sid.singleton fi.float_ts.ts_name) in
+  mk_decl (Dfloat fi) syms news
 
 let create_data_decl tdl =
   if tdl = [] then raise EmptyDecl;
@@ -568,7 +586,7 @@ let create_prop_decl k p f =
 (** Utilities *)
 
 let decl_map fn d = match d.d_node with
-  | Dtype _ | Drange _ | Ddata _ | Dparam _ -> d
+  | Dtype _ | Drange _ | Dfloat _ | Ddata _ | Dparam _ -> d
   | Dlogic l ->
       let fn (ls,ld) =
         let vl,e,close = open_ls_defn_cb ld in
@@ -583,7 +601,7 @@ let decl_map fn d = match d.d_node with
       create_prop_decl k pr (fn f)
 
 let decl_fold fn acc d = match d.d_node with
-  | Dtype _ | Drange _ | Ddata _ | Dparam _ -> acc
+  | Dtype _ | Drange _ | Dfloat _ | Ddata _ | Dparam _ -> acc
   | Dlogic l ->
       let fn acc (_,ld) =
         let _,e = open_ls_defn ld in
@@ -603,7 +621,7 @@ let list_rpair_map_fold fn =
   Lists.map_fold_left fn
 
 let decl_map_fold fn acc d = match d.d_node with
-  | Dtype _ | Drange _ | Ddata _ | Dparam _ -> acc, d
+  | Dtype _ | Drange _ | Dfloat _ | Ddata _ | Dparam _ -> acc, d
   | Dlogic l ->
       let fn acc (ls,ld) =
         let vl,e,close = open_ls_defn_cb ld in
@@ -657,27 +675,33 @@ let known_add_decl kn0 decl =
 
 let find_constructors kn ts =
   match (Mid.find ts.ts_name kn).d_node with
-  | Dtype _ | Drange _ -> []
+  | Dtype _ | Drange _ | Dfloat _ -> []
   | Ddata dl -> List.assq ts dl
   | Dparam _ | Dlogic _ | Dind _ | Dprop _ -> assert false
 
 let find_range_decl kn ts =
   match (Mid.find ts.ts_name kn).d_node with
   | Drange ri -> Some ri
-  | Dtype _ | Ddata _ -> None
+  | Dtype _ | Ddata _ | Dfloat _ -> None
+  | Dparam _ | Dlogic _ | Dind _ | Dprop _ -> assert false
+
+let find_float_decl kn ts =
+  match (Mid.find ts.ts_name kn).d_node with
+  | Dfloat fi -> Some fi
+  | Dtype _ | Ddata _ | Drange _ -> None
   | Dparam _ | Dlogic _ | Dind _ | Dprop _ -> assert false
 
 let find_inductive_cases kn ps =
   match (Mid.find ps.ls_name kn).d_node with
   | Dind (_, dl) -> List.assq ps dl
   | Dlogic _ | Dparam _ | Ddata _ -> []
-  | Dtype _ | Drange _ | Dprop _ -> assert false
+  | Dtype _ | Drange _ | Dfloat _ | Dprop _ -> assert false
 
 let find_logic_definition kn ls =
   match (Mid.find ls.ls_name kn).d_node with
   | Dlogic dl -> Some (List.assq ls dl)
   | Dparam _ | Dind _ | Ddata _ -> None
-  | Dtype _ | Drange _ | Dprop _ -> assert false
+  | Dtype _ | Drange _ | Dfloat _ | Dprop _ -> assert false
 
 let find_prop kn pr =
   match (Mid.find pr.pr_name kn).d_node with
@@ -685,7 +709,7 @@ let find_prop kn pr =
       let test (_,l) = List.mem_assq pr l in
       List.assq pr (snd (List.find test dl))
   | Dprop (_,_,f) -> f
-  | Dtype _ | Drange _ | Ddata _ | Dparam _ | Dlogic _ -> assert false
+  | Dtype _ | Drange _ | Dfloat _ | Ddata _ | Dparam _ | Dlogic _ -> assert false
 
 let find_prop_decl kn pr =
   match (Mid.find pr.pr_name kn).d_node with
@@ -693,7 +717,7 @@ let find_prop_decl kn pr =
       let test (_,l) = List.mem_assq pr l in
       Paxiom, List.assq pr (snd (List.find test dl))
   | Dprop (k,_,f) -> k,f
-  | Dtype _ | Drange _ | Ddata _ | Dparam _ | Dlogic _ -> assert false
+  | Dtype _ | Drange _ | Dfloat _ | Ddata _ | Dparam _ | Dlogic _ -> assert false
 
 let check_match kn d =
   let rec check () t = match t.t_node with

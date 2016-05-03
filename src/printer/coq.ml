@@ -927,6 +927,9 @@ let print_decl ~old info fmt d =
     | Drange _ ->
       Printer.unsupportedDecl d
         "coq: range types are not supported"
+    | Dfloat _ ->
+      Printer.unsupportedDecl d
+        "coq: mapping to float not yet implemented"
     | Dparam ls
     | Dlogic ((ls,_)::_)
     | Dind (_, (ls,_)::_) -> id_unique iprinter ls.ls_name
@@ -942,6 +945,9 @@ let print_decl ~old info fmt d =
   | Drange _ ->
     Printer.unsupportedDecl d
       "coq: range types are not supported"
+  | Dfloat _ ->
+    Printer.unsupportedDecl d
+      "coq: mapping to float not yet implemented"
   | Dparam ls ->
       print_param_decl ~prev info fmt ls
   | Dlogic [s,_ as ld] when not (Sid.mem s.ls_name d.d_syms) ->

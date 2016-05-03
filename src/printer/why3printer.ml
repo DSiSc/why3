@@ -262,9 +262,19 @@ let print_type_decl fmt ts =
 
 let print_range_decl fmt ri =
   if not (query_remove ri.range_ts.ts_name) then begin
-    fprintf fmt "@[<hov 2>type %a%a = %a .. %a@]@\n@\n"
+    fprintf fmt "@[<hov 2>type %a%a is range %a : %a .. %a@]@\n@\n"
       print_ts ri.range_ts print_ident_labels ri.range_ts.ts_name
+      print_ls ri.range_proj
       Pretty.print_integer_constant ri.range_low_cst Pretty.print_integer_constant ri.range_high_cst;
+    forget_tvs ()
+  end
+
+let print_float_decl fmt fi =
+  if not (query_remove fi.float_ts.ts_name) then begin
+    fprintf fmt "@[<hov 2>type %a%a is float %a : %a, %a@]@\n@\n"
+      print_ts fi.float_ts print_ident_labels fi.float_ts.ts_name
+      print_ls fi.float_proj
+      Pretty.print_integer_constant fi.float_eb_cst Pretty.print_integer_constant fi.float_sb_cst;
     forget_tvs ()
   end
 
@@ -345,6 +355,7 @@ let print_list_next sep print fmt = function
 let print_decl fmt d = match d.d_node with
   | Dtype ts  -> print_type_decl fmt ts
   | Drange ri -> print_range_decl fmt ri
+  | Dfloat fi -> print_float_decl fmt fi
   | Ddata tl  -> print_list_next nothing print_data_decl fmt tl
   | Dparam ls -> print_param_decl fmt ls
   | Dlogic ll -> print_list_next nothing print_logic_decl fmt ll

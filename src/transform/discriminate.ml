@@ -187,7 +187,7 @@ let ts_of_ls env ls decls =
 let map metas_rewrite_pr env d =
   let decls,metas =
     match d.d_node with
-    | Dtype _ | Drange _ -> [d],[]
+    | Dtype _ | Drange _ | Dfloat _ -> [d],[]
     | Ddata _ -> Printer.unsupportedDecl d
       "Algebraic and recursively-defined types are \
             not supported, run eliminate_algebraic"

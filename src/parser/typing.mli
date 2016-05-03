@@ -46,6 +46,7 @@ val print_qualid : Format.formatter -> Ptree.qualid -> unit
 
 exception UnboundSymbol of Ptree.qualid
 exception EmptyRange
+exception BadFloatSpec
 
 val find_qualid :
   ('a -> Ident.ident) -> ('b -> string list -> 'a) -> 'b -> Ptree.qualid -> 'a

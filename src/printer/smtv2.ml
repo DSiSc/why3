@@ -636,7 +636,9 @@ let print_decl vc_loc cntexample args info fmt d = match d.d_node with
     print_type_decl info fmt ts
   | Drange ri when query_syntax info.info_syn ri.range_ts.ts_name <> None -> ()
   | Drange _ -> unsupportedDecl d
-      "smtv2 : range types are not supported"
+                  "smtv2 : range types are not supported"
+  | Dfloat _ -> unsupportedDecl d
+                  "smtv2 : floats are not supported"
   | Ddata [(ts,_)] when query_syntax info.info_syn ts.ts_name <> None -> ()
   | Ddata dl ->
     fprintf fmt "@[(declare-datatypes ()@ (%a))@]@\n"
