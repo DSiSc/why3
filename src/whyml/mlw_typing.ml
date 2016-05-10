@@ -1005,7 +1005,7 @@ let add_types ~wp uc tdl =
                      range_proj = ls
                    } in
           abstr, algeb, alias, ri :: range, float
-      | TDfloat (eb,sb,proj) ->
+      | TDfloat (eb,sb,proj,isF) ->
         let ts = match ts with
           | TS ts -> ts
           | PT _ -> assert false
@@ -1017,14 +1017,18 @@ let add_types ~wp uc tdl =
         then
           Loc.error ~loc:d.td_loc Typing.BadFloatSpec
         else
-          let id = create_user_id proj in
-          let ls = create_lsymbol id [ty_app ts []] (Some ty_real) in
+          let proj_id = create_user_id proj in
+          let isF_id = create_user_id isF in
+          let ty = ty_app ts [] in
+          let proj = create_lsymbol proj_id [ty] (Some ty_real) in
+          let isF = create_lsymbol isF_id [ty] None in
           let fi = { float_ts = ts;
                      float_eb_cst = eb;
                      float_eb_val = eb_val;
                      float_sb_cst = sb;
                      float_sb_val = sb_val;
-                     float_proj = ls
+                     float_proj = proj;
+                     float_isFinite = isF
                    } in
         abstr, algeb, alias, range, fi :: float
       | (TDalgebraic _ | TDrecord _) when Hstr.find mutables x ->

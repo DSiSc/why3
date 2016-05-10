@@ -98,12 +98,13 @@ type range_info = {
 }
 
 type float_info = {
-  float_ts     : tysymbol;
-  float_eb_cst : Number.integer_constant;
-  float_eb_val : BigInt.t;
-  float_sb_cst : Number.integer_constant;
-  float_sb_val : BigInt.t;
-  float_proj   : Term.lsymbol;
+  float_ts       : tysymbol;
+  float_eb_cst   : Number.integer_constant;
+  float_eb_val   : BigInt.t;
+  float_sb_cst   : Number.integer_constant;
+  float_sb_val   : BigInt.t;
+  float_proj     : Term.lsymbol;
+  float_isFinite : Term.lsymbol;
 }
 
 type decl = private {

@@ -1,0 +1,18 @@
+module Test_float
+
+ use import real.Real
+ use import real.Abs
+
+ type f is float to_real, is_finite: 3, 3
+
+ goal g : forall x:f. x = (0.23 : f)
+
+ goal h : forall x:f. to_real x < 100.0
+
+ use import int.Int
+ use import bv.BV8
+ use real.FromInt
+
+ goal j : FromInt.from_int (to_uint (0 : t)) = to_real (0.0 : f)
+
+end

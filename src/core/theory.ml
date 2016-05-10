@@ -459,7 +459,8 @@ let add_decl ?(warn=true) uc d =
     add_symbol add_ls ri.range_proj.ls_name ri.range_proj uc
   | Dfloat fi ->
     let uc = add_symbol add_ts fi.float_ts.ts_name fi.float_ts uc in
-    add_symbol add_ls fi.float_proj.ls_name fi.float_proj uc
+    let uc = add_symbol add_ls fi.float_proj.ls_name fi.float_proj uc in
+    add_symbol add_ls fi.float_isFinite.ls_name fi.float_isFinite uc
   | Ddata dl  -> List.fold_left add_data uc dl
   | Dparam ls -> add_symbol add_ls ls.ls_name ls uc
   | Dlogic dl -> List.fold_left add_logic uc dl
@@ -639,7 +640,8 @@ let cl_float cl inst fi =
   (* TODO Andrei plz check *)
   create_float_decl { fi with
                       float_ts = cl_find_ts cl fi.float_ts;
-                      float_proj = cl_find_ls cl fi.float_proj }
+                      float_proj = cl_find_ls cl fi.float_proj;
+                      float_isFinite = cl_find_ls cl fi.float_isFinite }
 
 let cl_data cl inst tdl =
   let add_ls ls =

@@ -17,7 +17,10 @@ open Decl
 let meta_keep_range = Theory.register_meta "range:keep" [Theory.MTtysymbol]
   ~desc:"Keep@ range@ type."
 
-let elim le_int le_real abs_real prs d = match d.d_node with
+let meta_keep_float = Theory.register_meta "float:keep" [Theory.MTtysymbol]
+  ~desc:"Keep@ float@ type."
+
+let elim_range le_int prs d = match d.d_node with
   | Drange ri when not (Sts.mem ri.range_ts prs) ->
     let ty_decl = create_ty_decl ri.range_ts in
     let ls_decl = create_param_decl ri.range_proj in
@@ -32,9 +35,13 @@ let elim le_int le_real abs_real prs d = match d.d_node with
     let f = t_forall_close [v] [] f in
     let ax_decl = create_prop_decl Paxiom pr f in
     [ty_decl; ls_decl; ax_decl]
+  | _ -> [d]
+
+let elim_float le_real abs_real prs d = match d.d_node with
   | Dfloat fi when not (Sts.mem fi.float_ts prs) ->
     let ty_decl = create_ty_decl fi.float_ts in
-    let ls_decl = create_param_decl fi.float_proj in
+    let proj_decl = create_param_decl fi.float_proj in
+    let isFinite_decl = create_param_decl fi.float_isFinite in
     let pr = create_prsymbol (id_derive "_axiom" fi.float_ts.ts_name) in
     let v = create_vsymbol (id_fresh "dummy") (ty_app fi.float_ts []) in
     let v_term = t_app fi.float_proj [t_var v] (Some ty_real) in
@@ -50,9 +57,10 @@ let elim le_int le_real abs_real prs d = match d.d_node with
            (Number.real_const_hex m_string "" (Some e_string))) in
     let f = t_app le_real [t_app abs_real [v_term] (Some ty_real); term] None
     in
+    let f = t_implies (t_app fi.float_isFinite [t_var v] None) f in
     let f = t_forall_close [v] [] f in
     let ax_decl = create_prop_decl Paxiom pr f in
-    [ty_decl; ls_decl; ax_decl]
+    [ty_decl; proj_decl; isFinite_decl; ax_decl]
   | _ -> [d]
 
 let eliminate_range env =
@@ -63,9 +71,13 @@ let eliminate_range env =
   let le_real = Theory.ns_find_ls th.Theory.th_export ["infix <="] in
   let th = Env.read_theory env ["real"] "Abs" in
   let abs_real = Theory.ns_find_ls th.Theory.th_export ["abs"] in
-  Trans.on_tagged_ts meta_keep_range
-    (fun tss ->
-       Trans.decl (elim le_int le_real abs_real tss) None)
+  Trans.seq
+    [Trans.on_tagged_ts meta_keep_range
+       (fun tss ->
+          Trans.decl (elim_range le_int tss) None);
+     Trans.on_tagged_ts meta_keep_float
+       (fun tss ->
+          Trans.decl (elim_float le_real abs_real tss) None)]
 
 let () =
   Trans.register_env_transform "eliminate_range" eliminate_range

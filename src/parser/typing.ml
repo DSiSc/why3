@@ -525,21 +525,25 @@ let add_types dl th =
                    range_proj = ls
                  } in
         abstr, algeb, alias, ri::range, float
-    | TDfloat (eb,sb,proj) ->
+    | TDfloat (eb,sb,proj,isF) ->
       let eb_val = Number.compute_int eb  in
       let sb_val = Number.compute_int sb in
       if BigInt.le eb_val (BigInt.of_int 1)
       || BigInt.le sb_val (BigInt.of_int 1) then
         Loc.error ~loc:d.td_loc BadFloatSpec
       else
-        let id = create_user_id proj in
-        let ls = create_lsymbol id [ty_app ts []] (Some ty_real) in
+        let proj_id = create_user_id proj in
+        let isF_id = create_user_id isF in
+        let ty = ty_app ts [] in
+        let proj = create_fsymbol proj_id [ty] ty_real in
+        let isF = create_psymbol isF_id [ty] in
         let fi = { float_ts = ts;
                    float_eb_cst = eb;
                    float_eb_val = eb_val;
                    float_sb_cst = sb;
                    float_sb_val = sb_val;
-                   float_proj = ls
+                   float_proj = proj;
+                   float_isFinite = isF
                  } in
         abstr, algeb, alias, range, fi::float
   in

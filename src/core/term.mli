@@ -207,7 +207,7 @@ val t_const : Number.constant -> term
 val t_range_const : Number.integer_constant ->
   tysymbol -> BigInt.t -> BigInt.t -> lsymbol -> term
 val t_float_const : Number.real_constant ->
-  tysymbol -> BigInt.t -> BigInt.t -> lsymbol -> term
+  tysymbol -> BigInt.t -> BigInt.t -> lsymbol -> lsymbol -> term
 val t_if : term -> term -> term -> term
 val t_let : term -> term_bound -> term
 val t_case : term -> term_branch list -> term
