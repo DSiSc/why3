@@ -268,6 +268,26 @@ let syntax_range_literal s fmt c =
   in
   global_substitute_fmt opt_search_forward_literal_format f s fmt
 
+let syntax_float_literal s fmt c =
+  let f s b e fmt =
+    let number_format = {
+      Number.long_int_support = true;
+      Number.extra_leading_zeros_support = false;
+      Number.dec_int_support = Number.Number_default;
+      Number.hex_int_support = Number.Number_unsupported;
+      Number.oct_int_support = Number.Number_unsupported;
+      Number.bin_int_support = Number.Number_unsupported;
+      Number.def_int_support = Number.Number_unsupported;
+      Number.dec_real_support = Number.Number_default;
+      Number.hex_real_support = Number.Number_unsupported;
+      Number.frac_real_support = Number.Number_custom
+          (Number.PrintFracReal ("%s.0", "(* %s.0 %s.0)", "(/ %s.0 %s.0)"));
+      Number.def_real_support = Number.Number_unsupported;
+    } in
+    Number.print number_format fmt (Number.ConstReal c)
+  in
+  global_substitute_fmt opt_search_forward_literal_format f s fmt
+
 (** {2 use printers} *)
 
 let print_prelude fmt pl =

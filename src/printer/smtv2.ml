@@ -378,15 +378,23 @@ let rec print_term info fmt t =
   (* | Teps _ -> *)
   | Teps _ ->
     begin try
-        let ts,_p,c = t_projection_lit t in
+        let ts,_p,c = t_projection_range_lit t in
         (* fixme, check that _p is the correct projection *)
         (* look for syntax literal ty in driver *)
-        match query_syntax info.info_rliteral ts.ts_name with
-        | Some s -> syntax_range_literal s fmt c
-        | None -> raise Not_found
+        begin match query_syntax info.info_rliteral ts.ts_name with
+          | Some s -> syntax_range_literal s fmt c
+          | None -> raise Not_found
+        end
       with Not_found ->
-        unsupportedTerm t
-          "smtv2: you must eliminate epsilon"
+        try
+          let ts,_p,c = t_projection_float_lit t in
+          begin match query_syntax info.info_rliteral ts.ts_name with
+            | Some s -> syntax_float_literal s fmt c
+            | None -> raise Not_found
+          end
+        with Not_found ->
+          unsupportedTerm t
+            "smtv2: you must eliminate epsilon"
     end
   | Tquant _ | Tbinop _ | Tnot _ | Ttrue | Tfalse -> raise (TermExpected t)
   in
@@ -637,6 +645,7 @@ let print_decl vc_loc cntexample args info fmt d = match d.d_node with
   | Drange ri when query_syntax info.info_syn ri.range_ts.ts_name <> None -> ()
   | Drange _ -> unsupportedDecl d
                   "smtv2 : range types are not supported"
+  | Dfloat fi when query_syntax info.info_syn fi.float_ts.ts_name <> None -> ()
   | Dfloat _ -> unsupportedDecl d
                   "smtv2 : floats are not supported"
   | Ddata [(ts,_)] when query_syntax info.info_syn ts.ts_name <> None -> ()

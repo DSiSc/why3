@@ -311,10 +311,21 @@ val t_pred_app : term -> term -> term  (* prop-typed application *)
 val t_func_app_l : term -> term list -> term  (* value-typed application *)
 val t_pred_app_l : term -> term list -> term  (* prop-typed application *)
 
-val t_projection_lit : term ->
+val t_projection_float_lit : term ->
+  tysymbol * lsymbol * Number.real_constant
+(** [t_projection_range_lit t] If [t] as the form [eps x: ts. p x /\ pr x = c]
+    with [c] a real constant, returns the triple [ts,pr,c]. Raises
+    NotFound otherwise. *)
+
+val t_projection_range_lit : term ->
   tysymbol * lsymbol * Number.integer_constant
-(** [t_projection_lit t] If [t] as the form [eps x: ts. p x = c],
-    returns the triple [ts,p,c]. Raises NotFound otherwise. *)
+(** [t_projection_range_lit t] If [t] as the form [eps x: ts. p x = c]
+    with [c] an integer constant, returns the triple [ts,p,c]. Raises
+    NotFound otherwise. *)
+
+val t_is_projection_lit : term -> bool
+(** [t_is_projection_lit c] returns true if [t] is in one of the two
+    form above *)
 
 (** {2 Lambda-term manipulation} *)
 

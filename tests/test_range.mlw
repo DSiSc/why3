@@ -30,7 +30,7 @@ module M
 
 end
 
-module M
+module N
   use import bv.BV8
   use import int.Int
 

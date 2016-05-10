@@ -966,7 +966,7 @@ let t_float_const c ts eb sb proj isFinite =
 
 (* range litteral *)
 
-let t_projection_lit t =
+let t_projection_range_lit t =
   match t.t_node with
   | Teps tb ->
     let (v,t) = t_open_bound tb in
@@ -986,6 +986,36 @@ let t_projection_lit t =
       | _ -> raise Not_found
     end
   | _ -> raise Not_found
+
+let t_projection_float_lit t =
+  match t.t_node with
+  | Teps tb ->
+    let (v,t) = t_open_bound tb in
+    begin match t.t_node with
+      (* look for term of the form 'f v = const' *)
+      (* fixme: check that ls' is the projection of a range type *)
+      | Tbinop (Tand, _,
+                { t_node = (Tapp (ls, [ { t_node = Tapp (ls', [ { t_node = Tvar v' } ]) };
+                                        { t_node = Tconst (Number.ConstReal c) } ])) } )
+        -> if ls_equal ls ps_equ && vs_equal v v'
+        then
+          begin
+            match v.vs_ty.ty_node with
+            | Tyapp (ty, []) -> ty,ls',c
+            | _ -> raise Not_found
+          end
+        else raise Not_found
+      | _ -> raise Not_found
+    end
+  | _ -> raise Not_found
+
+let t_is_projection_lit t =
+  try
+    let _ = t_projection_float_lit t in true
+  with Not_found ->
+  try
+    let _ = t_projection_range_lit t in true
+  with Not_found -> false
 
 (* generic map over types, symbols and variables *)
 
@@ -1245,11 +1275,9 @@ let t_map_sign fn sign f = t_label_copy f (match f.t_node with
         else t_or (t_and f1p f2) (t_and (t_not f1n) f3)
   | Tif _
   | Teps _ ->
-        begin try
-            let _ = t_projection_lit f in t_map (fn sign) f
-          with Not_found ->        failwith "t_map_sign: cannot determine polarity"
-        end
-
+    if t_is_projection_lit f
+    then t_map (fn sign) f
+    else failwith "t_map_sign: cannot determine polarity"
   | _ -> t_map (fn sign) f)
 
 (* continuation-passing traversal *)

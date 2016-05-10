@@ -45,6 +45,14 @@ timeout "interrupted by timeout"
 
 (** Extra theories supported by Z3 *)
 
+theory LitTest.T
+
+  meta "float:keep" type f
+  syntax type f "(_ FloatingPoint 3 3)"
+  syntax literal f "(fp %1b)"
+
+end
+
 (* div/mod of Z3 seems to be Euclidean Division *)
 theory int.EuclideanDivision
    syntax function div "(div %1 %2)"

@@ -3,7 +3,12 @@ module Test_float
  use import real.Real
  use import real.Abs
 
- type f is float to_real, is_finite: 3, 3
+ (* type f is float to_real, is_finite: 3, 3 *)
+ use import LitTest.T
+
+ (* meta "float:keep" type f *)
+ (* meta "syntax_literal" type f, "au", 1 *)
+ (* meta "syntax_type" type f, "Float32", 1 *)
 
  goal g : forall x:f. x = (0.23 : f)
 

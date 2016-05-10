@@ -108,6 +108,9 @@ val syntax_arguments_typed :
 val syntax_range_literal :
   string -> Number.integer_constant pp
 
+val syntax_float_literal :
+  string -> Number.real_constant pp
+
 (** {2 pretty-printing transformations (useful for caching)} *)
 
 val on_syntax_map : (syntax_map -> 'a Trans.trans) -> 'a Trans.trans

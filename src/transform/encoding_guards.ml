@@ -49,10 +49,9 @@ let rec collect svs t = match t.t_node with
   | Tvar v -> Svs.add v svs
   | Tapp _ | Tconst _ -> svs
   | Teps _ ->
-    begin try
-        let _ = t_projection_lit t in svs
-      with Not_found -> assert false
-    end
+    if t_is_projection_lit t
+    then svs
+    else assert false
   | Tif (_,t1,t2) ->
       collect (collect svs t1) t2
   | Tlet (t1, b) ->
@@ -103,12 +102,10 @@ let rec expl_term info svs sign t = match t.t_node with
       let t2 = expl_term info svs sign t2 in
       t_label_copy t (t_if f1 t1 t2)
   | Teps _ ->
-    begin try
-        let _ = t_projection_lit t in t
-      with Not_found ->
-        Printer.unsupportedTerm t
-      "epsilon are not supported, run eliminate_epsilon"
-    end
+    if t_is_projection_lit t
+    then t
+    else Printer.unsupportedTerm t
+        "epsilon are not supported, run eliminate_epsilon"
   | _ ->
       t_map_sign (expl_term info svs) sign t
 
