@@ -58,6 +58,9 @@ val min : t -> t -> t
 val max : t -> t -> t
 val abs : t -> t
 
+(** number of digits  *)
+val num_digits : t -> int
+
 (** power of small integers. Second arg must be non-negative *)
 val pow_int_pos : int -> int -> t
 val pow_int_pos_bigint : int -> t -> t

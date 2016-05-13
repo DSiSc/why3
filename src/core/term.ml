@@ -163,7 +163,6 @@ exception FunctionSymbolExpected of lsymbol
 exception PredicateSymbolExpected of lsymbol
 exception ConstructorExpected of lsymbol
 exception OutOfRange of Number.integer_constant
-exception NotRepresentableFloat of Number.real_constant
 
 let pat_app fs pl ty =
   let s = match fs.ls_value with
@@ -950,8 +949,9 @@ let t_range_const c ts a b ls =
 
 let t_float_const c ts eb sb proj isFinite =
   (* TODO : check representability *)
-  if true
-  then
+  let _ = Number.floatCheck c eb sb in
+  (* if
+  then *)
     let id = Ident.id_fresh "dummy" in
     let ty = ty_app ts [] in
     let vs = create_vsymbol id ty in
@@ -960,7 +960,7 @@ let t_float_const c ts eb sb proj isFinite =
     let t = t_and (t_app isFinite [t_var vs] None) t in
     let bi = t_close_bound vs t in
     t_eps bi
-  else raise (NotRepresentableFloat c)
+  (* else raise (NotRepresentableFloat c) *)
 
 (** Term library *)
 

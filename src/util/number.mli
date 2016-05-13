@@ -43,6 +43,12 @@ val compute_int : integer_constant -> BigInt.t
 val real_const_dec : string -> string -> string option -> real_constant
 val real_const_hex : string -> string -> string option -> real_constant
 
+(** Float checking *)
+
+exception NotRepresentableFloat of real_constant
+
+val floatCheck : real_constant -> BigInt.t -> BigInt.t -> BigInt.t * BigInt.t
+
 (** Printing *)
 
 type integer_format =
