@@ -301,9 +301,55 @@ exception NotRepresentableFloat of real_constant
 let debug_float = Debug.register_info_flag "float"
   ~desc:"Avoid@ catching@ exceptions@ in@ order@ to@ get@ float@ literal@ checks@ messages."
 
-let floatCheck c eb sb =
-  (* TODO: deal with neg numbers *)
+let float_parser c =
+  let exp_parser e = match e.[0] with
+    | '-' -> minus (compute_any 10 (String.sub e 1 (String.length e - 1)))
+    | _   -> compute_any 10 e
+  in
 
+  (* get the value s and e such that c = s * 2 ^ e *)
+  let s, e =
+    match c with
+    (* c = a.b * 10 ^ e *)
+    | RConstDec (a,b,e) ->
+      let b_length = String.length b in
+      let s = ref (compute_any 10 (a ^ b)) in
+      let e = sub (match e with
+          | None -> Debug.dprintf debug_float "c = %s.%s" a b;
+            zero
+          | Some e -> Debug.dprintf debug_float "c = %s.%se%s" a b e;
+            exp_parser e)
+          (of_int b_length)
+      in
+      (* transform c = s * 10 ^ i into c = s' * 2 ^ i' *)
+      let s =
+        if lt e zero then begin
+          let efive = pow_int_pos_bigint 5 (minus e) in
+          let dv, rem = euclidean_div_mod !s efive in
+          if not (eq rem zero) then begin
+            raise (NotRepresentableFloat c);
+          end else
+            dv
+        end else
+          mul !s (pow_int_pos_bigint 5 e)
+      in
+      Debug.dprintf debug_float " = %s * 2 ^ %s" (to_string s) (to_string e);
+      ref s, ref e
+
+    (* c = a.b * 2 ^ e *)
+    | RConstHex (a,b,e) ->
+      let b_length = String.length b in
+      ref (compute_any 16 (a ^ b)),
+      ref (sub (match e with
+          | None -> Debug.dprintf debug_float "c = %s.%s" a b;
+            zero
+          | Some e -> Debug.dprintf debug_float "c = %s.%sp%s" a b e;
+            exp_parser e)
+          (of_int (b_length * 4)))
+  in
+  s, e
+
+let float_check c eb sb =
   (* 2 ^ (sb - 1)    min representable normalized significand*)
   let smin = pow_int_pos_bigint 2 (sub sb one) in
   (* (2 ^ sb) - 1    max representable normalized significand*)
@@ -312,143 +358,76 @@ let floatCheck c eb sb =
   let emax = pow_int_pos_bigint 2 (sub eb one) in
   (* 1 - emax        exponent of the denormalized *)
   let eden = sub one emax in
-  (* 3 - emax - sb   smallest denormalized *)
+  (* 3 - emax - sb   smallest denormalized' exponent *)
   let emin = sub (add (of_int 2) eden) sb in
 
-  (*  Debug.dprintf debug_float "eb: %s, sb : %s, smin : %s, smax : %s, eden : %s, emin : %s, emax : %s@."
-      (to_string eb) (to_string sb) (to_string smin) (to_string smax) (to_string eden) (to_string emin) (to_string emax); *)
-
-  let exp_parser e = match e.[0] with
-    | '-' -> minus (compute_any 10 (String.sub e 1 (String.length e - 1)))
-    | _   -> compute_any 10 e
-  in
-
-  (* get the value s and e such that c = s * 2 ^ e *)
-  let s,e =
-    match c with
-    (* c = a.b * 10 ^ e *)
-    | RConstDec (a,b,e) ->
-      let b_length = String.length b in
-      let s = ref (compute_any 10 (a ^ b)) in
-      let e = sub (match e with
-          | None -> Debug.dprintf debug_float "c = %s.%s@;" a b;
-            zero
-          | Some e -> Debug.dprintf debug_float "c = %s.%se%s@;" a b e;
-            exp_parser e)
-          (of_int b_length)
-      in
-      (* Debug.dprintf debug_float "c = s : %s, e : %s@." (to_string !s) (to_string e); *)
-      (* transform c = s * 10 ^ i into c = s' * 2 ^ i' *)
-      let s =
-        if lt e zero then
-          begin
-            let efive = pow_int_pos_bigint 5 (minus e) in
-            (* TOCHECK: for c = s * 10 ^ -i; if 5^i does not divise s, s is
-               not representable *)
-            if not (eq (euclidean_mod !s efive) zero)
-            then begin
-              Debug.dprintf debug_float "s : %s, e : %s@." (to_string !s) (to_string e);
-              raise (NotRepresentableFloat c);
-            end
-            else
-              euclidean_div !s efive
-          end
-        else
-          mul !s (pow_int_pos_bigint 5 e)
-      in
-      Debug.dprintf debug_float "c = %s * 2 ^ %s@." (to_string s) (to_string e);
-      ref s, ref e
-
-    (* c = a.b * 2 ^ e *)
-    | RConstHex (a,b,e) ->
-      let b_length = String.length b in
-      ref (compute_any 16 (a ^ b)),
-      ref (sub (match e with
-          | None -> Debug.dprintf debug_float "c = %s.%s@;" a b;
-            zero
-          | Some e -> Debug.dprintf debug_float "c = %s.%sp%s@;" a b e;
-            exp_parser e)
-        (of_int (b_length * 4)))
-  in
-  (* we now have c = s * 2 ^ e *)
+  (* get [s] and [e] such that "c = s * 2 ^ e" *)
+  let s, e = float_parser c in
 
   (* if s = 0 stop now *)
   if eq !s zero then
     zero, zero
 
   else begin
-    (* shift the dot in e to follow fp format and keep s as int*)
-    (* c = s * 2 ^ (e + (sb - 1)) *)
-    e := add !e (sub sb one);
 
-    (* if s is too big or e is too small, try remove trailing zeros in
-       s and incr e *)
+    (* if s is too big or e is too small, try to remove trailing zeros
+       in s and incr e *)
     while gt !s smax || lt !e emin do
-      let new_s = euclidean_div !s (of_int 2) in
-      if not (eq !s (mul_int 2 new_s))
-      then
-        begin
-          Debug.dprintf debug_float "Too many digits in significand.";
-          raise (NotRepresentableFloat c);
-        end
-      else
-        begin
-          s := new_s;
-          e := succ !e
-        end
+      let new_s, rem = euclidean_div_mod !s (of_int 2) in
+      if not (eq rem zero) then begin
+        Debug.dprintf debug_float "Too many digits in significand.";
+        raise (NotRepresentableFloat c);
+      end else begin
+        s := new_s;
+        e := succ !e
+      end
     done;
 
-    (* if s is too small and e is too big *)
-    while lt !s smin && gt !e eden do
+    (* if s is too small and e is too big, add trailing zeros in s and
+       decr e *)
+    while lt !s smin && gt !e emin do
       s := mul_int 2 !s;
       e := pred !e
     done;
 
-    Debug.dprintf debug_float "c = %s * 2 ^ (%s - %s)@." (to_string !s) (to_string !e) (to_string (sub sb one));
+    Debug.dprintf debug_float " = %s * 2 ^ %s@." (to_string !s) (to_string !e);
 
-    if lt !e eden then begin
-      Debug.dprintf debug_float "Float out of bounds.";
-      raise (NotRepresentableFloat c)
-    end;
+    if lt !s smin then begin
+      (* denormal case *)
 
-    if eq !e eden then begin
-      if not (eq (euclidean_mod !s (of_int 2)) zero) then
-        begin
-          Debug.dprintf debug_float "Float too small.";
-          raise (NotRepresentableFloat c)
-        end;
+      Debug.dprintf debug_float "final: c = 0.[%s] * 2 ^ ([0] - bias + 1); bias=%s, i.e, 0[%a][%a]@."
+        (to_string !s) (to_string (sub emax one)) (print_in_base 2 (Some (to_int eb))) zero
+      (print_in_base 2 (Some (to_int (sub sb one)))) !s;
 
-      (* remove hidden bit for denormalized *)
-      s := euclidean_div !s (of_int 2)
-    end;
+      !s, zero
 
-    (* now that s and e are in shape, check that e is not too big *)
-    if ge !e emax then begin
-      Debug.dprintf debug_float "Exponent too big.";
-      raise (NotRepresentableFloat c)
-    end;
+    end else begin
+      (* normal case *)
 
-    (* add the exponent bia to e *)
-    let fe = add !e (sub emax one) in
-    let fs =
-      if eq fe zero
-      then begin
-          Debug.dprintf debug_float "final: c = 0.[%s] * 2 ^ ([%s] - bias + 1); bias=%s@."
-            (to_string !s) (to_string fe) (to_string (sub emax one));
-          !s
-      end else begin
-        Debug.dprintf debug_float "final: c = 1.[%s] * 2 ^ ([%s] - bias); bias=%s@."
-          (to_string (sub !s smin)) (to_string fe) (to_string (sub emax one));
-        sub !s smin
-      end
-    in
+      (* normalize the exponent *)
+      let fe = add !e (sub sb one) in
 
-    assert (le zero fs && lt fs (pow_int_pos_bigint 2 (sub sb one))
-         && le zero fe && lt fe (pow_int_pos_bigint 2 eb));
+      (* now that s and e are in shape, check that e is not too big *)
+      if ge fe emax then begin
+        Debug.dprintf debug_float "Exponent too big.";
+        raise (NotRepresentableFloat c)
+      end;
 
-    fs, fe
+      (* add the exponent bia to e *)
+      let fe = add fe (sub emax one) in
+      let fs = sub !s smin in
+
+      Debug.dprintf debug_float "final: c = 1.[%s] * 2 ^ ([%s] - bias); bias=%s, i.e, 0[%a][%a]@."
+        (to_string fs) (to_string fe) (to_string (sub emax one))
+        (print_in_base 2 (Some (to_int eb))) fe
+        (print_in_base 2 (Some (to_int (sub sb one)))) fs;
+
+      assert (le zero fs && lt fs (pow_int_pos_bigint 2 (sub sb one))
+              && le zero fe && lt fe (sub (pow_int_pos_bigint 2 eb) one));
+
+      fs, fe
+    end
   end
-
 
 (*
 Local Variables:

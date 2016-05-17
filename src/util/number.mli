@@ -43,12 +43,6 @@ val compute_int : integer_constant -> BigInt.t
 val real_const_dec : string -> string -> string option -> real_constant
 val real_const_hex : string -> string -> string option -> real_constant
 
-(** Float checking *)
-
-exception NotRepresentableFloat of real_constant
-
-val floatCheck : real_constant -> BigInt.t -> BigInt.t -> BigInt.t * BigInt.t
-
 (** Printing *)
 
 type integer_format =
@@ -93,3 +87,14 @@ val print_in_base : int -> int option -> formatter -> BigInt.t -> unit
 (** [print_in_base radix digits fmt i] print the value of [i] in base
     [radix]. If digits is not [None] adds leading 0s to have [digits]
     characters. *)
+
+(** Float checking *)
+
+exception NotRepresentableFloat of real_constant
+
+val float_check : real_constant -> BigInt.t -> BigInt.t -> BigInt.t * BigInt.t
+(** [float_check c eb sb] check that [c] is a float literal
+    representable with [eb] bits in the exponent and [sb] bits
+    (counting the hidden bit) in the significand. Returns a pair [s,e]
+    with [s] the significand (without the hidden bit), and [e] the
+    biased exponent. Raise [NotRepresentableFloat] exception otherwise.*)
