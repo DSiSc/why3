@@ -311,6 +311,7 @@ type float_info = {
   float_sb_val   : BigInt.t;
   float_proj     : Term.lsymbol;
   float_isFinite : Term.lsymbol;
+  float_get_rep  : Term.lsymbol;
 }
 
 type decl = {
@@ -456,6 +457,7 @@ let create_float_decl fi =
   let syms = Sid.empty in
   let news = Sid.add fi.float_proj.ls_name (Sid.singleton fi.float_ts.ts_name) in
   let news = Sid.add fi.float_isFinite.ls_name news in
+  let news = Sid.add fi.float_get_rep.ls_name news in
   mk_decl (Dfloat fi) syms news
 
 let create_data_decl tdl =

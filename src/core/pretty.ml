@@ -348,10 +348,11 @@ let print_range_decl fmt ri =
     print_integer_constant ri.range_low_cst print_integer_constant ri.range_high_cst
 
 let print_float_decl fmt fi =
-  fprintf fmt "@[<hov 2>type %a%a is float %a, %a : %a, %a@]"
+  fprintf fmt "@[<hov 2>type %a%a is float %a, %a, %a : %a, %a@]"
     print_ts fi.float_ts print_id_labels fi.float_ts.ts_name
     print_ls fi.float_proj print_ls fi.float_isFinite
-    print_integer_constant fi.float_eb_cst print_integer_constant fi.float_sb_cst
+    print_ls fi.float_get_rep print_integer_constant fi.float_eb_cst
+    print_integer_constant fi.float_sb_cst
 
 let print_data_decl fst fmt (ts,csl) =
   fprintf fmt "@[<hov 2>%s %a%a%a =@\n@[<hov>%a@]@]"

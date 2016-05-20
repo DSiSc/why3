@@ -947,14 +947,22 @@ let t_range_const c ts a b ls =
     t_eps bi
   else raise (OutOfRange c)
 
-let t_float_const c ts eb sb proj isFinite =
-  let _s,_e = Number.float_check c eb sb in
+let t_float_const c ts eb sb proj isFinite getRep =
+  let s,e = Number.float_check c eb sb in
   let id = Ident.id_fresh "dummy" in
   let ty = ty_app ts [] in
   let vs = create_vsymbol id ty in
   let t = t_equ (t_app proj [t_var vs] (Some ty_real))
       (t_const (Number.ConstReal c)) in
   let t = t_and (t_app isFinite [t_var vs] None) t in
+  let t =
+    let e_const = Number.int_const_dec (BigInt.to_string e) in
+    let s_const = Number.int_const_dec (BigInt.to_string s) in
+    t_and t
+      (t_equ (t_app getRep [t_var vs]
+                (Some (ty_tuple [ty_int;ty_int])))
+         (t_tuple [t_const (Number.ConstInt e_const);
+                   t_const (Number.ConstInt s_const)])) in
   let bi = t_close_bound vs t in
   t_eps bi
 
@@ -988,16 +996,20 @@ let t_projection_float_lit t =
   | Teps tb ->
     let (v,t) = t_open_bound tb in
     begin match t.t_node with
-      (* look for term of the form 'f v = const' *)
-      (* fixme: check that ls' is the projection of a range type *)
-      | Tbinop (Tand, _,
-                { t_node = (Tapp (ls, [ { t_node = Tapp (ls', [ { t_node = Tvar v' } ]) };
-                                        { t_node = Tconst (Number.ConstReal c) } ])) } )
-        -> if ls_equal ls ps_equ && vs_equal v v'
+      (* look for term of the form '(_ /\ f v = const') /\ (f' v = (const, const)) *)
+      | Tbinop (Tand,
+                { t_node = Tbinop (Tand, _,
+                                   { t_node = (Tapp (lseq, [ { t_node = Tapp (lsproj, [ { t_node = Tvar v' } ]) };
+                                                            { t_node = Tconst (Number.ConstReal c) } ])) } ) },
+                { t_node = Tapp (lseq', [ { t_node = Tapp (lsproj', [ { t_node = Tvar v'' } ]) };
+                                          { t_node = Tapp (_, [ { t_node = Tconst (Number.ConstInt e)};
+                                                                { t_node = Tconst (Number.ConstInt s)}]) } ]) } )
+        -> if ls_equal lseq ps_equ && ls_equal lseq' ps_equ &&
+              vs_equal v v' && vs_equal v' v''
         then
           begin
             match v.vs_ty.ty_node with
-            | Tyapp (ty, []) -> ty,ls',c
+            | Tyapp (ty, []) -> ty,lsproj,c,lsproj',e,s
             | _ -> raise Not_found
           end
         else raise Not_found

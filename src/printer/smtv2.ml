@@ -387,9 +387,9 @@ let rec print_term info fmt t =
         end
       with Not_found ->
         try
-          let ts,_p,c = t_projection_float_lit t in
+          let ts,_p,c,_r,e,s = t_projection_float_lit t in
           begin match query_syntax info.info_rliteral ts.ts_name with
-            | Some s -> syntax_float_literal s fmt c
+            | Some st -> syntax_float_literal st fmt c e s
             | None -> raise Not_found
           end
         with Not_found ->

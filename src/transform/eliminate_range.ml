@@ -42,6 +42,7 @@ let elim_float le_real abs_real prs d = match d.d_node with
     let ty_decl = create_ty_decl fi.float_ts in
     let proj_decl = create_param_decl fi.float_proj in
     let isFinite_decl = create_param_decl fi.float_isFinite in
+    let get_rep_decl = create_param_decl fi.float_get_rep in
     let pr = create_prsymbol (id_derive "_axiom" fi.float_ts.ts_name) in
     let v = create_vsymbol (id_fresh "dummy") (ty_app fi.float_ts []) in
     let v_term = t_app fi.float_proj [t_var v] (Some ty_real) in
@@ -60,7 +61,7 @@ let elim_float le_real abs_real prs d = match d.d_node with
     let f = t_implies (t_app fi.float_isFinite [t_var v] None) f in
     let f = t_forall_close [v] [] f in
     let ax_decl = create_prop_decl Paxiom pr f in
-    [ty_decl; proj_decl; isFinite_decl; ax_decl]
+    [ty_decl; proj_decl; isFinite_decl; get_rep_decl; ax_decl]
   | _ -> [d]
 
 let eliminate_range env =

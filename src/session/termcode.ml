@@ -549,6 +549,7 @@ module Checksum = struct
       tysymbol b fi.Decl.float_ts;
       lsymbol b fi.Decl.float_proj;
       lsymbol b fi.Decl.float_isFinite;
+      lsymbol b fi.Decl.float_get_rep;
       integer_constant b fi.Decl.float_eb_cst;
       integer_constant b fi.Decl.float_sb_cst
     | Decl.Ddata ddl ->

@@ -488,7 +488,8 @@ and try_term strict keep_loc uloc env prop dty node =
       ri.Decl.range_high_val ri.Decl.range_proj
   | DTfloat_const (c, fi) ->
     t_float_const c fi.Decl.float_ts fi.Decl.float_eb_val
-      fi.Decl.float_sb_val fi.Decl.float_proj fi.Decl.float_isFinite
+      fi.Decl.float_sb_val fi.Decl.float_proj
+      fi.Decl.float_isFinite fi.Decl.float_get_rep
   | DTapp (ls,[]) when ls_equal ls fs_bool_true ->
       if prop then t_true else t_bool_true
   | DTapp (ls,[]) when ls_equal ls fs_bool_false ->

@@ -268,7 +268,7 @@ let syntax_range_literal s fmt c =
   in
   global_substitute_fmt opt_search_forward_literal_format f s fmt
 
-let syntax_float_literal s fmt c =
+let syntax_float_literal s fmt c exp sgfc =
   let f s b e fmt =
     let number_format = {
       Number.long_int_support = true;
@@ -284,7 +284,10 @@ let syntax_float_literal s fmt c =
           (Number.PrintFracReal ("%s.0", "(* %s.0 %s.0)", "(/ %s.0 %s.0)"));
       Number.def_real_support = Number.Number_unsupported;
     } in
-    Number.print number_format fmt (Number.ConstReal c)
+    let exp = Number.compute_int exp in
+    let sgfc = Number.compute_int sgfc in
+    fprintf fmt "%a, %a, %a" (Number.print number_format) (Number.ConstReal c)
+      (Number.print_in_base 10 None) exp (Number.print_in_base 10 None) sgfc
   in
   global_substitute_fmt opt_search_forward_literal_format f s fmt
 

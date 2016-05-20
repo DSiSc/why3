@@ -347,8 +347,8 @@ typedefn:
 (* fixme : allow negative bounds *)
 | IS RANGE labels(lident) COLON INTEGER DOTDOT INTEGER
      { false, Public, TDrange ($5, $7, $3), [] }
-| IS FLOAT labels(lident) COMMA labels(lident) COLON INTEGER COMMA INTEGER
-     { false, Public, TDfloat ($7, $9, $3, $5), [] }
+| IS FLOAT labels(lident) COMMA labels(lident) COMMA labels(lident) COLON INTEGER COMMA INTEGER
+     { false, Public, TDfloat ($9, $11, $3, $5, $7), [] }
 
 model:
 | EQUAL         { false }
