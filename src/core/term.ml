@@ -162,7 +162,6 @@ exception BadArity of lsymbol * int
 exception FunctionSymbolExpected of lsymbol
 exception PredicateSymbolExpected of lsymbol
 exception ConstructorExpected of lsymbol
-exception OutOfRange of Number.integer_constant
 
 let pat_app fs pl ty =
   let s = match fs.ls_value with
@@ -337,8 +336,7 @@ let t_compare t1 t2 =
           begin match t1.t_node, t2.t_node with
           | Tvar v1, Tvar v2 ->
               comp_raise (vs_compare v1 v2)
-          | Tconst c1, Tconst c2 ->
-              perv_compare c1 c2
+          | Tconst c1, Tconst c2 -> perv_compare c1 c2
           | Tapp (s1,l1), Tapp (s2,l2) ->
               comp_raise (ls_compare s1 s2);
               List.iter2 (t_compare bnd vml1 vml2) l1 l2
@@ -823,12 +821,8 @@ let t_app ls tl ty = ignore (ls_app_inst ls tl ty); t_app ls tl ty
 let fs_app fs tl ty = t_app fs tl (Some ty)
 let ps_app ps tl    = t_app ps tl None
 
-let t_const c = match c with
-  | Number.ConstInt _  -> t_const c ty_int
-  | Number.ConstReal _ -> t_const c ty_real
-
 let t_nat_const n =
-  t_const (Number.ConstInt (Number.int_const_dec (string_of_int n)))
+  t_const (Number.ConstInt (Number.int_const_dec (string_of_int n))) ty_int
 
 let t_if f t1 t2 =
   t_ty_check t2 t1.t_ty;
@@ -934,96 +928,7 @@ let t_pred_app pr t = t_equ (t_func_app pr t) t_bool_true
 let t_func_app_l fn tl = List.fold_left t_func_app fn tl
 let t_pred_app_l pr tl = t_equ (t_func_app_l pr tl) t_bool_true
 
-let t_range_const c ts a b ls =
-  let v = Number.compute_int c in
-  if BigInt.le a v && BigInt.le v b
-  then
-    let id = Ident.id_fresh "dummy" in
-    let ty = ty_app ts [] in
-    let vs = create_vsymbol id ty in
-    let t = t_equ (t_app ls [t_var vs] (Some ty_int))
-                  (t_const (Number.ConstInt c)) in
-    let bi = t_close_bound vs t in
-    t_eps bi
-  else raise (OutOfRange c)
-
-let t_float_const c ts eb sb proj isFinite getRep =
-  let s,e = Number.float_check c eb sb in
-  let id = Ident.id_fresh "dummy" in
-  let ty = ty_app ts [] in
-  let vs = create_vsymbol id ty in
-  let t = t_equ (t_app proj [t_var vs] (Some ty_real))
-      (t_const (Number.ConstReal c)) in
-  let t = t_and (t_app isFinite [t_var vs] None) t in
-  let t =
-    let e_const = Number.int_const_dec (BigInt.to_string e) in
-    let s_const = Number.int_const_dec (BigInt.to_string s) in
-    t_and t
-      (t_equ (t_app getRep [t_var vs]
-                (Some (ty_tuple [ty_int;ty_int])))
-         (t_tuple [t_const (Number.ConstInt e_const);
-                   t_const (Number.ConstInt s_const)])) in
-  let bi = t_close_bound vs t in
-  t_eps bi
-
 (** Term library *)
-
-(* range litteral *)
-
-let t_projection_range_lit t =
-  match t.t_node with
-  | Teps tb ->
-    let (v,t) = t_open_bound tb in
-    begin match t.t_node with
-      (* look for term of the form 'f v = const' *)
-      (* fixme: check that ls' is the projection of a range type *)
-      | Tapp (ls, [ { t_node = Tapp (ls', [ { t_node = Tvar v' } ]) };
-                    { t_node = Tconst (Number.ConstInt c) } ])
-        -> if ls_equal ls ps_equ && vs_equal v v'
-        then
-          begin
-            match v.vs_ty.ty_node with
-            | Tyapp (ty, []) -> ty,ls',c
-            | _ -> raise Not_found
-          end
-        else raise Not_found
-      | _ -> raise Not_found
-    end
-  | _ -> raise Not_found
-
-let t_projection_float_lit t =
-  match t.t_node with
-  | Teps tb ->
-    let (v,t) = t_open_bound tb in
-    begin match t.t_node with
-      (* look for term of the form '(_ /\ f v = const') /\ (f' v = (const, const)) *)
-      | Tbinop (Tand,
-                { t_node = Tbinop (Tand, _,
-                                   { t_node = (Tapp (lseq, [ { t_node = Tapp (lsproj, [ { t_node = Tvar v' } ]) };
-                                                            { t_node = Tconst (Number.ConstReal c) } ])) } ) },
-                { t_node = Tapp (lseq', [ { t_node = Tapp (lsproj', [ { t_node = Tvar v'' } ]) };
-                                          { t_node = Tapp (_, [ { t_node = Tconst (Number.ConstInt e)};
-                                                                { t_node = Tconst (Number.ConstInt s)}]) } ]) } )
-        -> if ls_equal lseq ps_equ && ls_equal lseq' ps_equ &&
-              vs_equal v v' && vs_equal v' v''
-        then
-          begin
-            match v.vs_ty.ty_node with
-            | Tyapp (ty, []) -> ty,lsproj,c,lsproj',e,s
-            | _ -> raise Not_found
-          end
-        else raise Not_found
-      | _ -> raise Not_found
-    end
-  | _ -> raise Not_found
-
-let t_is_projection_lit t =
-  try
-    let _ = t_projection_float_lit t in true
-  with Not_found ->
-  try
-    let _ = t_projection_range_lit t in true
-  with Not_found -> false
 
 (* generic map over types, symbols and variables *)
 
@@ -1282,10 +1187,7 @@ let t_map_sign fn sign f = t_label_copy f (match f.t_node with
         then t_and (t_implies f1n f2) (t_implies (t_not f1p) f3)
         else t_or (t_and f1p f2) (t_and (t_not f1n) f3)
   | Tif _
-  | Teps _ ->
-    if t_is_projection_lit f
-    then t_map (fn sign) f
-    else failwith "t_map_sign: cannot determine polarity"
+  | Teps _ -> failwith "t_map_sign: cannot determine polarity"
   | _ -> t_map (fn sign) f)
 
 (* continuation-passing traversal *)

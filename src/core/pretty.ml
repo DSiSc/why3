@@ -569,7 +569,6 @@ let () = Exn_printer.register
       fprintf fmt "Not a function symbol: %a" print_ls ls
   | Term.PredicateSymbolExpected ls ->
     fprintf fmt "Not a predicate symbol: %a" print_ls ls
-  | Term.OutOfRange c -> fprintf fmt "%a is out of range" print_const (ConstInt c)
   | Term.ConstructorExpected ls ->
       fprintf fmt "%s %a is not a constructor"
         (if ls.ls_value = None then "Predicate" else "Function") print_ls ls
@@ -631,5 +630,6 @@ let () = Exn_printer.register
         id.id_string
   | Decl.NoTerminationProof ls ->
       fprintf fmt "Cannot prove the termination of %a" print_ls ls
+  | Decl.OutOfRange c -> fprintf fmt "%a is out of range" print_const (ConstInt c)
   | _ -> raise exn
   end

@@ -70,7 +70,6 @@ exception UncoveredVar of vsymbol
 exception BadArity of lsymbol * int
 exception FunctionSymbolExpected of lsymbol
 exception PredicateSymbolExpected of lsymbol
-exception OutOfRange of Number.integer_constant
 exception ConstructorExpected of lsymbol
 
 (** {2 Patterns} *)
@@ -203,12 +202,7 @@ val ls_arg_inst : lsymbol -> term list -> ty Mtv.t
 val ls_app_inst : lsymbol -> term list -> ty option -> ty Mtv.t
 
 val t_var : vsymbol -> term
-val t_const : Number.constant -> term
-val t_range_const : Number.integer_constant ->
-  tysymbol -> BigInt.t -> BigInt.t -> lsymbol -> term
-val t_float_const : Number.real_constant ->
-  tysymbol -> BigInt.t -> BigInt.t -> lsymbol -> lsymbol -> lsymbol
-  -> term
+val t_const : Number.constant -> ty -> term
 val t_if : term -> term -> term -> term
 val t_let : term -> term_bound -> term
 val t_case : term -> term_branch list -> term
@@ -311,24 +305,6 @@ val t_pred_app : term -> term -> term  (* prop-typed application *)
 
 val t_func_app_l : term -> term list -> term  (* value-typed application *)
 val t_pred_app_l : term -> term list -> term  (* prop-typed application *)
-
-val t_projection_float_lit : term ->
-  tysymbol * lsymbol * Number.real_constant *
-  lsymbol * Number.integer_constant * Number.integer_constant
-(** [t_projection_range_lit t] If [t] as the form [eps x: ts. (p x /\
-    pr x = c) /\ gr x = (e,s)] with [c] a real constant, [e] and [s]
-    two integer constants, returns the tuple [ts,pr,c,gr,e,s]. Raises
-    NotFound otherwise. *)
-
-val t_projection_range_lit : term ->
-  tysymbol * lsymbol * Number.integer_constant
-(** [t_projection_range_lit t] If [t] as the form [eps x: ts. p x = c]
-    with [c] an integer constant, returns the triple [ts,p,c]. Raises
-    NotFound otherwise. *)
-
-val t_is_projection_lit : term -> bool
-(** [t_is_projection_lit c] returns true if [t] is in one of the two
-    form above *)
 
 (** {2 Lambda-term manipulation} *)
 

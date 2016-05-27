@@ -484,7 +484,8 @@ let rec dexpr ({uc = uc} as lenv) denv {expr_desc = desc; expr_loc = loc} =
       let e1, ch = if chainable_op uc denv op2
         then get_chain e12 ch else e12, ch in
       make_chain "q1 " "q2 " (dexpr lenv denv e1) ch
-  | Ptree.Econst c -> DEconst c
+  | Ptree.Econst (Number.ConstInt _ as c) -> DEconst (c, dity_int)
+  | Ptree.Econst (Number.ConstReal _ as c) -> DEconst (c, dity_real)
   | Ptree.Erecord [] -> raise Decl.EmptyRecord
   | Ptree.Erecord ((q,_)::_ as fl) ->
       let prog_val cs pj = function
@@ -628,15 +629,23 @@ let rec dexpr ({uc = uc} as lenv) denv {expr_desc = desc; expr_loc = loc} =
     let dty = ity_of_pty uc pty in
     try
       match e2.de_node, dty.ity_node with
-      | DEconst (Number.ConstInt c), Itypur (ts, []) ->
+      | DEconst (Number.ConstInt _ as c, _), Itypur (ts, []) ->
         begin match find_range_decl
                       (Theory.get_known (get_theory uc)) ts with
         | None -> raise Not_found
-        | Some ri -> DErange_const (c, ri)
+        | Some ri ->
+          DEconst (c, dity_of_ity dty)
+        end
+      | DEconst (Number.ConstReal _ as c, _), Itypur (ts, []) ->
+        begin match find_float_decl
+                      (Theory.get_known (get_theory uc)) ts with
+        | None -> raise Not_found
+        | Some fi ->
+          DEconst (c, dity_of_ity dty)
         end
       | _ -> raise Not_found
     with Not_found ->
-      DEcast (dexpr lenv denv e1, ity_of_pty uc pty))
+      DEcast (e2, dty))
 
 and drec_defn ~top lenv denv fdl =
   let prep (id, gh, (bl, pty, e, sp)) =

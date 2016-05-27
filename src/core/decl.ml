@@ -14,6 +14,8 @@ open Ident
 open Ty
 open Term
 
+exception OutOfRange of Number.integer_constant
+
 (** Type declaration *)
 
 type constructor = lsymbol * lsymbol option list
@@ -677,13 +679,14 @@ let known_add_decl kn0 decl =
   if Sid.is_empty unk then kn
   else raise (UnknownIdent (Sid.choose unk))
 
-let find_constructors kn ts =
+ let find_constructors kn ts =
   match (Mid.find ts.ts_name kn).d_node with
   | Dtype _ | Drange _ | Dfloat _ -> []
   | Ddata dl -> List.assq ts dl
   | Dparam _ | Dlogic _ | Dind _ | Dprop _ -> assert false
 
-let find_range_decl kn ts =
+let
+  find_range_decl kn ts =
   match (Mid.find ts.ts_name kn).d_node with
   | Drange ri -> Some ri
   | Dtype _ | Ddata _ | Dfloat _ -> None
@@ -730,6 +733,31 @@ let check_match kn d =
         let pl = List.map (fun b -> let p,_ = t_open_branch b in [p]) bl in
         Loc.try2 ?loc:t.t_loc (Pattern.check_compile ~get_constructors) [t1] pl;
         t_fold check () t
+    | _ -> t_fold check () t
+  in
+  decl_fold check () d
+
+let check_literals kn d =
+  let rec check () t = match t.t_node, t.t_ty with
+    | Tconst (Number.ConstInt c), Some { ty_node = Tyapp (ts,[]) } ->
+      begin match find_range_decl kn ts with
+        | Some ri ->
+          (* check that c is in range *)
+          let cval = Number.compute_int c in
+          if BigInt.gt cval ri.range_high_val ||
+             BigInt.lt cval ri.range_low_val
+          then
+            raise (OutOfRange c);
+        | None -> ();
+      end;
+      t_fold check () t
+    | Tconst (Number.ConstReal c), Some { ty_node = Tyapp (ts,[]) } ->
+      begin match find_float_decl kn ts with
+        | Some fi ->
+          let _ = Number.float_check c fi.float_eb_val fi.float_sb_val in
+          ()
+        | None -> ()
+      end;
     | _ -> t_fold check () t
   in
   decl_fold check () d
@@ -817,6 +845,7 @@ let known_add_decl kn d =
   check_positivity kn d;
   check_foundness kn d;
   check_match kn d;
+  check_literals kn d;
   kn
 
 (** Records *)

@@ -105,7 +105,6 @@ type to_elim =
   | All           (* eliminate all epsilon-terms *)
   | NonLambda     (* preserve lambda-terms *)
   | NonLambdaSet  (* preserve lambda-terms with value-typed body *)
-  | NonLit of Ty.Sts.t * Ty.Sts.t   (* preserve literals of specific type *)
 
 let to_elim el t = match el with
   | All -> true
@@ -113,22 +112,6 @@ let to_elim el t = match el with
   | NonLambdaSet ->
       let vl,_,t = t_open_lambda t in
       vl = [] || t.t_ty = None
-  | NonLit (tssR,tssF) ->
-    begin match t.t_ty with
-      | Some { Ty.ty_node = Ty.Tyapp (ts,[]) } when Ty.Sts.mem ts tssR ->
-        (* fixme: check that the projection is the projection of ts *)
-        begin try
-            let _ = t_projection_range_lit t in false
-          with Not_found -> true
-        end
-      | Some { Ty.ty_node = Ty.Tyapp (ts,[]) } when Ty.Sts.mem ts tssF ->
-        (* fixme: check that the projection is the projection of ts *)
-        begin try
-            let _ = t_projection_float_lit t in false
-          with Not_found -> true
-        end
-      | _ -> true
-    end
 
 let rec lift_f el acc t0 = match t0.t_node with
   | (Tapp (ps, [t1; {t_node = Teps fb} as t2])
@@ -214,10 +197,6 @@ let lift_d el d = match d.d_node with
 let eliminate_epsilon     = Trans.decl (lift_d All) None
 let eliminate_nl_epsilon  = Trans.decl (lift_d NonLambda) None
 let eliminate_nls_epsilon = Trans.decl (lift_d NonLambdaSet) None
-let eliminate_nrl_epsilon =
-  Trans.on_tagged_ts Eliminate_range.meta_keep_range (fun tssR ->
-      Trans.on_tagged_ts Eliminate_range.meta_keep_float (fun tssF ->
-          Trans.decl (lift_d (NonLit (tssR, tssF))) None))
 
 let () = Trans.register_transform "eliminate_epsilon" eliminate_epsilon
   ~desc:"Eliminate@ lambda-terms@ and@ other@ comprehension@ forms."
@@ -229,7 +208,3 @@ let () = Trans.register_transform "eliminate_non_lambda_epsilon"
 let () = Trans.register_transform "eliminate_non_lambda_set_epsilon"
   eliminate_nls_epsilon
   ~desc:"Eliminate@ all@ comprehension@ forms@ except@ value-typed@ lambda-terms."
-
-let () = Trans.register_transform "eliminate_non_range_literal_epsilon"
-  eliminate_nrl_epsilon
-  ~desc:"Eliminate@ all@ comprehension@ forms@ except@ range@ literals."

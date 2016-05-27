@@ -27,8 +27,8 @@ let elim_range le_int prs d = match d.d_node with
     let pr = create_prsymbol (id_derive "_axiom" ri.range_ts.ts_name) in
     let v = create_vsymbol (id_fresh "dummy") (ty_app ri.range_ts []) in
     let v_term = t_app ri.range_proj [t_var v] (Some ty_int) in
-    let a_term = t_const (Number.ConstInt ri.range_low_cst) in
-    let b_term = t_const (Number.ConstInt ri.range_high_cst) in
+    let a_term = t_const (Number.ConstInt ri.range_low_cst) ty_int in
+    let b_term = t_const (Number.ConstInt ri.range_high_cst) ty_int in
     let f = t_and (t_app le_int [a_term; v_term] None)
                   (t_app le_int [v_term; b_term] None)
     in
@@ -55,7 +55,7 @@ let elim_float le_real abs_real prs d = match d.d_node with
     let e_string = Format.flush_str_formatter () in
     let term = t_const
         (Number.ConstReal
-           (Number.real_const_hex m_string "" (Some e_string))) in
+           (Number.real_const_hex m_string "" (Some e_string))) ty_real in
     let f = t_app le_real [t_app abs_real [v_term] (Some ty_real); term] None
     in
     let f = t_implies (t_app fi.float_isFinite [t_var v] None) f in

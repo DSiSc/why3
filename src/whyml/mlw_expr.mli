@@ -232,9 +232,7 @@ val fs_void : lsymbol
 val t_void : term
 val e_void : expr
 
-val e_const : Number.constant -> expr
-val e_range_const : Number.integer_constant -> Ty.tysymbol ->
-  BigInt.t -> BigInt.t -> lsymbol -> expr
+val e_const : Number.constant -> ity -> expr
 val e_lazy_and : expr -> expr -> expr
 val e_lazy_or : expr -> expr -> expr
 val e_not : expr -> expr

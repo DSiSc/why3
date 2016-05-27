@@ -166,6 +166,8 @@ exception BadRecordField of lsymbol
 exception RecordFieldMissing of lsymbol * lsymbol
 exception DuplicateRecordField of lsymbol * lsymbol
 
+exception OutOfRange of Number.integer_constant
+
 (** {2 Utilities} *)
 
 val decl_map : (term -> term) -> decl -> decl

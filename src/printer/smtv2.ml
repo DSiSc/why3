@@ -296,22 +296,39 @@ let rec print_term info fmt t =
   check_enter_vc_term t info;
 
   let () = match t.t_node with
-  | Tconst c ->
-      let number_format = {
-          Number.long_int_support = true;
-          Number.extra_leading_zeros_support = false;
-          Number.dec_int_support = Number.Number_default;
-          Number.hex_int_support = Number.Number_unsupported;
-          Number.oct_int_support = Number.Number_unsupported;
-          Number.bin_int_support = Number.Number_unsupported;
-          Number.def_int_support = Number.Number_unsupported;
-          Number.dec_real_support = Number.Number_unsupported;
-          Number.hex_real_support = Number.Number_unsupported;
-          Number.frac_real_support = Number.Number_custom
-            (Number.PrintFracReal ("%s.0", "(* %s.0 %s.0)", "(/ %s.0 %s.0)"));
-          Number.def_real_support = Number.Number_unsupported;
-        } in
-      Number.print number_format fmt c
+    | Tconst c ->
+(*      begin try
+          let ts,_p,c = t_projection_range_lit t in
+          (* fixme, check that _p is the correct projection *)
+          (* look for syntax literal ty in driver *)
+          begin match query_syntax info.info_rliteral ts.ts_name with
+            | Some s -> syntax_range_literal s fmt c
+            | None -> raise Not_found
+          end
+        with Not_found ->
+        try
+          let ts,_p,c,_r,e,s = t_projection_float_lit t in
+          begin match query_syntax info.info_rliteral ts.ts_name with
+            | Some st -> syntax_float_literal st fmt c e s
+            | None -> raise Not_found
+          end
+        with Not_found -> *)
+          let number_format = {
+            Number.long_int_support = true;
+            Number.extra_leading_zeros_support = false;
+            Number.dec_int_support = Number.Number_default;
+            Number.hex_int_support = Number.Number_unsupported;
+            Number.oct_int_support = Number.Number_unsupported;
+            Number.bin_int_support = Number.Number_unsupported;
+            Number.def_int_support = Number.Number_unsupported;
+            Number.dec_real_support = Number.Number_unsupported;
+            Number.hex_real_support = Number.Number_unsupported;
+            Number.frac_real_support = Number.Number_custom
+                (Number.PrintFracReal ("%s.0", "(* %s.0 %s.0)", "(/ %s.0 %s.0)"));
+            Number.def_real_support = Number.Number_unsupported;
+          } in
+          Number.print number_format fmt c
+      (* end *)
   | Tvar v -> print_var info fmt v
   | Tapp (ls, tl) ->
     (* let's check if a converter applies *)
@@ -375,27 +392,8 @@ let rec print_term info fmt t =
             (print_branches info subject print_term) bl;
           forget_var info subject
     end
-  (* | Teps _ -> *)
-  | Teps _ ->
-    begin try
-        let ts,_p,c = t_projection_range_lit t in
-        (* fixme, check that _p is the correct projection *)
-        (* look for syntax literal ty in driver *)
-        begin match query_syntax info.info_rliteral ts.ts_name with
-          | Some s -> syntax_range_literal s fmt c
-          | None -> raise Not_found
-        end
-      with Not_found ->
-        try
-          let ts,_p,c,_r,e,s = t_projection_float_lit t in
-          begin match query_syntax info.info_rliteral ts.ts_name with
-            | Some st -> syntax_float_literal st fmt c e s
-            | None -> raise Not_found
-          end
-        with Not_found ->
-          unsupportedTerm t
-            "smtv2: you must eliminate epsilon"
-    end
+  | Teps _ -> unsupportedTerm t
+      "smtv2: you must eliminate epsilon"
   | Tquant _ | Tbinop _ | Tnot _ | Ttrue | Tfalse -> raise (TermExpected t)
   in
 

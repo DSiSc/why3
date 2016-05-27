@@ -56,9 +56,7 @@ type dterm = private {
 and dterm_node =
   | DTvar of string * dty
   | DTgvar of vsymbol
-  | DTconst of Number.constant
-  | DTrange_const of Number.integer_constant * Decl.range_info
-  | DTfloat_const of Number.real_constant * Decl.float_info
+  | DTconst of Number.constant * dty
   | DTapp of lsymbol * dterm list
   | DTfapp of dterm * dterm
   | DTif of dterm * dterm * dterm

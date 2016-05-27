@@ -286,8 +286,11 @@ let rec dterm uc gvars denv {term_desc = desc; term_loc = loc} =
       let e1, ch = if chainable_op uc op2
         then get_chain e12 ch else e12, ch in
       make_chain (dterm uc gvars denv e1) ch
-  | Ptree.Tconst c ->
-      DTconst c
+  | Ptree.Tconst c -> begin
+      match c with
+      | Number.ConstInt _ -> DTconst (c, dty_of_ty ty_int)
+      | Number.ConstReal _ -> DTconst (c, dty_of_ty ty_real)
+    end
   | Ptree.Tlet (x, e1, e2) ->
       let id = create_user_id x in
       let e1 = dterm uc gvars denv e1 in
@@ -366,15 +369,15 @@ let rec dterm uc gvars denv {term_desc = desc; term_loc = loc} =
     let dty = ty_of_pty uc ty in
     try
       match e2.dt_node, dty.ty_node with
-      | DTconst (Number.ConstInt c), Tyapp (ts, []) ->
+      | DTconst (Number.ConstInt _ as c, _), Tyapp (ts, []) ->
         begin match find_range_decl (get_known uc) ts with
           | None -> raise Not_found
-          | Some ri -> DTrange_const (c, ri)
+          | Some ri -> DTconst (c, dty_of_ty (ty_app ri.range_ts []))
         end
-      | DTconst (Number.ConstReal c), Tyapp (ts, []) ->
+      | DTconst (Number.ConstReal _ as c, _), Tyapp (ts, []) ->
         begin match find_float_decl (get_known uc) ts with
           | None -> raise Not_found
-          | Some fi -> DTfloat_const (c, fi)
+          | Some fi -> DTconst (c, dty_of_ty (ty_app fi.float_ts []))
         end
       | _ -> raise Not_found
     with Not_found ->

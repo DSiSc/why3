@@ -487,6 +487,7 @@ let rec tr_positive p = match kind_of_term p with
 let const_of_big_int b =
   Term.t_const
     (Number.ConstInt (Number.int_const_dec (Big_int.string_of_big_int b)))
+    ty_int
 
 (* translates a closed Coq term t:Z or R into a FOL term of type int or real *)
 let rec tr_arith_constant dep t = match kind_of_term t with
@@ -499,8 +500,10 @@ let rec tr_arith_constant dep t = match kind_of_term t with
       Term.fs_app fs [t] Ty.ty_int
   | Const _ when is_global coq_R0 t ->
       Term.t_const (Number.ConstReal (Number.real_const_dec "0" "0" None))
+      ty_real
   | Const _ when is_global coq_R1 t ->
       Term.t_const (Number.ConstReal (Number.real_const_dec "1" "0" None))
+      ty_real
 (*   | App (f, [|a;b|]) when f = Lazy.force coq_Rplus -> *)
 (*       let ta = tr_arith_constant a in *)
 (*       let tb = tr_arith_constant b in *)

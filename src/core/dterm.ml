@@ -175,9 +175,7 @@ type dterm = {
 and dterm_node =
   | DTvar of string * dty
   | DTgvar of vsymbol
-  | DTconst of Number.constant
-  | DTrange_const of Number.integer_constant * Decl.range_info
-  | DTfloat_const of Number.real_constant * Decl.float_info
+  | DTconst of Number.constant * dty
   | DTapp of lsymbol * dterm list
   | DTfapp of dterm * dterm
   | DTif of dterm * dterm * dterm
@@ -298,14 +296,7 @@ let dterm ?loc node =
       Some dty
     | DTgvar vs ->
       Some (dty_of_ty vs.vs_ty)
-    | DTconst (Number.ConstInt _) ->
-      Some dty_int
-    | DTconst (Number.ConstReal _) ->
-      Some dty_real
-    | DTrange_const (_c, ri) ->
-      Some (dty_of_ty (Ty.ty_app ri.Decl.range_ts []))
-    | DTfloat_const (_c, fi) ->
-      Some (dty_of_ty (Ty.ty_app fi.Decl.float_ts []))
+    | DTconst (_,ty) -> Some ty
     | DTapp (ls,dtl) ->
         let dtyl, dty = specialize_ls ls in
         dty_unify_app ls dterm_expected_type dtl dtyl;
@@ -481,15 +472,7 @@ and try_term strict keep_loc uloc env prop dty node =
       t_var (Mstr.find_exn (UnboundVar n) n env)
   | DTgvar vs ->
       t_var vs
-  | DTconst c ->
-    t_const c
-  | DTrange_const (c, ri) ->
-    t_range_const c ri.Decl.range_ts ri.Decl.range_low_val
-      ri.Decl.range_high_val ri.Decl.range_proj
-  | DTfloat_const (c, fi) ->
-    t_float_const c fi.Decl.float_ts fi.Decl.float_eb_val
-      fi.Decl.float_sb_val fi.Decl.float_proj
-      fi.Decl.float_isFinite fi.Decl.float_get_rep
+  | DTconst (c,dty) -> t_const c (ty_of_dty ~strict dty)
   | DTapp (ls,[]) when ls_equal ls fs_bool_true ->
       if prop then t_true else t_bool_true
   | DTapp (ls,[]) when ls_equal ls fs_bool_false ->
