@@ -271,10 +271,9 @@ let print_range_decl fmt ri =
 
 let print_float_decl fmt fi =
   if not (query_remove fi.float_ts.ts_name) then begin
-    fprintf fmt "@[<hov 2>type %a%a is float %a, %a, %a : %a, %a@]@\n@\n"
+    fprintf fmt "@[<hov 2>type %a%a is float %a, %a : %a, %a@]@\n@\n"
       print_ts fi.float_ts print_ident_labels fi.float_ts.ts_name
       print_ls fi.float_proj print_ls fi.float_isFinite
-      print_ls fi.float_get_rep
       Pretty.print_integer_constant fi.float_eb_cst
       Pretty.print_integer_constant fi.float_sb_cst;
     forget_tvs ()

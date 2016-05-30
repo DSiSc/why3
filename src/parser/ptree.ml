@@ -128,7 +128,7 @@ type type_def =
   | TDrecord    of field list
   | TDrange     of integer_constant * integer_constant * ident
   | TDfloat     of integer_constant * integer_constant * ident
-                   * ident * ident
+                   * ident
 
 type visibility = Public | Private | Abstract
 

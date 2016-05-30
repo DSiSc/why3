@@ -528,8 +528,8 @@ let add_types dl th =
                    range_proj = ls
                  } in
         abstr, algeb, alias, ri::range, float
-    | TDfloat (eb,sb,proj,isF,getRep) ->
-      let eb_val = Number.compute_int eb  in
+    | TDfloat (eb,sb,proj,isF) ->
+      let eb_val = Number.compute_int eb in
       let sb_val = Number.compute_int sb in
       if BigInt.le eb_val (BigInt.of_int 1)
       || BigInt.le sb_val (BigInt.of_int 1) then
@@ -537,12 +537,9 @@ let add_types dl th =
       else
         let proj_id = create_user_id proj in
         let isF_id = create_user_id isF in
-        let getRep_id = create_user_id getRep in
         let ty = ty_app ts [] in
         let proj = create_fsymbol proj_id [ty] ty_real in
         let isF = create_psymbol isF_id [ty] in
-        let getRep =
-          create_fsymbol getRep_id [ty] (ty_tuple [ty_int;ty_int]) in
         let fi = { float_ts       = ts;
                    float_eb_cst   = eb;
                    float_eb_val   = eb_val;
@@ -550,7 +547,6 @@ let add_types dl th =
                    float_sb_val   = sb_val;
                    float_proj     = proj;
                    float_isFinite = isF;
-                   float_get_rep  = getRep;
                  } in
         abstr, algeb, alias, range, fi::float
   in

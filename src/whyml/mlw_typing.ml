@@ -1014,7 +1014,7 @@ let add_types ~wp uc tdl =
                      range_proj = ls
                    } in
           abstr, algeb, alias, ri :: range, float
-      | TDfloat (eb,sb,proj,isF,getRep) ->
+      | TDfloat (eb,sb,proj,isF) ->
         let ts = match ts with
           | TS ts -> ts
           | PT _ -> assert false
@@ -1028,13 +1028,9 @@ let add_types ~wp uc tdl =
         else
           let proj_id = create_user_id proj in
           let isF_id = create_user_id isF in
-          let getR_id = create_user_id getRep in
           let ty = ty_app ts [] in
           let proj = create_lsymbol proj_id [ty] (Some ty_real) in
           let isF = create_lsymbol isF_id [ty] None in
-          let getRep =
-            create_lsymbol getR_id [ty] (Some (ty_tuple [ty_int;ty_int]))
-          in
           let fi = { float_ts = ts;
                      float_eb_cst = eb;
                      float_eb_val = eb_val;
@@ -1042,7 +1038,6 @@ let add_types ~wp uc tdl =
                      float_sb_val = sb_val;
                      float_proj = proj;
                      float_isFinite = isF;
-                     float_get_rep = getRep;
                    } in
         abstr, algeb, alias, range, fi :: float
       | (TDalgebraic _ | TDrecord _) when Hstr.find mutables x ->

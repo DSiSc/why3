@@ -256,13 +256,6 @@ let print support fmt = function
   | ConstReal (RConstDec (i, f, e)) -> print_dec_real support fmt i f e
   | ConstReal (RConstHex (i, f, e)) -> print_hex_real support fmt i f e
 
-let () = Exn_printer.register
-  begin fun fmt exn -> match exn with
-  | InvalidConstantLiteral (n,s) ->
-      fprintf fmt "Invalid constant literal in base %d: '%s'" n s
-  | _ -> raise exn
-  end
-
 let char_of_int i =
   if i < 10 then
     Char.chr (i + Char.code '0')
@@ -427,6 +420,29 @@ let float_check c eb sb =
 
       fs, fe
     end
+  end
+
+let print_real_constant fmt c =
+  match c with
+  | RConstDec (a,b,e) ->
+    begin match e with
+      | None -> fprintf fmt "%s.%s" a b
+      | Some e -> fprintf fmt "%s.%se%s" a b e
+    end
+  | RConstHex (a,b,e) ->
+    begin match e with
+      | None -> fprintf fmt "0x%s.%s" a b
+      | Some e -> fprintf fmt "0x%s.%sp%s" a b e
+    end
+
+let () = Exn_printer.register
+  begin fun fmt exn -> match exn with
+  | InvalidConstantLiteral (n,s) ->
+    fprintf fmt "Invalid constant literal in base %d: '%s'" n s
+  | NotRepresentableFloat c ->
+    fprintf fmt "Invalid floating point literal : '%a'"
+      print_real_constant c
+  | _ -> raise exn
   end
 
 (*

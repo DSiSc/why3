@@ -72,8 +72,7 @@ let compute_diff t1 t2 =
       | Dfloat fi ->
         let acc = remove_ts acc fi.float_ts in
         let acc = remove_ls acc fi.float_proj in
-        let acc = remove_ls acc fi.float_isFinite in
-        remove_ls acc fi.float_get_rep
+        remove_ls acc fi.float_isFinite
       | Ddata l -> List.fold_left (fun acc (ts,_) -> remove_ts acc ts) acc l
       | Dparam ls -> remove_ls acc ls
       | Dlogic l -> List.fold_left (fun acc (ls,_) -> remove_ls acc ls) acc l
@@ -241,8 +240,7 @@ let add_rem rem decl =
   | Drange ri -> remove_ls (remove_ts rem ri.range_ts) ri.range_proj
   | Dfloat fi -> let rem = remove_ts rem fi.float_ts in
     let rem = remove_ls rem fi.float_proj in
-    let rem = remove_ls rem fi.float_isFinite in
-    remove_ls rem fi.float_get_rep
+    remove_ls rem fi.float_isFinite
   | Ddata l -> List.fold_left (fun rem (ts,_) -> remove_ts rem ts) rem l
   | Dparam ls -> remove_ls rem ls
   | Dlogic l -> List.fold_left (fun rem (ls,_) -> remove_ls rem ls) rem l

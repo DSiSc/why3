@@ -105,7 +105,6 @@ type float_info = {
   float_sb_val   : BigInt.t;
   float_proj     : Term.lsymbol;
   float_isFinite : Term.lsymbol;
-  float_get_rep  : Term.lsymbol;
 }
 
 type decl = private {
