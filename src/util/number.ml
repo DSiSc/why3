@@ -418,7 +418,7 @@ let float_check c eb sb =
       assert (le zero fs && lt fs (pow_int_pos_bigint 2 (sub sb one))
               && le zero fe && lt fe (sub (pow_int_pos_bigint 2 eb) one));
 
-      fs, fe
+      fe, fs
     end
   end
 

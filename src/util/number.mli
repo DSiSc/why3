@@ -95,6 +95,6 @@ exception NotRepresentableFloat of real_constant
 val float_check : real_constant -> BigInt.t -> BigInt.t -> BigInt.t * BigInt.t
 (** [float_check c eb sb] check that [c] is a float literal
     representable with [eb] bits in the exponent and [sb] bits
-    (counting the hidden bit) in the significand. Returns a pair [s,e]
+    (counting the hidden bit) in the significand. Returns a pair [e,s]
     with [s] the significand (without the hidden bit), and [e] the
     biased exponent. Raise [NotRepresentableFloat] exception otherwise.*)

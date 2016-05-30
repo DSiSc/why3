@@ -119,6 +119,10 @@ let opt_search_forward_literal_format s pos =
       if s.[!i] = '%' then begin
         incr i;
         b := !i;
+        begin match s.[!i] with
+        | 's' | 'e' | 'm' -> incr i; (* float literals *)
+        | _ -> ()
+        end;
         while !i < l && is_digit s.[!i] do incr i done;
         begin match s.[!i] with
         | 'b' | 'x' | 'o' | 'd' -> incr i; raise Exit
@@ -202,9 +206,9 @@ let check_syntax_literal _ts s =
     incr count;
   (* nothing else to check ?! *)
   in
-  iter_group opt_search_forward_literal_format arg s;
-  if !count <> 1 then
-    raise (BadSyntaxArity (1,!count))
+  iter_group opt_search_forward_literal_format arg s
+  (* if !count <> 1 then *)
+    (* raise (BadSyntaxArity (1,!count)) *)
 
 let syntax_arguments s print fmt l =
   let args = Array.of_list l in
@@ -268,26 +272,27 @@ let syntax_range_literal s fmt c =
   in
   global_substitute_fmt opt_search_forward_literal_format f s fmt
 
-let syntax_float_literal s fmt c exp sgfc =
+let syntax_float_literal s fmt c eb sb =
   let f s b e fmt =
-    let number_format = {
-      Number.long_int_support = true;
-      Number.extra_leading_zeros_support = false;
-      Number.dec_int_support = Number.Number_default;
-      Number.hex_int_support = Number.Number_unsupported;
-      Number.oct_int_support = Number.Number_unsupported;
-      Number.bin_int_support = Number.Number_unsupported;
-      Number.def_int_support = Number.Number_unsupported;
-      Number.dec_real_support = Number.Number_default;
-      Number.hex_real_support = Number.Number_unsupported;
-      Number.frac_real_support = Number.Number_custom
-          (Number.PrintFracReal ("%s.0", "(* %s.0 %s.0)", "(/ %s.0 %s.0)"));
-      Number.def_real_support = Number.Number_unsupported;
-    } in
-    let exp = Number.compute_int exp in
-    let sgfc = Number.compute_int sgfc in
-    fprintf fmt "%a, %a, %a" (Number.print number_format) (Number.ConstReal c)
-      (Number.print_in_base 10 None) exp (Number.print_in_base 10 None) sgfc
+    let base = match s.[e-1] with
+      | 'x' -> 16
+      | 'd' -> 10
+      | 'o' -> 8
+      | 'b' -> 2
+      | _ -> assert false
+    in
+    let digits =
+      if e > b + 2 then
+        Some (int_of_string (String.sub s (b+1) (e-b-2)))
+      else
+        None
+    in
+    let e,m = Number.float_check c eb sb in
+    match s.[b] with
+    | 's' -> Number.print_in_base base digits fmt BigInt.zero
+    | 'e' -> Number.print_in_base base digits fmt e
+    | 'm' -> Number.print_in_base base digits fmt m
+    | _ -> assert false
   in
   global_substitute_fmt opt_search_forward_literal_format f s fmt
 

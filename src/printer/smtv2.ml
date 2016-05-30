@@ -127,6 +127,7 @@ type info = {
   mutable info_in_goal : bool;
   info_vc_term : vc_term_info;
   info_printer : ident_printer;
+  info_km      : known_map;
 }
 
 let debug_print_term message t =
@@ -297,22 +298,28 @@ let rec print_term info fmt t =
 
   let () = match t.t_node with
     | Tconst c ->
-(*      begin try
-          let ts,_p,c = t_projection_range_lit t in
-          (* fixme, check that _p is the correct projection *)
-          (* look for syntax literal ty in driver *)
-          begin match query_syntax info.info_rliteral ts.ts_name with
-            | Some s -> syntax_range_literal s fmt c
-            | None -> raise Not_found
+      begin try match t.t_ty with
+        | Some { ty_node = Tyapp (ts, []); } ->
+                    (* look for syntax literal ts in driver *)
+          begin match c with
+            | Number.ConstInt c ->
+              begin match query_syntax info.info_rliteral ts.ts_name with
+                | Some s -> syntax_range_literal s fmt c
+                | None -> raise Not_found
+              end
+            | Number.ConstReal c ->
+              begin match query_syntax info.info_rliteral ts.ts_name with
+                | Some st ->
+                  let fi = match find_float_decl info.info_km ts with
+                    | Some fi -> fi
+                    | None -> assert false
+                  in
+                  syntax_float_literal st fmt c fi.float_eb_val fi.float_sb_val
+                | None -> raise Not_found
+              end
           end
+        | _ -> raise Not_found
         with Not_found ->
-        try
-          let ts,_p,c,_r,e,s = t_projection_float_lit t in
-          begin match query_syntax info.info_rliteral ts.ts_name with
-            | Some st -> syntax_float_literal st fmt c e s
-            | None -> raise Not_found
-          end
-        with Not_found -> *)
           let number_format = {
             Number.long_int_support = true;
             Number.extra_leading_zeros_support = false;
@@ -328,7 +335,7 @@ let rec print_term info fmt t =
             Number.def_real_support = Number.Number_unsupported;
           } in
           Number.print number_format fmt c
-      (* end *)
+      end
   | Tvar v -> print_var info fmt v
   | Tapp (ls, tl) ->
     (* let's check if a converter applies *)
@@ -637,7 +644,10 @@ let print_data_decl info fmt (ts,cl) =
     (print_ident info) ts.ts_name
     (print_list space (print_constructor_decl info)) cl
 
-let print_decl vc_loc cntexample args info fmt d = match d.d_node with
+let print_decl vc_loc cntexample args known_map info fmt d =
+  let info = { info with info_km = known_map; }
+  in
+    match d.d_node with
   | Dtype ts ->
     print_type_decl info fmt ts
   | Drange ri when query_syntax info.info_syn ri.range_ts.ts_name <> None -> ()
@@ -676,7 +686,8 @@ let print_task args ?old:_ fmt task =
     info_model = S.empty;
     info_in_goal = false;
     info_vc_term = vc_info;
-    info_printer = ident_printer () } in
+    info_printer = ident_printer ();
+    info_km = Mid.empty } in
   print_prelude fmt args.prelude;
   set_produce_models fmt cntexample;
   print_th_prelude task fmt args.th_prelude;
@@ -685,7 +696,7 @@ let print_task args ?old:_ fmt task =
         print_decls t.Task.task_prev;
         begin match t.Task.task_decl.Theory.td_node with
         | Theory.Decl d ->
-            begin try print_decl vc_loc cntexample args info fmt d
+            begin try print_decl vc_loc cntexample args t.Task.task_known info fmt d
             with Unsupported s -> raise (UnsupportedDecl (d,s)) end
         | _ -> () end
     | None -> () in

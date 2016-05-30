@@ -49,7 +49,16 @@ theory LitTest.T
 
   meta "float:keep" type f
   syntax type f "(_ FloatingPoint 3 3)"
-  syntax literal f "(fp %1b)"
+  syntax literal f "(fp #b%s1b #b%e3b #b%m2b)"
+
+
+  meta "float:keep" type single
+  syntax type single "(_ FloatingPoint 8 24)"
+  syntax literal single "(fp #b%s1b #b%e8b #b%m23b)"
+
+  syntax function to_real2 "(fp.to_real %1)"
+
+  syntax function (+) "(fp.add RNE %1 %2)"
 
 end
 
