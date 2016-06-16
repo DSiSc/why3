@@ -286,11 +286,10 @@ let rec dterm uc gvars denv {term_desc = desc; term_loc = loc} =
       let e1, ch = if chainable_op uc op2
         then get_chain e12 ch else e12, ch in
       make_chain (dterm uc gvars denv e1) ch
-  | Ptree.Tconst c -> begin
-      match c with
-      | Number.ConstInt _ -> DTconst (c, dty_of_ty ty_int)
-      | Number.ConstReal _ -> DTconst (c, dty_of_ty ty_real)
-    end
+  | Ptree.Tconst (Number.ConstInt _ as c) ->
+      DTconst (c, dty_of_ty ty_int)
+  | Ptree.Tconst (Number.ConstReal _ as c) ->
+      DTconst (c, dty_of_ty ty_real)
   | Ptree.Tlet (x, e1, e2) ->
       let id = create_user_id x in
       let e1 = dterm uc gvars denv e1 in
@@ -365,23 +364,21 @@ let rec dterm uc gvars denv {term_desc = desc; term_loc = loc} =
   | Ptree.Tnamed (Lstr lab, e1) ->
       DTlabel (dterm uc gvars denv e1, Slab.singleton lab)
   | Ptree.Tcast (e1, ty) ->
-    let e2 = dterm uc gvars denv e1 in
-    let dty = ty_of_pty uc ty in
-    try
-      match e2.dt_node, dty.ty_node with
+      (* FIXME: accepts and silently ignores double casts: ((0:ty1):ty2) *)
+      let e1 = dterm uc gvars denv e1 in
+      let ty = ty_of_pty uc ty in
+      match e1.dt_node, ty.ty_node with
       | DTconst (Number.ConstInt _ as c, _), Tyapp (ts, []) ->
-        begin match find_range_decl (get_known uc) ts with
-          | None -> raise Not_found
-          | Some ri -> DTconst (c, dty_of_ty (ty_app ri.range_ts []))
-        end
+          begin match find_range_decl (get_known uc) ts with
+          | Some _ -> DTconst (c, dty_of_ty ty)
+          | None -> DTcast (e1, ty)
+          end
       | DTconst (Number.ConstReal _ as c, _), Tyapp (ts, []) ->
-        begin match find_float_decl (get_known uc) ts with
-          | None -> raise Not_found
-          | Some fi -> DTconst (c, dty_of_ty (ty_app fi.float_ts []))
-        end
-      | _ -> raise Not_found
-    with Not_found ->
-      DTcast (e2, dty))
+          begin match find_float_decl (get_known uc) ts with
+          | Some _ -> DTconst (c, dty_of_ty ty)
+          | None -> DTcast (e1, ty)
+          end
+      | _ -> DTcast (e1, ty))
 
 (** Export for program parsing *)
 
@@ -404,58 +401,57 @@ let tyl_of_params ?(noop=false) uc pl =
 
 let add_types dl th =
   let def = List.fold_left
-      (fun def d ->
-         let id = d.td_ident.id_str in
-         Mstr.add_new (Loc.Located (d.td_loc, ClashSymbol id)) id d def)
-      Mstr.empty dl
+    (fun def d ->
+      let id = d.td_ident.id_str in
+      Mstr.add_new (Loc.Located (d.td_loc, ClashSymbol id)) id d def)
+    Mstr.empty dl
   in
   let tysymbols = Hstr.create 17 in
   let rec visit x =
     let d = Mstr.find x def in
-    try
-      match Hstr.find tysymbols x with
+    try match Hstr.find tysymbols x with
       | None -> Loc.errorm ~loc:d.td_loc "Cyclic type definition"
       | Some ts -> ts
     with Not_found ->
       Hstr.add tysymbols x None;
       let vars = Hstr.create 17 in
       let vl = List.map (fun id ->
-          if Hstr.mem vars id.id_str then
-            Loc.error ~loc:id.id_loc (DuplicateTypeVar id.id_str);
-          let i = tv_of_string id.id_str in
-          Hstr.add vars id.id_str i;
-          i) d.td_params
+        if Hstr.mem vars id.id_str then
+          Loc.error ~loc:id.id_loc (DuplicateTypeVar id.id_str);
+        let i = tv_of_string id.id_str in
+        Hstr.add vars id.id_str i;
+        i) d.td_params
       in
       let id = create_user_id d.td_ident in
       let ts = match d.td_def with
         | TDalias ty ->
-          let rec apply = function
-            | PTtyvar (v, _) ->
-              begin
-                try ty_var (Hstr.find vars v.id_str) with Not_found ->
-                  Loc.error ~loc:v.id_loc (UnboundTypeVar v.id_str)
-              end
-            | PTtyapp (q, tyl) ->
-              let ts = match q with
-                | Qident x when Mstr.mem x.id_str def ->
-                  visit x.id_str
-                | Qident _ | Qdot _ ->
-                  find_tysymbol th q
-              in
-              Loc.try2 ~loc:(qloc q) ty_app ts (List.map apply tyl)
-            | PTtuple tyl ->
-              let ts = ts_tuple (List.length tyl) in
-              ty_app ts (List.map apply tyl)
-            | PTarrow (ty1, ty2) ->
-              ty_func (apply ty1) (apply ty2)
-            | PTparen ty ->
-              apply ty
-          in
-          create_tysymbol id vl (Some (apply ty))
+            let rec apply = function
+              | PTtyvar (v, _) ->
+                  begin
+                    try ty_var (Hstr.find vars v.id_str) with Not_found ->
+                      Loc.error ~loc:v.id_loc (UnboundTypeVar v.id_str)
+                  end
+              | PTtyapp (q, tyl) ->
+                  let ts = match q with
+                    | Qident x when Mstr.mem x.id_str def ->
+                        visit x.id_str
+                    | Qident _ | Qdot _ ->
+                        find_tysymbol th q
+                  in
+                  Loc.try2 ~loc:(qloc q) ty_app ts (List.map apply tyl)
+              | PTtuple tyl ->
+                  let ts = ts_tuple (List.length tyl) in
+                  ty_app ts (List.map apply tyl)
+              | PTarrow (ty1, ty2) ->
+                  ty_func (apply ty1) (apply ty2)
+              | PTparen ty ->
+                  apply ty
+            in
+            create_tysymbol id vl (Some (apply ty))
         | TDabstract | TDalgebraic _ | TDrange _ | TDfloat _ ->
-          create_tysymbol id vl None
+            create_tysymbol id vl None
         | TDrecord _ ->
-          assert false
+            assert false
       in
       Hstr.add tysymbols x (Some ts);
       ts
@@ -476,95 +472,96 @@ let add_types dl th =
   let decl d (abstr,algeb,alias,range,float) =
     let ts = match Hstr.find tysymbols d.td_ident.id_str with
       | None ->
-        assert false
+          assert false
       | Some ts ->
-        ts
+          ts
     in
     match d.td_def with
-    | TDabstract -> ts::abstr, algeb, alias, range, float
-    | TDalias _ -> abstr, algeb, ts::alias, range, float
-    | TDalgebraic cl ->
-      let ht = Hstr.create 17 in
-      let constr = List.length cl in
-      let opaque = Stv.of_list ts.ts_args in
-      let ty = ty_app ts (List.map ty_var ts.ts_args) in
-      let projection (_,id,_,_) fty = match id with
-        | None -> None
-        | Some ({ id_str = x; id_loc = loc } as id) ->
-          try
-            let pj = Hstr.find ht x in
-            let ty = Opt.get pj.ls_value in
-            ignore (Loc.try2 ~loc ty_equal_check ty fty);
-            Some pj
-          with Not_found ->
-            let fn = create_user_id id in
-            let pj = create_fsymbol ~opaque fn [ty] fty in
-            Hstr.replace csymbols x loc;
-            Hstr.replace ht x pj;
-            Some pj
-      in
-      let constructor (loc, id, pl) =
-        let tyl = tyl_of_params ~noop:true th' pl in
-        let pjl = List.map2 projection pl tyl in
-        Hstr.replace csymbols id.id_str loc;
-        create_fsymbol ~opaque ~constr (create_user_id id) tyl ty, pjl
-      in
-      abstr, (ts, List.map constructor cl) :: algeb, alias, range, float
-    | TDrecord _ ->
-      assert false
-    | TDrange (a,b,proj) ->
-      let a_val = Number.compute_int a  in
-      let b_val = Number.compute_int b in
-      if BigInt.lt b_val a_val then
-        Loc.error ~loc:d.td_loc EmptyRange
-      else
-        let id = create_user_id proj in
-        let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
-        let ri = { range_ts = ts;
-                   range_low_cst = a;
-                   range_low_val = a_val;
-                   range_high_cst = b;
-                   range_high_val = b_val;
-                   range_proj = ls
-                 } in
-        abstr, algeb, alias, ri::range, float
-    | TDfloat (eb,sb,proj,isF) ->
-      let eb_val = Number.compute_int eb in
-      let sb_val = Number.compute_int sb in
-      if BigInt.le eb_val (BigInt.of_int 1)
-      || BigInt.le sb_val (BigInt.of_int 1) then
-        Loc.error ~loc:d.td_loc BadFloatSpec
-      else
-        let proj_id = create_user_id proj in
-        let isF_id = create_user_id isF in
-        let ty = ty_app ts [] in
-        let proj = create_fsymbol proj_id [ty] ty_real in
-        let isF = create_psymbol isF_id [ty] in
-        let fi = { float_ts       = ts;
-                   float_eb_cst   = eb;
-                   float_eb_val   = eb_val;
-                   float_sb_cst   = sb;
-                   float_sb_val   = sb_val;
-                   float_proj     = proj;
-                   float_isFinite = isF;
-                 } in
-        abstr, algeb, alias, range, fi::float
+      | TDabstract -> ts::abstr, algeb, alias, range, float
+      | TDalias _ -> abstr, algeb, ts::alias, range, float
+      | TDalgebraic cl ->
+          let ht = Hstr.create 17 in
+          let constr = List.length cl in
+          let opaque = Stv.of_list ts.ts_args in
+          let ty = ty_app ts (List.map ty_var ts.ts_args) in
+          let projection (_,id,_,_) fty = match id with
+            | None -> None
+            | Some ({ id_str = x; id_loc = loc } as id) ->
+                try
+                  let pj = Hstr.find ht x in
+                  let ty = Opt.get pj.ls_value in
+                  ignore (Loc.try2 ~loc ty_equal_check ty fty);
+                  Some pj
+                with Not_found ->
+                  let fn = create_user_id id in
+                  let pj = create_fsymbol ~opaque fn [ty] fty in
+                  Hstr.replace csymbols x loc;
+                  Hstr.replace ht x pj;
+                  Some pj
+          in
+          let constructor (loc, id, pl) =
+            let tyl = tyl_of_params ~noop:true th' pl in
+            let pjl = List.map2 projection pl tyl in
+            Hstr.replace csymbols id.id_str loc;
+            create_fsymbol ~opaque ~constr (create_user_id id) tyl ty, pjl
+          in
+          abstr, (ts, List.map constructor cl) :: algeb, alias, range, float
+      | TDrecord _ ->
+          assert false
+      | TDrange (a,b,proj) ->
+          let a_val = Number.compute_int a  in
+          let b_val = Number.compute_int b in
+          if BigInt.lt b_val a_val then
+            Loc.error ~loc:d.td_loc EmptyRange
+          else
+            let id = create_user_id proj in
+            let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
+            let ri = {
+              range_ts = ts;
+              range_low_cst = a;
+              range_low_val = a_val;
+              range_high_cst = b;
+              range_high_val = b_val;
+              range_proj = ls } in
+            abstr, algeb, alias, ri::range, float
+      | TDfloat (eb,sb,proj,isF) ->
+          let eb_val = Number.compute_int eb in
+          let sb_val = Number.compute_int sb in
+          if BigInt.le eb_val (BigInt.of_int 1) ||
+            BigInt.le sb_val (BigInt.of_int 1) then
+            Loc.error ~loc:d.td_loc BadFloatSpec
+          else
+            let proj_id = create_user_id proj in
+            let isF_id = create_user_id isF in
+            let ty = ty_app ts [] in
+            let proj = create_fsymbol proj_id [ty] ty_real in
+            let isF = create_psymbol isF_id [ty] in
+            let fi = {
+              float_ts       = ts;
+              float_eb_cst   = eb;
+              float_eb_val   = eb_val;
+              float_sb_cst   = sb;
+              float_sb_val   = sb_val;
+              float_proj     = proj;
+              float_isFinite = isF } in
+            abstr, algeb, alias, range, fi::float
   in
-  let abstr,algeb,alias,range,float = List.fold_right decl dl ([],[],[],[],[]) in
+  let abstr,algeb,alias,range,float =
+    List.fold_right decl dl ([],[],[],[],[]) in
   try
     let th = List.fold_left add_ty_decl th abstr in
-    let th = if algeb = [] then th else add_data_decl th algeb in
-    let th = List.fold_left add_ty_decl th alias in
     let th = List.fold_left add_range_decl th range in
     let th = List.fold_left add_float_decl th float in
+    let th = if algeb = [] then th else add_data_decl th algeb in
+    let th = List.fold_left add_ty_decl th alias in
     th
   with
-  | ClashSymbol s ->
-    Loc.error ~loc:(Hstr.find csymbols s) (ClashSymbol s)
-  | RecordFieldMissing ({ ls_name = { id_string = s }} as cs,ls) ->
-    Loc.error ~loc:(Hstr.find csymbols s) (RecordFieldMissing (cs,ls))
-  | DuplicateRecordField ({ ls_name = { id_string = s }} as cs,ls) ->
-    Loc.error ~loc:(Hstr.find csymbols s) (DuplicateRecordField (cs,ls))
+    | ClashSymbol s ->
+        Loc.error ~loc:(Hstr.find csymbols s) (ClashSymbol s)
+    | RecordFieldMissing ({ ls_name = { id_string = s }} as cs,ls) ->
+        Loc.error ~loc:(Hstr.find csymbols s) (RecordFieldMissing (cs,ls))
+    | DuplicateRecordField ({ ls_name = { id_string = s }} as cs,ls) ->
+        Loc.error ~loc:(Hstr.find csymbols s) (DuplicateRecordField (cs,ls))
 
 let prepare_typedef td =
   if td.td_model then

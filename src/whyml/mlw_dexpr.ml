@@ -81,8 +81,6 @@ let dity_real = Dpur (ts_real, [])
 let dity_bool = Dpur (ts_bool, [])
 let dity_unit = Dpur (ts_unit, [])
 
-let dvty_int  = [], dity_int
-let dvty_real = [], dity_real
 let dvty_bool = [], dity_bool
 let dvty_unit = [], dity_unit
 

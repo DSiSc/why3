@@ -241,7 +241,7 @@ let print_decl info fmt d = match d.d_node with
         (id_unique pr_printer ls.ls_name)
         print_symbol ls.ls_name print_sig ls
   | Drange _   | Dfloat _ -> unsupportedDecl d
-      "TPTP does not support range types, use eliminate_range"
+      "TPTP does not support range types, use eliminate_literal"
   | Ddata _ -> unsupportedDecl d
       "TPTP does not support algebraic datatypes, use eliminate_algebraic"
   | Dlogic _ -> unsupportedDecl d

@@ -327,7 +327,7 @@ let filter_logic info ((params,funs,preds,types) as acc) (ls,ld) =
 
 let rec filter_hyp info params defs eqs hyps pr f =
   match f.t_node with
-  | Tapp(ls,[t1;t2]) when ls == ps_equ -> (* parameter definition *)
+  | Tapp(ls,[t1;t2]) when ls_equal ls ps_equ -> (* parameter definition *)
       let try_equality t1 t2 =
         match t1.t_node with
           | Tapp(l,[]) ->
@@ -336,8 +336,7 @@ let rec filter_hyp info params defs eqs hyps pr f =
               t_s_fold (fun _ _ -> ()) (fun _ ls ->
                   Hid.replace defs ls.ls_name ()) () t2;
               (* filters out the defined parameter *)
-              let params = List.filter (fun p -> p.ls_name <> l.ls_name) params
-              in
+              let params = List.filter (fun p -> not (ls_equal p l)) params in
               (params, (pr,t1,t2)::eqs, hyps)
           | _ -> raise AlreadyDefined in
       begin try

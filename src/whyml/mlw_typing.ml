@@ -625,27 +625,21 @@ let rec dexpr ({uc = uc} as lenv) denv {expr_desc = desc; expr_loc = loc} =
   | Ptree.Enamed (Lstr lab, e1) ->
       DElabel (dexpr lenv denv e1, Slab.singleton lab)
   | Ptree.Ecast (e1, pty) ->
-    let e2 = dexpr lenv denv e1 in
-    let dty = ity_of_pty uc pty in
-    try
-      match e2.de_node, dty.ity_node with
+      (* FIXME: accepts and silently ignores double casts: ((0:ty1):ty2) *)
+      let e1 = dexpr lenv denv e1 in
+      let ity = ity_of_pty uc pty in
+      match e1.de_node, ity.ity_node with
       | DEconst (Number.ConstInt _ as c, _), Itypur (ts, []) ->
-        begin match find_range_decl
-                      (Theory.get_known (get_theory uc)) ts with
-        | None -> raise Not_found
-        | Some ri ->
-          DEconst (c, dity_of_ity dty)
-        end
+          begin match find_range_decl (Theory.get_known (get_theory uc)) ts with
+          | Some _ -> DEconst (c, dity_of_ity ity)
+          | None -> DEcast (e1, ity)
+          end
       | DEconst (Number.ConstReal _ as c, _), Itypur (ts, []) ->
-        begin match find_float_decl
-                      (Theory.get_known (get_theory uc)) ts with
-        | None -> raise Not_found
-        | Some fi ->
-          DEconst (c, dity_of_ity dty)
-        end
-      | _ -> raise Not_found
-    with Not_found ->
-      DEcast (e2, dty))
+          begin match find_float_decl (Theory.get_known (get_theory uc)) ts with
+          | Some _ -> DEconst (c, dity_of_ity ity)
+          | None -> DEcast (e1, ity)
+          end
+      | _ -> DEcast (e1, ity))
 
 and drec_defn ~top lenv denv fdl =
   let prep (id, gh, (bl, pty, e, sp)) =

@@ -238,13 +238,13 @@ let print_decl info fmt d = match d.d_node with
   | Dtype ts ->
       print_type_decl info fmt ts
   | Ddata _ -> unsupportedDecl d
-                 "cvc3 : algebraic type are not supported"
+      "cvc3: algebraic types are not supported"
   | Drange ri ->
-    if not (Mid.mem ri.range_ts.ts_name info.info_syn) then
-      unsupportedDecl d "cvc3 does not support range types"
+      if not (Mid.mem ri.range_ts.ts_name info.info_syn) then
+        unsupportedDecl d "cvc3 does not support range types"
   | Dfloat fi ->
-    if not (Mid.mem fi.float_ts.ts_name info.info_syn) then
-      unsupportedDecl d "cvc3 does not support floats"
+      if not (Mid.mem fi.float_ts.ts_name info.info_syn) then
+        unsupportedDecl d "cvc3 does not support floats"
   | Dparam ls ->
       print_param_decl info fmt ls
   | Dlogic dl ->

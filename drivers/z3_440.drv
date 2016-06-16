@@ -47,12 +47,12 @@ timeout "interrupted by timeout"
 
 theory LitTest.T
 
-  meta "float:keep" type f
+  meta "literal:keep" type f
   syntax type f "(_ FloatingPoint 3 3)"
   syntax literal f "(fp #b%s1b #b%e3b #b%m2b)"
 
 
-  meta "float:keep" type single
+  meta "literal:keep" type single
   syntax type single "(_ FloatingPoint 8 24)"
   syntax literal single "(fp #b%s1b #b%e8b #b%m23b)"
 

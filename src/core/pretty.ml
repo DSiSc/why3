@@ -345,7 +345,8 @@ let print_range_decl fmt ri =
   fprintf fmt "@[<hov 2>type %a%a is range %a : %a .. %a@]"
     print_ts ri.range_ts print_id_labels ri.range_ts.ts_name
     print_ls ri.range_proj
-    print_integer_constant ri.range_low_cst print_integer_constant ri.range_high_cst
+    print_integer_constant ri.range_low_cst
+    print_integer_constant ri.range_high_cst
 
 let print_float_decl fmt fi =
   fprintf fmt "@[<hov 2>type %a%a is float %a, %a : %a, %a@]"
@@ -568,7 +569,7 @@ let () = Exn_printer.register
   | Term.FunctionSymbolExpected ls ->
       fprintf fmt "Not a function symbol: %a" print_ls ls
   | Term.PredicateSymbolExpected ls ->
-    fprintf fmt "Not a predicate symbol: %a" print_ls ls
+      fprintf fmt "Not a predicate symbol: %a" print_ls ls
   | Term.ConstructorExpected ls ->
       fprintf fmt "%s %a is not a constructor"
         (if ls.ls_value = None then "Predicate" else "Function") print_ls ls
@@ -630,6 +631,7 @@ let () = Exn_printer.register
         id.id_string
   | Decl.NoTerminationProof ls ->
       fprintf fmt "Cannot prove the termination of %a" print_ls ls
-  | Decl.OutOfRange c -> fprintf fmt "%a is out of range" print_const (ConstInt c)
+  | Decl.OutOfRange c ->
+      fprintf fmt "%a is out of range" print_const (ConstInt c)
   | _ -> raise exn
   end

@@ -287,6 +287,22 @@ let check_exit_vc_term t info =
     info.info_vc_term.vc_inside <- false;
   end
 
+
+let number_format = {
+  Number.long_int_support = true;
+  Number.extra_leading_zeros_support = false;
+  Number.dec_int_support = Number.Number_default;
+  Number.hex_int_support = Number.Number_unsupported;
+  Number.oct_int_support = Number.Number_unsupported;
+  Number.bin_int_support = Number.Number_unsupported;
+  Number.def_int_support = Number.Number_unsupported;
+  Number.dec_real_support = Number.Number_unsupported;
+  Number.hex_real_support = Number.Number_unsupported;
+  Number.frac_real_support = Number.Number_custom
+    (Number.PrintFracReal ("%s.0", "(* %s.0 %s.0)", "(/ %s.0 %s.0)"));
+  Number.def_real_support = Number.Number_unsupported;
+}
+
 (** expr *)
 let rec print_term info fmt t =
   debug_print_term "Printing term: " t;
@@ -298,44 +314,22 @@ let rec print_term info fmt t =
 
   let () = match t.t_node with
     | Tconst c ->
-      begin try match t.t_ty with
-        | Some { ty_node = Tyapp (ts, []); } ->
-                    (* look for syntax literal ts in driver *)
-          begin match c with
-            | Number.ConstInt c ->
-              begin match query_syntax info.info_rliteral ts.ts_name with
-                | Some s -> syntax_range_literal s fmt c
-                | None -> raise Not_found
-              end
-            | Number.ConstReal c ->
-              begin match query_syntax info.info_rliteral ts.ts_name with
-                | Some st ->
-                  let fi = match find_float_decl info.info_km ts with
-                    | Some fi -> fi
-                    | None -> assert false
-                  in
-                  syntax_float_literal st fmt c fi.float_eb_val fi.float_sb_val
-                | None -> raise Not_found
-              end
-          end
-        | _ -> raise Not_found
-        with Not_found ->
-          let number_format = {
-            Number.long_int_support = true;
-            Number.extra_leading_zeros_support = false;
-            Number.dec_int_support = Number.Number_default;
-            Number.hex_int_support = Number.Number_unsupported;
-            Number.oct_int_support = Number.Number_unsupported;
-            Number.bin_int_support = Number.Number_unsupported;
-            Number.def_int_support = Number.Number_unsupported;
-            Number.dec_real_support = Number.Number_unsupported;
-            Number.hex_real_support = Number.Number_unsupported;
-            Number.frac_real_support = Number.Number_custom
-                (Number.PrintFracReal ("%s.0", "(* %s.0 %s.0)", "(/ %s.0 %s.0)"));
-            Number.def_real_support = Number.Number_unsupported;
-          } in
-          Number.print number_format fmt c
-      end
+        let ts = match t.t_ty with
+          | Some { ty_node = Tyapp (ts, []) } -> ts
+          | _ -> assert false (* impossible *) in
+        (* look for syntax literal ts in driver *)
+        begin match query_syntax info.info_rliteral ts.ts_name, c with
+        | Some st, Number.ConstInt c ->
+            syntax_range_literal st fmt c
+        | Some st, Number.ConstReal c ->
+            let fi = Opt.get (find_float_decl info.info_km ts) in
+            syntax_float_literal st fmt c fi.float_eb_val fi.float_sb_val
+        | None, _ -> Number.print number_format fmt c
+          (* TODO/FIXME: we must assert here that the type is either
+              ty_int or ty_real, otherwise it makes no sense to print
+              the literal. Do we ensure that preserved literal types
+              are exactly those that have a dedicated syntax? *)
+        end
   | Tvar v -> print_var info fmt v
   | Tapp (ls, tl) ->
     (* let's check if a converter applies *)
@@ -644,29 +638,27 @@ let print_data_decl info fmt (ts,cl) =
     (print_ident info) ts.ts_name
     (print_list space (print_constructor_decl info)) cl
 
-let print_decl vc_loc cntexample args known_map info fmt d =
-  let info = { info with info_km = known_map; }
-  in
-    match d.d_node with
+let print_decl vc_loc cntexample args info fmt d =
+  match d.d_node with
   | Dtype ts ->
-    print_type_decl info fmt ts
+      print_type_decl info fmt ts
   | Drange ri when query_syntax info.info_syn ri.range_ts.ts_name <> None -> ()
   | Drange _ -> unsupportedDecl d
-                  "smtv2 : range types are not supported"
+      "smtv2: range types are not supported" (* FIXME: misleading message *)
   | Dfloat fi when query_syntax info.info_syn fi.float_ts.ts_name <> None -> ()
   | Dfloat _ -> unsupportedDecl d
-                  "smtv2 : floats are not supported"
+      "smtv2: floats are not supported" (* FIXME: misleading message *)
   | Ddata [(ts,_)] when query_syntax info.info_syn ts.ts_name <> None -> ()
   | Ddata dl ->
-    fprintf fmt "@[(declare-datatypes ()@ (%a))@]@\n"
-      (print_list space (print_data_decl info)) dl
+      fprintf fmt "@[(declare-datatypes ()@ (%a))@]@\n"
+        (print_list space (print_data_decl info)) dl
   | Dparam ls ->
       collect_model_ls info ls;
       print_param_decl info fmt ls
   | Dlogic dl ->
       print_list nothing (print_logic_decl info) fmt dl
   | Dind _ -> unsupportedDecl d
-      "smtv2 : inductive definition are not supported"
+      "smtv2: inductive definitions are not supported"
   | Dprop (k,pr,f) ->
       if Mid.mem pr.pr_name info.info_syn then () else
       print_prop_decl vc_loc cntexample args info fmt k pr f
@@ -687,7 +679,7 @@ let print_task args ?old:_ fmt task =
     info_in_goal = false;
     info_vc_term = vc_info;
     info_printer = ident_printer ();
-    info_km = Mid.empty } in
+    info_km = Task.task_known task } in
   print_prelude fmt args.prelude;
   set_produce_models fmt cntexample;
   print_th_prelude task fmt args.th_prelude;
@@ -696,7 +688,8 @@ let print_task args ?old:_ fmt task =
         print_decls t.Task.task_prev;
         begin match t.Task.task_decl.Theory.td_node with
         | Theory.Decl d ->
-            begin try print_decl vc_loc cntexample args t.Task.task_known info fmt d
+            begin try
+              print_decl vc_loc cntexample args info fmt d
             with Unsupported s -> raise (UnsupportedDecl (d,s)) end
         | _ -> () end
     | None -> () in

@@ -336,7 +336,8 @@ let t_compare t1 t2 =
           begin match t1.t_node, t2.t_node with
           | Tvar v1, Tvar v2 ->
               comp_raise (vs_compare v1 v2)
-          | Tconst c1, Tconst c2 -> perv_compare c1 c2
+          | Tconst c1, Tconst c2 ->
+              perv_compare c1 c2
           | Tapp (s1,l1), Tapp (s2,l2) ->
               comp_raise (ls_compare s1 s2);
               List.iter2 (t_compare bnd vml1 vml2) l1 l2

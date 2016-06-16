@@ -455,21 +455,21 @@ let add_decl ?(warn=true) uc d =
   match d.d_node with
   | Dtype ts  -> add_symbol add_ts ts.ts_name ts uc
   | Drange ri ->
-    let uc = add_symbol add_ts ri.range_ts.ts_name ri.range_ts uc in
-    add_symbol add_ls ri.range_proj.ls_name ri.range_proj uc
+      let uc = add_symbol add_ts ri.range_ts.ts_name ri.range_ts uc in
+      add_symbol add_ls ri.range_proj.ls_name ri.range_proj uc
   | Dfloat fi ->
-    let uc = add_symbol add_ts fi.float_ts.ts_name fi.float_ts uc in
-    let uc = add_symbol add_ls fi.float_proj.ls_name fi.float_proj uc in
-    add_symbol add_ls fi.float_isFinite.ls_name fi.float_isFinite uc
+      let uc = add_symbol add_ts fi.float_ts.ts_name fi.float_ts uc in
+      let uc = add_symbol add_ls fi.float_proj.ls_name fi.float_proj uc in
+      add_symbol add_ls fi.float_isFinite.ls_name fi.float_isFinite uc
   | Ddata dl  -> List.fold_left add_data uc dl
   | Dparam ls -> add_symbol add_ls ls.ls_name ls uc
   | Dlogic dl -> List.fold_left add_logic uc dl
   | Dind (_, dl) -> List.fold_left add_ind uc dl
   | Dprop ((k,pr,_) as p) ->
-    if warn && should_be_conservative uc.uc_name &&
-       should_be_conservative pr.pr_name
-    then warn_dubious_axiom uc k pr.pr_name d.d_syms;
-    add_prop uc p
+      if warn && should_be_conservative uc.uc_name &&
+        should_be_conservative pr.pr_name
+      then warn_dubious_axiom uc k pr.pr_name d.d_syms;
+      add_prop uc p
 
 (** Declaration constructors + add_decl *)
 
@@ -629,19 +629,23 @@ let cl_type cl inst ts =
 let cl_range cl inst ri =
   if Mts.mem ri.range_ts inst.inst_ts then
     raise (CannotInstantiate ri.range_ts.ts_name);
-  (* TODO Andrei plz check *)
+  if Mls.mem ri.range_proj inst.inst_ls then
+    raise (CannotInstantiate ri.range_proj.ls_name);
   create_range_decl { ri with
-                      range_ts = cl_find_ts cl ri.range_ts;
-                      range_proj = cl_find_ls cl ri.range_proj }
+    range_ts = cl_find_ts cl ri.range_ts;
+    range_proj = cl_find_ls cl ri.range_proj }
 
 let cl_float cl inst fi =
   if Mts.mem fi.float_ts inst.inst_ts then
     raise (CannotInstantiate fi.float_ts.ts_name);
-  (* TODO Andrei plz check *)
+  if Mls.mem fi.float_proj inst.inst_ls then
+    raise (CannotInstantiate fi.float_proj.ls_name);
+  if Mls.mem fi.float_isFinite inst.inst_ls then
+    raise (CannotInstantiate fi.float_isFinite.ls_name);
   create_float_decl { fi with
-                      float_ts = cl_find_ts cl fi.float_ts;
-                      float_proj = cl_find_ls cl fi.float_proj;
-                      float_isFinite = cl_find_ls cl fi.float_isFinite; }
+    float_ts = cl_find_ts cl fi.float_ts;
+    float_proj = cl_find_ls cl fi.float_proj;
+    float_isFinite = cl_find_ls cl fi.float_isFinite; }
 
 let cl_data cl inst tdl =
   let add_ls ls =

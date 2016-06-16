@@ -159,9 +159,9 @@ end
 (* keywords *)
 
 %token AS AXIOM BY CLONE COINDUCTIVE CONSTANT
-%token ELSE END EPSILON EXISTS EXPORT FALSE FORALL FUNCTION
-%token GOAL IF IMPORT IN INDUCTIVE LEMMA
-%token LET MATCH META NAMESPACE NOT PROP PREDICATE IS RANGE FLOAT
+%token ELSE END EPSILON EXISTS EXPORT FALSE FLOAT FORALL FUNCTION
+%token GOAL IF IMPORT IN INDUCTIVE IS LEMMA
+%token LET MATCH META NAMESPACE NOT PROP PREDICATE RANGE
 %token SO THEN THEORY TRUE TYPE USE WITH
 
 (* program keywords *)
@@ -344,11 +344,11 @@ typedefn:
     { $1, $2, TDrecord $4, $6 }
 | model abstract ty invariant*
     { $1, $2, TDalias $3, $4 }
-(* fixme : allow negative bounds *)
+(* FIXME: allow negative bounds *)
 | IS RANGE labels(lident) COLON INTEGER DOTDOT INTEGER
-     { false, Public, TDrange ($5, $7, $3), [] }
+    { false, Public, TDrange ($5, $7, $3), [] }
 | IS FLOAT labels(lident) COMMA labels(lident) COLON INTEGER COMMA INTEGER
-     { false, Public, TDfloat ($7, $9, $3, $5), [] }
+    { false, Public, TDfloat ($7, $9, $3, $5), [] }
 
 model:
 | EQUAL         { false }
@@ -640,7 +640,7 @@ quant:
 
 numeral:
 | INTEGER { Number.ConstInt $1 }
-| REAL   { Number.ConstReal $1 }
+| REAL    { Number.ConstReal $1 }
 
 (* Program declarations *)
 

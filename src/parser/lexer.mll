@@ -247,9 +247,3 @@ rule token = parse
   let () = Env.register_format Env.base_language "why" ["why"] read_channel
     ~desc:"WhyML@ logical@ language"
 }
-
-(*
-Local Variables:
-compile-command: "unset LANG; make -C ../.. test"
-End:
-*)

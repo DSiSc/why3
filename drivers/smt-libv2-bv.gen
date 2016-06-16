@@ -76,7 +76,7 @@ theory bv.BV_Gen
 end
 
 theory bv.BV64
-  meta "range:keep" type t
+  meta "literal:keep" type t
 
   syntax literal t "#x%16x"
   syntax type t "(_ BitVec 64)"
@@ -89,7 +89,7 @@ theory bv.BV64
 end
 
 theory bv.BV32
-  meta "range:keep" type t
+  meta "literal:keep" type t
 
   syntax literal t "#x%8x"
   syntax type t "(_ BitVec 32)"
@@ -102,7 +102,7 @@ theory bv.BV32
 end
 
 theory bv.BV16
-  meta "range:keep" type t
+  meta "literal:keep" type t
 
   syntax literal t "#x%4x"
   syntax type t "(_ BitVec 16)"
@@ -115,7 +115,7 @@ theory bv.BV16
 end
 
 theory bv.BV8
-  meta "range:keep" type t
+  meta "literal:keep" type t
 
   syntax literal t (* "#b%8b"  *) "#x%2x"
   syntax type t "(_ BitVec 8)"

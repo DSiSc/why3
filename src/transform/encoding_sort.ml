@@ -43,8 +43,8 @@ let conv_ty tenv undefined ty =
   match ty.ty_node with
     | Tyapp (_,[]) -> ty
     | Tyapp (ts,_) ->
-      let ts = conv_ts tenv undefined ts.ts_name ty in
-      ty_app ts []
+        let ts = conv_ts tenv undefined ts.ts_name ty in
+        ty_app ts []
     | _ -> Printer.unsupportedType ty "type variable must be encoded"
 
 (* Convert a variable *)
@@ -133,7 +133,7 @@ let fold tenv taskpre task =
         | Dtype ts -> add_ty_decl task ts
         | Drange _
         | Dfloat _ ->
-          Printer.unsupportedDecl d "use eliminate_range"
+          Printer.unsupportedDecl d "use eliminate_literal"
         | Ddata _ ->
           Printer.unsupportedDecl d "use eliminate_algebraic"
         | Dparam ls ->
@@ -147,7 +147,7 @@ let fold tenv taskpre task =
         | Dprop _ ->
           let ud = Hts.create 3 in
           decl_ud ud (add_decl task
-                        (DeclTF.decl_map (fnT ud Mvs.empty) (fnF ud Mvs.empty) d))
+            (DeclTF.decl_map (fnT ud Mvs.empty) (fnF ud Mvs.empty) d))
       end
     | Meta(meta,ml) ->
       begin try

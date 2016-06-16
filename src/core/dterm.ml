@@ -73,8 +73,6 @@ let rec dty_unify dty1 dty2 = match dty1,dty2 with
       List.iter2 dty_unify dl1 dl2
   | _ -> raise Exit
 
-let dty_int  = Duty ty_int
-let dty_real = Duty ty_real
 let dty_bool = Duty ty_bool
 
 let protect_on x s = if x then "(" ^^ s ^^ ")" else s
@@ -293,10 +291,11 @@ let dpattern ?loc node =
 let dterm ?loc node =
   let get_dty = function
     | DTvar (_,dty) ->
-      Some dty
+        Some dty
     | DTgvar vs ->
-      Some (dty_of_ty vs.vs_ty)
-    | DTconst (_,ty) -> Some ty
+        Some (dty_of_ty vs.vs_ty)
+    | DTconst (_,dty) ->
+        Some dty
     | DTapp (ls,dtl) ->
         let dtyl, dty = specialize_ls ls in
         dty_unify_app ls dterm_expected_type dtl dtyl;
@@ -353,7 +352,7 @@ let dterm ?loc node =
            always replace [true] by [True] and [false] by [False], so that
            there is no need to count these constructs as "formulas" which
            require explicit if-then-else conversion to bool *)
-      Some dty_bool
+        Some dty_bool
     | DTcast (dt,ty) ->
         let dty = dty_of_ty ty in
         dterm_expected_type dt dty;
@@ -472,7 +471,8 @@ and try_term strict keep_loc uloc env prop dty node =
       t_var (Mstr.find_exn (UnboundVar n) n env)
   | DTgvar vs ->
       t_var vs
-  | DTconst (c,dty) -> t_const c (ty_of_dty ~strict dty)
+  | DTconst (c,dty) ->
+      t_const c (ty_of_dty ~strict dty)
   | DTapp (ls,[]) when ls_equal ls fs_bool_true ->
       if prop then t_true else t_bool_true
   | DTapp (ls,[]) when ls_equal ls fs_bool_false ->

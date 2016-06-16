@@ -35,9 +35,9 @@ let elim_abstract undef_ls rem_pr rem_ls rem_ts d = match d.d_node with
   | Dprop (Paxiom,pr,_) when Spr.mem pr rem_pr -> []
   | Dtype ts when Sts.mem ts rem_ts -> []
   | Ddata l ->
-    let test_id (ts,_) = not (Sts.mem ts rem_ts) in
-    let l = List.filter test_id l in
-    (if l = [] then [] else [create_data_decl l])
+      let test_id (ts,_) = not (Sts.mem ts rem_ts) in
+      let l = List.filter test_id l in
+      (if l = [] then [] else [create_data_decl l])
   | _ -> [d]
 
 let eliminate_builtin =
@@ -56,23 +56,17 @@ let () = Trans.register_transform "eliminate_builtin" eliminate_builtin
 let compute_diff t1 t2 =
   let km = Mid.set_diff (Task.task_known t1) (Task.task_known t2) in
   let hdone = Hdecl.create 10 in
-  let remove_ts acc ts =
-    (Printer.meta_remove_type, [Theory.MAts ts])::acc in
-  let remove_ls acc ls =
-    (Printer.meta_remove_logic, [Theory.MAls ls])::acc in
-  let remove_pr acc pr =
-    (Printer.meta_remove_prop, [Theory.MApr pr])::acc in
+  let remove_ts acc ts = (Printer.meta_remove_type, [Theory.MAts ts])::acc in
+  let remove_ls acc ls = (Printer.meta_remove_logic, [Theory.MAls ls])::acc in
+  let remove_pr acc pr = (Printer.meta_remove_prop, [Theory.MApr pr])::acc in
   Mid.fold_left (fun acc _ decl ->
     if Hdecl.mem hdone decl then acc
     else begin
       Hdecl.replace hdone decl ();
       match decl.d_node with
-      | Dtype ts -> remove_ts acc ts
-      | Drange ri -> remove_ls (remove_ts acc ri.range_ts) ri.range_proj
-      | Dfloat fi ->
-        let acc = remove_ts acc fi.float_ts in
-        let acc = remove_ls acc fi.float_proj in
-        remove_ls acc fi.float_isFinite
+      | Dtype ts
+      | Drange { range_ts = ts }
+      | Dfloat { float_ts = ts } -> remove_ts acc ts
       | Ddata l -> List.fold_left (fun acc (ts,_) -> remove_ts acc ts) acc l
       | Dparam ls -> remove_ls acc ls
       | Dlogic l -> List.fold_left (fun acc (ls,_) -> remove_ls acc ls) acc l
@@ -229,18 +223,13 @@ let rec elim_task task rem =
 
 
 let add_rem rem decl =
-  let remove_ts rem ts =
-    { rem with rem_ts = Sts.add ts rem.rem_ts} in
-  let remove_ls rem ls =
-    { rem with rem_ls = Sls.add ls rem.rem_ls} in
-  let remove_pr rem pr =
-    { rem with rem_pr = Spr.add pr rem.rem_pr} in
+  let remove_ts rem ts = { rem with rem_ts = Sts.add ts rem.rem_ts} in
+  let remove_ls rem ls = { rem with rem_ls = Sls.add ls rem.rem_ls} in
+  let remove_pr rem pr = { rem with rem_pr = Spr.add pr rem.rem_pr} in
   match decl.d_node with
-  | Dtype ts -> remove_ts rem ts
-  | Drange ri -> remove_ls (remove_ts rem ri.range_ts) ri.range_proj
-  | Dfloat fi -> let rem = remove_ts rem fi.float_ts in
-    let rem = remove_ls rem fi.float_proj in
-    remove_ls rem fi.float_isFinite
+  | Dtype ts
+  | Drange { range_ts = ts }
+  | Dfloat { float_ts = ts } -> remove_ts rem ts
   | Ddata l -> List.fold_left (fun rem (ts,_) -> remove_ts rem ts) rem l
   | Dparam ls -> remove_ls rem ls
   | Dlogic l -> List.fold_left (fun rem (ls,_) -> remove_ls rem ls) rem l

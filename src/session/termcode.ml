@@ -458,14 +458,14 @@ module Checksum = struct
     | CV2 -> ident_v2 b id
 
   let integer_constant b c =
-      Format.fprintf Format.str_formatter "%a" Pretty.print_integer_constant c;
-      let s = Format.flush_str_formatter () in
-      string b s
+    Format.fprintf Format.str_formatter "%a" Pretty.print_integer_constant c;
+    let s = Format.flush_str_formatter () in
+    string b s
 
   let const b c =
-      Format.fprintf Format.str_formatter "%a" Pretty.print_const c;
-      let s = Format.flush_str_formatter () in
-      string b s
+    Format.fprintf Format.str_formatter "%a" Pretty.print_const c;
+    let s = Format.flush_str_formatter () in
+    string b s
 
   let tvsymbol b tv = ident b tv.Ty.tv_name
 
@@ -537,20 +537,20 @@ module Checksum = struct
   (* start: T G F D R L I P (C M) *)
   let decl b d = match d.Decl.d_node with
     | Decl.Dtype ts ->
-      char b 'T'; tysymbol b ts
+        char b 'T'; tysymbol b ts
     | Decl.Drange ri ->
-      char b 'G';
-      tysymbol b ri.Decl.range_ts;
-      lsymbol b ri.Decl.range_proj;
-      integer_constant b ri.Decl.range_low_cst;
-      integer_constant b ri.Decl.range_high_cst
+        char b 'G';
+        tysymbol b ri.Decl.range_ts;
+        lsymbol b ri.Decl.range_proj;
+        integer_constant b ri.Decl.range_low_cst;
+        integer_constant b ri.Decl.range_high_cst
     | Decl.Dfloat fi ->
-      char b 'F';
-      tysymbol b fi.Decl.float_ts;
-      lsymbol b fi.Decl.float_proj;
-      lsymbol b fi.Decl.float_isFinite;
-      integer_constant b fi.Decl.float_eb_cst;
-      integer_constant b fi.Decl.float_sb_cst
+        char b 'F';
+        tysymbol b fi.Decl.float_ts;
+        lsymbol b fi.Decl.float_proj;
+        lsymbol b fi.Decl.float_isFinite;
+        integer_constant b fi.Decl.float_eb_cst;
+        integer_constant b fi.Decl.float_sb_cst
     | Decl.Ddata ddl ->
         let constructor b (ls, l) = lsymbol b ls; list (option lsymbol) b l in
         let data_decl b (ts, cl) = tysymbol b ts; list constructor b cl in

@@ -115,9 +115,8 @@ let ls_desc info ls =
 
 let decl info d = match d.d_node with
   | Dtype { ts_def = Some _ } -> []
-  | Dtype ts -> [d; lsdecl_of_ts ts]
-  | Drange { range_ts = ts } -> [d; lsdecl_of_ts ts]
-  | Dfloat { float_ts = ts } -> [d; lsdecl_of_ts ts]
+  | Dtype ts | Drange { range_ts = ts } | Dfloat { float_ts = ts } ->
+      [d; lsdecl_of_ts ts]
   | Ddata _ -> Printer.unsupportedDecl d
       "Algebraic types are not supported, run eliminate_algebraic"
   | Dparam ls ->

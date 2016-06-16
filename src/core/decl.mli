@@ -99,10 +99,10 @@ type range_info = {
 
 type float_info = {
   float_ts       : tysymbol;
-  float_eb_cst   : Number.integer_constant;
   float_eb_val   : BigInt.t;
-  float_sb_cst   : Number.integer_constant;
+  float_eb_cst   : Number.integer_constant;
   float_sb_val   : BigInt.t;
+  float_sb_cst   : Number.integer_constant;
   float_proj     : Term.lsymbol;
   float_isFinite : Term.lsymbol;
 }
@@ -198,9 +198,9 @@ exception UnknownIdent of ident
 exception RedeclaredIdent of ident
 exception NonFoundedTypeDecl of tysymbol
 
-val find_constructors : known_map -> tysymbol -> constructor list
 val find_range_decl : known_map -> tysymbol -> range_info option
 val find_float_decl : known_map -> tysymbol -> float_info option
+val find_constructors : known_map -> tysymbol -> constructor list
 val find_inductive_cases : known_map -> lsymbol -> (prsymbol * term) list
 val find_logic_definition : known_map -> lsymbol -> ls_defn option
 val find_prop : known_map -> prsymbol -> term

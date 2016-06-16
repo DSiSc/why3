@@ -307,10 +307,10 @@ type range_info = {
 
 type float_info = {
   float_ts       : tysymbol;
-  float_eb_cst   : Number.integer_constant;
   float_eb_val   : BigInt.t;
-  float_sb_cst   : Number.integer_constant;
+  float_eb_cst   : Number.integer_constant;
   float_sb_val   : BigInt.t;
+  float_sb_cst   : Number.integer_constant;
   float_proj     : Term.lsymbol;
   float_isFinite : Term.lsymbol;
 }
@@ -356,10 +356,16 @@ module Hsdecl = Hashcons.Make (struct
   let equal d1 d2 = match d1.d_node, d2.d_node with
     | Dtype  s1, Dtype  s2 -> ts_equal s1 s2
     | Drange ri1, Drange ri2 ->
-      ts_equal ri1.range_ts ri2.range_ts &&
-      ls_equal ri1.range_proj ri2.range_proj &&
-      BigInt.eq ri1.range_low_val ri2.range_low_val &&
-      BigInt.eq ri1.range_high_val ri2.range_high_val
+        ts_equal ri1.range_ts ri2.range_ts &&
+        ls_equal ri1.range_proj ri2.range_proj &&
+        BigInt.eq ri1.range_low_val ri2.range_low_val &&
+        BigInt.eq ri1.range_high_val ri2.range_high_val
+    | Dfloat fi1, Dfloat fi2 ->
+        ts_equal fi1.float_ts fi2.float_ts &&
+        ls_equal fi1.float_proj fi2.float_proj &&
+        ls_equal fi1.float_isFinite fi2.float_isFinite &&
+        BigInt.eq fi1.float_eb_val fi2.float_eb_val &&
+        BigInt.eq fi1.float_sb_val fi2.float_sb_val
     | Ddata  l1, Ddata  l2 -> Lists.equal eq_td l1 l2
     | Dparam s1, Dparam s2 -> ls_equal s1 s2
     | Dlogic l1, Dlogic l2 -> Lists.equal eq_ld l1 l2
@@ -385,11 +391,11 @@ module Hsdecl = Hashcons.Make (struct
   let hash d = match d.d_node with
     | Dtype  s -> ts_hash s
     | Drange ri ->
-      Hashcons.combine (ts_hash ri.range_ts) (ls_hash ri.range_proj)
+        Hashcons.combine (ts_hash ri.range_ts) (ls_hash ri.range_proj)
     | Dfloat fi ->
-      Hashcons.combine (ts_hash fi.float_ts) (ls_hash fi.float_proj)
-    | Ddata  l -> Hashcons.combine_list hs_td 3 l
+        Hashcons.combine (ts_hash fi.float_ts) (ls_hash fi.float_proj)
     | Dparam s -> ls_hash s
+    | Ddata  l -> Hashcons.combine_list hs_td 3 l
     | Dlogic l -> Hashcons.combine_list hs_ld 5 l
     | Dind (_,l) -> Hashcons.combine_list hs_ind 7 l
     | Dprop (k,pr,f) -> Hashcons.combine (hs_kind k) (hs_prop (pr,f))
@@ -449,14 +455,22 @@ let create_ty_decl ts =
   let news = Sid.singleton ts.ts_name in
   mk_decl (Dtype ts) syms news
 
+(* TODO: sanity checks for create_[range|float]_decl:
+  - _val have sensible values and correspond to _cst
+  - projection lsymbols have appropriate type signature
+  - type symbols have no arguments (?) and are not aliases
+  - ??? *)
+
 let create_range_decl ri =
   let syms = Sid.empty in
-  let news = Sid.add ri.range_proj.ls_name (Sid.singleton ri.range_ts.ts_name) in
+  let news = Sid.add ri.range_proj.ls_name
+    (Sid.singleton ri.range_ts.ts_name) in
   mk_decl (Drange ri) syms news
 
 let create_float_decl fi =
   let syms = Sid.empty in
-  let news = Sid.add fi.float_proj.ls_name (Sid.singleton fi.float_ts.ts_name) in
+  let news = Sid.add fi.float_proj.ls_name
+    (Sid.singleton fi.float_ts.ts_name) in
   let news = Sid.add fi.float_isFinite.ls_name news in
   mk_decl (Dfloat fi) syms news
 
@@ -677,14 +691,13 @@ let known_add_decl kn0 decl =
   if Sid.is_empty unk then kn
   else raise (UnknownIdent (Sid.choose unk))
 
- let find_constructors kn ts =
+let find_constructors kn ts =
   match (Mid.find ts.ts_name kn).d_node with
   | Dtype _ | Drange _ | Dfloat _ -> []
   | Ddata dl -> List.assq ts dl
   | Dparam _ | Dlogic _ | Dind _ | Dprop _ -> assert false
 
-let
-  find_range_decl kn ts =
+let find_range_decl kn ts =
   match (Mid.find ts.ts_name kn).d_node with
   | Drange ri -> Some ri
   | Dtype _ | Ddata _ | Dfloat _ -> None
@@ -714,7 +727,8 @@ let find_prop kn pr =
       let test (_,l) = List.mem_assq pr l in
       List.assq pr (snd (List.find test dl))
   | Dprop (_,_,f) -> f
-  | Dtype _ | Drange _ | Dfloat _ | Ddata _ | Dparam _ | Dlogic _ -> assert false
+  | Dtype _ | Drange _ | Dfloat _
+  | Ddata _ | Dparam _ | Dlogic _ -> assert false
 
 let find_prop_decl kn pr =
   match (Mid.find pr.pr_name kn).d_node with
@@ -722,7 +736,8 @@ let find_prop_decl kn pr =
       let test (_,l) = List.mem_assq pr l in
       Paxiom, List.assq pr (snd (List.find test dl))
   | Dprop (k,_,f) -> k,f
-  | Dtype _ | Drange _ | Dfloat _ | Ddata _ | Dparam _ | Dlogic _ -> assert false
+  | Dtype _ | Drange _ | Dfloat _
+  | Ddata _ | Dparam _ | Dlogic _ -> assert false
 
 let check_match kn d =
   let rec check () t = match t.t_node with
@@ -735,26 +750,28 @@ let check_match kn d =
   in
   decl_fold check () d
 
+(* FIXME: only look for range_decl or float_decl if the type is not
+   ty_int or ty_real: this saves a lookup and allows us to properly
+   abort if _decl is not found for a non-built-in type *)
 let check_literals kn d =
   let rec check () t = match t.t_node, t.t_ty with
     | Tconst (Number.ConstInt c), Some { ty_node = Tyapp (ts,[]) } ->
       begin match find_range_decl kn ts with
         | Some ri ->
+          (* TODO: move this to Number.range_check? *)
           (* check that c is in range *)
           let cval = Number.compute_int c in
           if BigInt.gt cval ri.range_high_val ||
              BigInt.lt cval ri.range_low_val
           then
             raise (OutOfRange c);
-        | None -> ();
-      end;
-      t_fold check () t
+        | None -> (); (* TODO: raise an exception if not ty_int *)
+      end
     | Tconst (Number.ConstReal c), Some { ty_node = Tyapp (ts,[]) } ->
       begin match find_float_decl kn ts with
         | Some fi ->
-          let _ = Number.float_check c fi.float_eb_val fi.float_sb_val in
-          ()
-        | None -> ()
+            ignore (Number.float_check c fi.float_eb_val fi.float_sb_val)
+        | None -> () (* TODO: raise an exception if not ty_real *)
       end;
     | _ -> t_fold check () t
   in
