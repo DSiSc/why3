@@ -14,7 +14,26 @@ open Ident
 open Ty
 open Term
 
-exception OutOfRange of Number.integer_constant
+(** {2 Special type declaration} *)
+
+type range_decl = {
+  range_ts        : tysymbol;
+  range_to_int    : lsymbol;
+  range_lo_val    : BigInt.t;
+  range_lo_cst    : Number.integer_constant;
+  range_hi_val    : BigInt.t;
+  range_hi_cst    : Number.integer_constant;
+}
+
+type float_decl = {
+  float_ts        : tysymbol;
+  float_to_real   : lsymbol;
+  float_is_finite : lsymbol;
+  float_eb_val    : BigInt.t;
+  float_eb_cst    : Number.integer_constant;
+  float_sb_val    : BigInt.t;
+  float_sb_cst    : Number.integer_constant;
+}
 
 (** Type declaration *)
 
@@ -296,25 +315,6 @@ type prop_decl = prop_kind * prsymbol * term
 
 (** Declaration type *)
 
-type range_info = {
-  range_ts       : tysymbol;
-  range_low_val  : BigInt.t;
-  range_low_cst  : Number.integer_constant;
-  range_high_val : BigInt.t;
-  range_high_cst : Number.integer_constant;
-  range_proj     : Term.lsymbol;
-}
-
-type float_info = {
-  float_ts       : tysymbol;
-  float_eb_val   : BigInt.t;
-  float_eb_cst   : Number.integer_constant;
-  float_sb_val   : BigInt.t;
-  float_sb_cst   : Number.integer_constant;
-  float_proj     : Term.lsymbol;
-  float_isFinite : Term.lsymbol;
-}
-
 type decl = {
   d_node : decl_node;
   d_syms : Sid.t;         (* idents used in declaration *)
@@ -324,11 +324,11 @@ type decl = {
 
 and decl_node =
   | Dtype  of tysymbol          (* abstract types and aliases *)
-  | Drange of range_info        (* range types *)
-  | Dfloat of float_info        (* float types *)
+  | Drange of range_decl        (* bounded integers *)
+  | Dfloat of float_decl        (* floating-point numbers *)
   | Ddata  of data_decl list    (* recursive algebraic types *)
   | Dparam of lsymbol           (* abstract functions and predicates *)
-  | Dlogic of logic_decl list   (* recursive functions and predicates *)
+  | Dlogic of logic_decl list   (* defined functions and predicates *)
   | Dind   of ind_list          (* (co)inductive predicates *)
   | Dprop  of prop_decl         (* axiom / lemma / goal *)
 
@@ -357,13 +357,13 @@ module Hsdecl = Hashcons.Make (struct
     | Dtype  s1, Dtype  s2 -> ts_equal s1 s2
     | Drange ri1, Drange ri2 ->
         ts_equal ri1.range_ts ri2.range_ts &&
-        ls_equal ri1.range_proj ri2.range_proj &&
-        BigInt.eq ri1.range_low_val ri2.range_low_val &&
-        BigInt.eq ri1.range_high_val ri2.range_high_val
+        ls_equal ri1.range_to_int ri2.range_to_int &&
+        BigInt.eq ri1.range_lo_val ri2.range_lo_val &&
+        BigInt.eq ri1.range_hi_val ri2.range_hi_val
     | Dfloat fi1, Dfloat fi2 ->
         ts_equal fi1.float_ts fi2.float_ts &&
-        ls_equal fi1.float_proj fi2.float_proj &&
-        ls_equal fi1.float_isFinite fi2.float_isFinite &&
+        ls_equal fi1.float_to_real fi2.float_to_real &&
+        ls_equal fi1.float_is_finite fi2.float_is_finite &&
         BigInt.eq fi1.float_eb_val fi2.float_eb_val &&
         BigInt.eq fi1.float_sb_val fi2.float_sb_val
     | Ddata  l1, Ddata  l2 -> Lists.equal eq_td l1 l2
@@ -391,9 +391,9 @@ module Hsdecl = Hashcons.Make (struct
   let hash d = match d.d_node with
     | Dtype  s -> ts_hash s
     | Drange ri ->
-        Hashcons.combine (ts_hash ri.range_ts) (ls_hash ri.range_proj)
+        Hashcons.combine (ts_hash ri.range_ts) (ls_hash ri.range_to_int)
     | Dfloat fi ->
-        Hashcons.combine (ts_hash fi.float_ts) (ls_hash fi.float_proj)
+        Hashcons.combine (ts_hash fi.float_ts) (ls_hash fi.float_to_real)
     | Dparam s -> ls_hash s
     | Ddata  l -> Hashcons.combine_list hs_td 3 l
     | Dlogic l -> Hashcons.combine_list hs_ld 5 l
@@ -463,15 +463,15 @@ let create_ty_decl ts =
 
 let create_range_decl ri =
   let syms = Sid.empty in
-  let news = Sid.add ri.range_proj.ls_name
+  let news = Sid.add ri.range_to_int.ls_name
     (Sid.singleton ri.range_ts.ts_name) in
   mk_decl (Drange ri) syms news
 
 let create_float_decl fi =
   let syms = Sid.empty in
-  let news = Sid.add fi.float_proj.ls_name
+  let news = Sid.add fi.float_to_real.ls_name
     (Sid.singleton fi.float_ts.ts_name) in
-  let news = Sid.add fi.float_isFinite.ls_name news in
+  let news = Sid.add fi.float_is_finite.ls_name news in
   mk_decl (Dfloat fi) syms news
 
 let create_data_decl tdl =
@@ -750,29 +750,21 @@ let check_match kn d =
   in
   decl_fold check () d
 
-(* FIXME: only look for range_decl or float_decl if the type is not
-   ty_int or ty_real: this saves a lookup and allows us to properly
-   abort if _decl is not found for a non-built-in type *)
+exception UnknownLiteralType of ty
+
 let check_literals kn d =
+  let get_ts ty = match ty.ty_node with
+    | Tyapp (ts,[]) -> ts
+    | _ -> raise (UnknownLiteralType ty) in
   let rec check () t = match t.t_node, t.t_ty with
-    | Tconst (Number.ConstInt c), Some { ty_node = Tyapp (ts,[]) } ->
-      begin match find_range_decl kn ts with
-        | Some ri ->
-          (* TODO: move this to Number.range_check? *)
-          (* check that c is in range *)
-          let cval = Number.compute_int c in
-          if BigInt.gt cval ri.range_high_val ||
-             BigInt.lt cval ri.range_low_val
-          then
-            raise (OutOfRange c);
-        | None -> (); (* TODO: raise an exception if not ty_int *)
-      end
-    | Tconst (Number.ConstReal c), Some { ty_node = Tyapp (ts,[]) } ->
-      begin match find_float_decl kn ts with
-        | Some fi ->
-            ignore (Number.float_check c fi.float_eb_val fi.float_sb_val)
-        | None -> () (* TODO: raise an exception if not ty_real *)
-      end;
+    | Tconst (Number.ConstInt c), Some ty when not (ty_equal ty ty_int) ->
+        let ri = match find_range_decl kn (get_ts ty) with
+          | Some ri -> ri | _ -> raise (UnknownLiteralType ty) in
+        Number.check_range c ri.range_lo_val ri.range_hi_val
+    | Tconst (Number.ConstReal c), Some ty when not (ty_equal ty ty_real) ->
+        let fi = match find_float_decl kn (get_ts ty) with
+          | Some fi -> fi | _ -> raise (UnknownLiteralType ty) in
+        Number.check_float c fi.float_eb_val fi.float_sb_val
     | _ -> t_fold check () t
   in
   decl_fold check () d

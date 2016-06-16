@@ -15,14 +15,35 @@ open Ident
 open Ty
 open Term
 
-(** {2 Type declaration} *)
+(** {2 Special type declaration} *)
+
+type range_decl = {
+  range_ts        : tysymbol;
+  range_to_int    : lsymbol;
+  range_lo_val    : BigInt.t;
+  range_lo_cst    : Number.integer_constant;
+  range_hi_val    : BigInt.t;
+  range_hi_cst    : Number.integer_constant;
+}
+
+type float_decl = {
+  float_ts        : tysymbol;
+  float_to_real   : lsymbol;
+  float_is_finite : lsymbol;
+  float_eb_val    : BigInt.t;
+  float_eb_cst    : Number.integer_constant;
+  float_sb_val    : BigInt.t;
+  float_sb_cst    : Number.integer_constant;
+}
+
+(** {2 Algebraic type declaration} *)
 
 type constructor = lsymbol * lsymbol option list
 (** constructor symbol with the list of projections *)
 
 type data_decl = tysymbol * constructor list
 
-(** {2 Logic symbols declaration} *)
+(** {2 Logic symbol declaration} *)
 
 type ls_defn
 
@@ -88,25 +109,6 @@ type prop_decl = prop_kind * prsymbol * term
 
 (** {2 Declaration type} *)
 
-type range_info = {
-  range_ts       : tysymbol;
-  range_low_val  : BigInt.t;
-  range_low_cst  : Number.integer_constant;
-  range_high_val : BigInt.t;
-  range_high_cst : Number.integer_constant;
-  range_proj     : Term.lsymbol;
-}
-
-type float_info = {
-  float_ts       : tysymbol;
-  float_eb_val   : BigInt.t;
-  float_eb_cst   : Number.integer_constant;
-  float_sb_val   : BigInt.t;
-  float_sb_cst   : Number.integer_constant;
-  float_proj     : Term.lsymbol;
-  float_isFinite : Term.lsymbol;
-}
-
 type decl = private {
   d_node : decl_node;
   d_syms : Sid.t;         (** idents used in declaration *)
@@ -116,11 +118,11 @@ type decl = private {
 
 and decl_node = private
   | Dtype  of tysymbol          (** abstract types and aliases *)
-  | Drange of range_info        (** range types *)
-  | Dfloat of float_info        (** float types *)
+  | Drange of range_decl        (** bounded integers *)
+  | Dfloat of float_decl        (** floating-point numbers *)
   | Ddata  of data_decl list    (** recursive algebraic types *)
   | Dparam of lsymbol           (** abstract functions and predicates *)
-  | Dlogic of logic_decl list   (** defined functions and predicates (possibly recursively) *)
+  | Dlogic of logic_decl list   (** defined functions and predicates *)
   | Dind   of ind_list          (** (co)inductive predicates *)
   | Dprop  of prop_decl         (** axiom / lemma / goal *)
 
@@ -135,8 +137,8 @@ val d_hash : decl -> int
 (** {2 Declaration constructors} *)
 
 val create_ty_decl : tysymbol -> decl
-val create_range_decl : range_info -> decl
-val create_float_decl : float_info -> decl
+val create_range_decl : range_decl -> decl
+val create_float_decl : float_decl -> decl
 val create_data_decl : data_decl list -> decl
 val create_param_decl : lsymbol -> decl
 val create_logic_decl : logic_decl list -> decl
@@ -165,7 +167,7 @@ exception BadRecordField of lsymbol
 exception RecordFieldMissing of lsymbol * lsymbol
 exception DuplicateRecordField of lsymbol * lsymbol
 
-exception OutOfRange of Number.integer_constant
+exception UnknownLiteralType of ty
 
 (** {2 Utilities} *)
 
@@ -198,8 +200,8 @@ exception UnknownIdent of ident
 exception RedeclaredIdent of ident
 exception NonFoundedTypeDecl of tysymbol
 
-val find_range_decl : known_map -> tysymbol -> range_info option
-val find_float_decl : known_map -> tysymbol -> float_info option
+val find_range_decl : known_map -> tysymbol -> range_decl option
+val find_float_decl : known_map -> tysymbol -> float_decl option
 val find_constructors : known_map -> tysymbol -> constructor list
 val find_inductive_cases : known_map -> lsymbol -> (prsymbol * term) list
 val find_logic_definition : known_map -> lsymbol -> ls_defn option

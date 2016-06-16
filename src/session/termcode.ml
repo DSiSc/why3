@@ -282,7 +282,7 @@ let ident_shape ~push id acc =
   id_string_shape ~push id.Ident.id_string acc
 
 let const_shape ~push acc c =
-  Format.fprintf Format.str_formatter "%a" Pretty.print_const c;
+  Format.fprintf Format.str_formatter "%a" Number.print_constant c;
   push (Format.flush_str_formatter ()) acc
 
 let rec pat_shape ~(push:string->'a->'a) c m (acc:'a) p : 'a =
@@ -458,12 +458,12 @@ module Checksum = struct
     | CV2 -> ident_v2 b id
 
   let integer_constant b c =
-    Format.fprintf Format.str_formatter "%a" Pretty.print_integer_constant c;
+    Number.print_integer_constant Format.str_formatter c;
     let s = Format.flush_str_formatter () in
     string b s
 
   let const b c =
-    Format.fprintf Format.str_formatter "%a" Pretty.print_const c;
+    Number.print_constant Format.str_formatter c;
     let s = Format.flush_str_formatter () in
     string b s
 
@@ -541,14 +541,14 @@ module Checksum = struct
     | Decl.Drange ri ->
         char b 'G';
         tysymbol b ri.Decl.range_ts;
-        lsymbol b ri.Decl.range_proj;
-        integer_constant b ri.Decl.range_low_cst;
-        integer_constant b ri.Decl.range_high_cst
+        lsymbol b ri.Decl.range_to_int;
+        integer_constant b ri.Decl.range_lo_cst;
+        integer_constant b ri.Decl.range_hi_cst
     | Decl.Dfloat fi ->
         char b 'F';
         tysymbol b fi.Decl.float_ts;
-        lsymbol b fi.Decl.float_proj;
-        lsymbol b fi.Decl.float_isFinite;
+        lsymbol b fi.Decl.float_to_real;
+        lsymbol b fi.Decl.float_is_finite;
         integer_constant b fi.Decl.float_eb_cst;
         integer_constant b fi.Decl.float_sb_cst
     | Decl.Ddata ddl ->

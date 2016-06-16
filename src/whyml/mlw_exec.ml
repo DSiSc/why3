@@ -100,10 +100,10 @@ and is_exec_decl ctx d =
   | Dtype ts ->
     allow_ts ts; true
   | Drange ri ->
-    allow_ts ri.range_ts; allow_ls ri.range_proj; true
+    allow_ts ri.range_ts; allow_ls ri.range_to_int; true
   | Dfloat fi ->
-    allow_ts fi.float_ts; allow_ls fi.float_proj;
-    allow_ls fi.float_isFinite; true
+    allow_ts fi.float_ts; allow_ls fi.float_to_real;
+    allow_ls fi.float_is_finite; true
   | Ddata ddl ->
       let constructor (ls, prl) =
         allow_ls ls; List.iter (Opt.iter allow_ls) prl in

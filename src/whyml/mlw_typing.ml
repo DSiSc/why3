@@ -987,53 +987,50 @@ let add_types ~wp uc tdl =
       | TDabstract ->
           ts :: abstr, algeb, alias, range, float
       | TDalias _ ->
-        abstr, algeb, ts :: alias, range, float
+          abstr, algeb, ts :: alias, range, float
       | TDrange (a,b,proj) ->
-        let ts = match ts with
-          | TS ts -> ts
-          | PT _ -> assert false
-        in
-        let a_val = Number.compute_int a  in
-        let b_val = Number.compute_int b in
-        if BigInt.lt b_val a_val then
-          Loc.error ~loc:d.td_loc Typing.EmptyRange
-        else
+          (* FIXME: all sanity checks must be done in Decl *)
+          let ts = match ts with
+            | TS ts -> ts
+            | PT _ -> assert false in
+          let a_val = Number.compute_int a  in
+          let b_val = Number.compute_int b in
+          if BigInt.lt b_val a_val then
+            Loc.error ~loc:d.td_loc Typing.EmptyRange;
           let id = create_user_id proj in
           let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
-          let ri = { range_ts = ts;
-                     range_low_cst = a;
-                     range_low_val = a_val;
-                     range_high_cst = b;
-                     range_high_val = b_val;
-                     range_proj = ls
-                   } in
+          let ri = {
+            range_ts     = ts;
+            range_lo_cst = a;
+            range_lo_val = a_val;
+            range_hi_cst = b;
+            range_hi_val = b_val;
+            range_to_int = ls } in
           abstr, algeb, alias, ri :: range, float
       | TDfloat (eb,sb,proj,isF) ->
-        let ts = match ts with
-          | TS ts -> ts
-          | PT _ -> assert false
-        in
-        let eb_val = Number.compute_int eb in
-        let sb_val = Number.compute_int sb in
-        if BigInt.lt eb_val (BigInt.of_int 1) ||
-           BigInt.lt sb_val (BigInt.of_int 1)
-        then
-          Loc.error ~loc:d.td_loc Typing.BadFloatSpec
-        else
+          (* FIXME: all sanity checks must be done in Decl *)
+          let ts = match ts with
+            | TS ts -> ts
+            | PT _ -> assert false in
+          let eb_val = Number.compute_int eb in
+          let sb_val = Number.compute_int sb in
+          if BigInt.lt eb_val (BigInt.of_int 1) ||
+             BigInt.lt sb_val (BigInt.of_int 1) then
+            Loc.error ~loc:d.td_loc Typing.BadFloatSpec;
           let proj_id = create_user_id proj in
           let isF_id = create_user_id isF in
           let ty = ty_app ts [] in
           let proj = create_lsymbol proj_id [ty] (Some ty_real) in
           let isF = create_lsymbol isF_id [ty] None in
-          let fi = { float_ts = ts;
-                     float_eb_cst = eb;
-                     float_eb_val = eb_val;
-                     float_sb_cst = sb;
-                     float_sb_val = sb_val;
-                     float_proj = proj;
-                     float_isFinite = isF;
-                   } in
-        abstr, algeb, alias, range, fi :: float
+          let fi = {
+            float_ts = ts;
+            float_eb_cst = eb;
+            float_eb_val = eb_val;
+            float_sb_cst = sb;
+            float_sb_val = sb_val;
+            float_to_real = proj;
+            float_is_finite = isF; } in
+          abstr, algeb, alias, range, fi :: float
       | (TDalgebraic _ | TDrecord _) when Hstr.find mutables x ->
           abstr, (ts, Hstr.find predefs x) :: algeb, alias, range, float
       | TDalgebraic csl ->
@@ -1113,13 +1110,13 @@ let add_types ~wp uc tdl =
     add_type_invariant d.td_loc uc d.td_ident d.td_params d.td_inv in
   try
     let uc = List.fold_left add_type_decl uc abstr in
+    let uc = List.fold_left add_range_decl uc range in
+    let uc = List.fold_left add_float_decl uc float in
     let uc = if alg_imp = [] then uc else
       add_pdecl_with_tuples ~wp uc (create_data_decl alg_imp) in
     let uc = if alg_pur = [] then uc else
       add_decl_with_tuples uc (Decl.create_data_decl alg_pur) in
     let uc = List.fold_left add_type_decl uc alias in
-    let uc = List.fold_left add_range_decl uc range in
-    let uc = List.fold_left add_float_decl uc float in
     let uc = List.fold_left add_invariant uc tdl in
     uc
   with

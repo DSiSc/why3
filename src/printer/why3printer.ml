@@ -137,7 +137,6 @@ let print_pat = print_pat_node 0
 let print_vsty fmt v =
   fprintf fmt "%a:@,%a" print_vs v print_ty v.vs_ty
 
-let print_const = Pretty.print_const
 let print_quant = Pretty.print_quant
 let print_binop = Pretty.print_binop
 
@@ -174,7 +173,7 @@ and print_tnode pri fmt t = match t.t_node with
   | Tvar v ->
       print_vs fmt v
   | Tconst c ->
-      print_const fmt c
+      Number.print_constant fmt c
   | Tapp (fs, tl) when unambig_fs fs ->
       print_app pri fs fmt tl
   | Tapp (fs, tl) ->
@@ -264,8 +263,9 @@ let print_range_decl fmt ri =
   if not (query_remove ri.range_ts.ts_name) then begin
     fprintf fmt "@[<hov 2>type %a%a is range %a : %a .. %a@]@\n@\n"
       print_ts ri.range_ts print_ident_labels ri.range_ts.ts_name
-      print_ls ri.range_proj
-      Pretty.print_integer_constant ri.range_low_cst Pretty.print_integer_constant ri.range_high_cst;
+      print_ls ri.range_to_int
+      Number.print_integer_constant ri.range_lo_cst
+      Number.print_integer_constant ri.range_hi_cst;
     forget_tvs ()
   end
 
@@ -273,9 +273,9 @@ let print_float_decl fmt fi =
   if not (query_remove fi.float_ts.ts_name) then begin
     fprintf fmt "@[<hov 2>type %a%a is float %a, %a : %a, %a@]@\n@\n"
       print_ts fi.float_ts print_ident_labels fi.float_ts.ts_name
-      print_ls fi.float_proj print_ls fi.float_isFinite
-      Pretty.print_integer_constant fi.float_eb_cst
-      Pretty.print_integer_constant fi.float_sb_cst;
+      print_ls fi.float_to_real print_ls fi.float_is_finite
+      Number.print_integer_constant fi.float_eb_cst
+      Number.print_integer_constant fi.float_sb_cst;
     forget_tvs ()
   end
 

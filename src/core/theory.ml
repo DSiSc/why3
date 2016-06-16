@@ -375,24 +375,9 @@ let add_symbol add id v uc =
       uc_export = add true  id.id_string v e0 :: ste }
   | _ -> assert false
 
-let add_data uc (ts,csl) =
-  let add_proj uc = function
-    | Some pj -> add_symbol add_ls pj.ls_name pj uc
-    | None -> uc in
-  let add_constr uc (fs,pl) =
-    let uc = add_symbol add_ls fs.ls_name fs uc in
-    List.fold_left add_proj uc pl in
-  let uc = add_symbol add_ts ts.ts_name ts uc in
-  List.fold_left add_constr uc csl
-
-let add_logic uc (ls,_) = add_symbol add_ls ls.ls_name ls uc
-
-let add_ind uc (ps,la) =
-  let uc = add_symbol add_ls ps.ls_name ps uc in
-  let add uc (pr,_) = add_symbol add_pr pr.pr_name pr uc in
-  List.fold_left add uc la
-
-let add_prop uc (_,pr,_) = add_symbol add_pr pr.pr_name pr uc
+let add_symbol_ts uc ts = add_symbol add_ts ts.ts_name ts uc
+let add_symbol_ls uc ls = add_symbol add_ls ls.ls_name ls uc
+let add_symbol_pr uc pr = add_symbol add_pr pr.pr_name pr uc
 
 let create_decl d = mk_tdecl (Decl d)
 
@@ -453,23 +438,42 @@ let add_decl ?(warn=true) uc d =
   check_decl_opacity d; (* we don't care about tasks *)
   let uc = add_tdecl uc (create_decl d) in
   match d.d_node with
-  | Dtype ts  -> add_symbol add_ts ts.ts_name ts uc
+  | Dtype ts  ->
+      add_symbol_ts uc ts
   | Drange ri ->
-      let uc = add_symbol add_ts ri.range_ts.ts_name ri.range_ts uc in
-      add_symbol add_ls ri.range_proj.ls_name ri.range_proj uc
+      let uc = add_symbol_ts uc ri.range_ts in
+      add_symbol_ls uc ri.range_to_int
   | Dfloat fi ->
-      let uc = add_symbol add_ts fi.float_ts.ts_name fi.float_ts uc in
-      let uc = add_symbol add_ls fi.float_proj.ls_name fi.float_proj uc in
-      add_symbol add_ls fi.float_isFinite.ls_name fi.float_isFinite uc
-  | Ddata dl  -> List.fold_left add_data uc dl
-  | Dparam ls -> add_symbol add_ls ls.ls_name ls uc
-  | Dlogic dl -> List.fold_left add_logic uc dl
-  | Dind (_, dl) -> List.fold_left add_ind uc dl
-  | Dprop ((k,pr,_) as p) ->
+      let uc = add_symbol_ts uc fi.float_ts in
+      let uc = add_symbol_ls uc fi.float_to_real in
+      add_symbol_ls uc fi.float_is_finite
+  | Ddata dl  ->
+      let add_field uc = function
+        | Some pj -> add_symbol_ls uc pj
+        | None -> uc in
+      let add_constr uc (cs,pl) =
+        let uc = add_symbol_ls uc cs in
+        List.fold_left add_field uc pl in
+      let add_data uc (ts,csl) =
+        let uc = add_symbol_ts uc ts in
+        List.fold_left add_constr uc csl in
+      List.fold_left add_data uc dl
+  | Dparam ls ->
+      add_symbol_ls uc ls
+  | Dlogic dl ->
+      let add_logic uc (ls,_) = add_symbol_ls uc ls in
+      List.fold_left add_logic uc dl
+  | Dind (_, dl) ->
+      let add_ind uc (ps,la) =
+        let uc = add_symbol_ls uc ps in
+        let add uc (pr,_) = add_symbol_pr uc pr in
+        List.fold_left add uc la in
+      List.fold_left add_ind uc dl
+  | Dprop (k,pr,_) ->
       if warn && should_be_conservative uc.uc_name &&
         should_be_conservative pr.pr_name
       then warn_dubious_axiom uc k pr.pr_name d.d_syms;
-      add_prop uc p
+      add_symbol_pr uc pr
 
 (** Declaration constructors + add_decl *)
 
@@ -629,23 +633,23 @@ let cl_type cl inst ts =
 let cl_range cl inst ri =
   if Mts.mem ri.range_ts inst.inst_ts then
     raise (CannotInstantiate ri.range_ts.ts_name);
-  if Mls.mem ri.range_proj inst.inst_ls then
-    raise (CannotInstantiate ri.range_proj.ls_name);
+  if Mls.mem ri.range_to_int inst.inst_ls then
+    raise (CannotInstantiate ri.range_to_int.ls_name);
   create_range_decl { ri with
-    range_ts = cl_find_ts cl ri.range_ts;
-    range_proj = cl_find_ls cl ri.range_proj }
+    range_ts     = cl_find_ts cl ri.range_ts;
+    range_to_int = cl_find_ls cl ri.range_to_int }
 
 let cl_float cl inst fi =
   if Mts.mem fi.float_ts inst.inst_ts then
     raise (CannotInstantiate fi.float_ts.ts_name);
-  if Mls.mem fi.float_proj inst.inst_ls then
-    raise (CannotInstantiate fi.float_proj.ls_name);
-  if Mls.mem fi.float_isFinite inst.inst_ls then
-    raise (CannotInstantiate fi.float_isFinite.ls_name);
+  if Mls.mem fi.float_to_real inst.inst_ls then
+    raise (CannotInstantiate fi.float_to_real.ls_name);
+  if Mls.mem fi.float_is_finite inst.inst_ls then
+    raise (CannotInstantiate fi.float_is_finite.ls_name);
   create_float_decl { fi with
-    float_ts = cl_find_ts cl fi.float_ts;
-    float_proj = cl_find_ls cl fi.float_proj;
-    float_isFinite = cl_find_ls cl fi.float_isFinite; }
+    float_ts        = cl_find_ts cl fi.float_ts;
+    float_to_real   = cl_find_ls cl fi.float_to_real;
+    float_is_finite = cl_find_ls cl fi.float_is_finite; }
 
 let cl_data cl inst tdl =
   let add_ls ls =

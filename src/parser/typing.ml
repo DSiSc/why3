@@ -509,6 +509,7 @@ let add_types dl th =
       | TDrecord _ ->
           assert false
       | TDrange (a,b,proj) ->
+          (* FIXME: all safety checks must be done in Decl *)
           let a_val = Number.compute_int a  in
           let b_val = Number.compute_int b in
           if BigInt.lt b_val a_val then
@@ -517,14 +518,15 @@ let add_types dl th =
             let id = create_user_id proj in
             let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
             let ri = {
-              range_ts = ts;
-              range_low_cst = a;
-              range_low_val = a_val;
-              range_high_cst = b;
-              range_high_val = b_val;
-              range_proj = ls } in
+              range_ts     = ts;
+              range_lo_cst = a;
+              range_lo_val = a_val;
+              range_hi_cst = b;
+              range_hi_val = b_val;
+              range_to_int = ls } in
             abstr, algeb, alias, ri::range, float
       | TDfloat (eb,sb,proj,isF) ->
+          (* FIXME: all safety checks must be done in Decl *)
           let eb_val = Number.compute_int eb in
           let sb_val = Number.compute_int sb in
           if BigInt.le eb_val (BigInt.of_int 1) ||
@@ -537,13 +539,13 @@ let add_types dl th =
             let proj = create_fsymbol proj_id [ty] ty_real in
             let isF = create_psymbol isF_id [ty] in
             let fi = {
-              float_ts       = ts;
-              float_eb_cst   = eb;
-              float_eb_val   = eb_val;
-              float_sb_cst   = sb;
-              float_sb_val   = sb_val;
-              float_proj     = proj;
-              float_isFinite = isF } in
+              float_ts        = ts;
+              float_eb_cst    = eb;
+              float_eb_val    = eb_val;
+              float_sb_cst    = sb;
+              float_sb_val    = sb_val;
+              float_to_real   = proj;
+              float_is_finite = isF } in
             abstr, algeb, alias, range, fi::float
   in
   let abstr,algeb,alias,range,float =

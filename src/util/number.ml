@@ -286,13 +286,21 @@ let rec print_in_base_aux radix digits fmt i =
 let print_in_base radix digits fmt i =
   print_in_base_aux (of_int radix) digits fmt i
 
+(** Range checks *)
+
+exception OutOfRange of integer_constant
+
+let check_range c lo hi =
+  let cval = compute_int c in
+  if BigInt.lt cval lo || BigInt.gt cval hi then raise (OutOfRange c)
 
 (** Float checks *)
 
-exception NotRepresentableFloat of real_constant
+exception NonRepresentableFloat of real_constant
 
 let debug_float = Debug.register_info_flag "float"
-  ~desc:"Avoid@ catching@ exceptions@ in@ order@ to@ get@ float@ literal@ checks@ messages."
+  ~desc:"Avoid@ catching@ exceptions@ in@ order@ to@ get@ \
+         float@ literal@ checks@ messages."
 
 let float_parser c =
   let exp_parser e = match e.[0] with
@@ -320,7 +328,7 @@ let float_parser c =
           let efive = pow_int_pos_bigint 5 (minus e) in
           let dv, rem = euclidean_div_mod !s efive in
           if not (eq rem zero) then begin
-            raise (NotRepresentableFloat c);
+            raise (NonRepresentableFloat c);
           end else
             dv
         end else
@@ -342,7 +350,7 @@ let float_parser c =
   in
   s, e
 
-let float_check c eb sb =
+let compute_float c eb sb =
   (* 2 ^ (sb - 1)    min representable normalized significand*)
   let smin = pow_int_pos_bigint 2 (sub sb one) in
   (* (2 ^ sb) - 1    max representable normalized significand*)
@@ -369,7 +377,7 @@ let float_check c eb sb =
       let new_s, rem = euclidean_div_mod !s (of_int 2) in
       if not (eq rem zero) then begin
         Debug.dprintf debug_float "Too many digits in significand.";
-        raise (NotRepresentableFloat c);
+        raise (NonRepresentableFloat c);
       end else begin
         s := new_s;
         e := succ !e
@@ -403,7 +411,7 @@ let float_check c eb sb =
       (* now that s and e are in shape, check that e is not too big *)
       if ge fe emax then begin
         Debug.dprintf debug_float "Exponent too big.";
-        raise (NotRepresentableFloat c)
+        raise (NonRepresentableFloat c)
       end;
 
       (* add the exponent bia to e *)
@@ -422,31 +430,30 @@ let float_check c eb sb =
     end
   end
 
-let print_real_constant fmt c =
-  match c with
-  | RConstDec (a,b,e) ->
-    begin match e with
-      | None -> fprintf fmt "%s.%s" a b
-      | Some e -> fprintf fmt "%s.%se%s" a b e
-    end
-  | RConstHex (a,b,e) ->
-    begin match e with
-      | None -> fprintf fmt "0x%s.%s" a b
-      | Some e -> fprintf fmt "0x%s.%sp%s" a b e
-    end
+let check_float c eb sb = ignore (compute_float c eb sb)
 
-let () = Exn_printer.register
-  begin fun fmt exn -> match exn with
+let print_integer_constant fmt = function
+  | IConstDec s -> fprintf fmt "%s" s
+  | IConstHex s -> fprintf fmt "0x%s" s
+  | IConstOct s -> fprintf fmt "0o%s" s
+  | IConstBin s -> fprintf fmt "0b%s" s
+
+let print_real_constant fmt = function
+  | RConstDec (i,f,None)   -> fprintf fmt "%s.%s" i f
+  | RConstDec (i,f,Some e) -> fprintf fmt "%s.%se%s" i f e
+  | RConstHex (i,f,Some e) -> fprintf fmt "0x%s.%sp%s" i f e
+  | RConstHex (i,f,None)   -> fprintf fmt "0x%s.%s" i f
+
+let print_constant fmt = function
+  | ConstInt c  -> print_integer_constant fmt c
+  | ConstReal c -> print_real_constant fmt c
+
+let () = Exn_printer.register (fun fmt exn -> match exn with
   | InvalidConstantLiteral (n,s) ->
-    fprintf fmt "Invalid constant literal in base %d: '%s'" n s
-  | NotRepresentableFloat c ->
-    fprintf fmt "Invalid floating point literal : '%a'"
-      print_real_constant c
-  | _ -> raise exn
-  end
-
-(*
-Local Variables:
-compile-command: "unset LANG; make -C ../.. byte"
-End:
-*)
+      fprintf fmt "Invalid integer literal in base %d: '%s'" n s
+  | NonRepresentableFloat c ->
+      fprintf fmt "Invalid floating point literal: '%a'"
+        print_real_constant c
+  | OutOfRange c ->
+      fprintf fmt "Integer literal %a is out of range" print_integer_constant c
+  | _ -> raise exn)

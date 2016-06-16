@@ -30,33 +30,32 @@ let add_literal (known_lit, decl as acc) t c ls_proj =
   let decl = ax_decl::ls_decl::decl in
   (Mterm.add t ls_t known_lit, decl), ls_t
 
-let rec abstract_terms env type_kept acc t =
+(* TODO: remove int and real literals if not supported.
+   NOTE: in this case, [add_literal] above is incorrect. *)
+let rec abstract_terms kn type_kept acc t =
   match t.t_node, t.t_ty with
-  | Tconst c, Some { ty_node = Tyapp (ts, []) } ->
-    (* TODO: check if ty_int or ty_real first,
-       then assert false if not found *)
-    begin match find_range_decl env ts with
-      | Some ri when not (Sts.mem ri.range_ts type_kept) ->
-          add_literal acc t c ri.range_proj
-      | _ -> begin match find_float_decl env ts with
-          | Some fi when not (Sts.mem fi.float_ts type_kept) ->
-              add_literal acc t c fi.float_proj
-          | _ -> acc, t
-        end
-    end
-  | _ -> t_map_fold (abstract_terms env type_kept) acc t
+  | Tconst (Number.ConstInt _ as c), Some {ty_node = Tyapp (ts,[])}
+    when not (ts_equal ts ts_int || Sts.mem ts type_kept) ->
+      let ri = Opt.get (find_range_decl kn ts) in
+      add_literal acc t c ri.range_to_int
+  | Tconst (Number.ConstReal _ as c), Some {ty_node = Tyapp (ts,[])}
+    when not (ts_equal ts ts_real || Sts.mem ts type_kept) ->
+      let fi = Opt.get (find_float_decl kn ts) in
+      add_literal acc t c fi.float_to_real
+  | _ ->
+      t_map_fold (abstract_terms kn type_kept) acc t
 
-let elim le_int le_real abs_real type_kept env d (known_lit,task) =
+let elim le_int le_real abs_real type_kept kn d (known_lit,task) =
   match d.d_node with
   | Drange ri when not (Sts.mem ri.range_ts type_kept) ->
     let ty_decl = create_ty_decl ri.range_ts in
-    let ls_decl = create_param_decl ri.range_proj in
+    let ls_decl = create_param_decl ri.range_to_int in
     let pr = create_prsymbol (id_derive "_axiom" ri.range_ts.ts_name) in
     (* TODO: why call it dummy? *)
     let v = create_vsymbol (id_fresh "dummy") (ty_app ri.range_ts []) in
-    let v_term = t_app ri.range_proj [t_var v] (Some ty_int) in
-    let a_term = t_const (Number.ConstInt ri.range_low_cst) ty_int in
-    let b_term = t_const (Number.ConstInt ri.range_high_cst) ty_int in
+    let v_term = t_app ri.range_to_int [t_var v] (Some ty_int) in
+    let a_term = t_const (Number.ConstInt ri.range_lo_cst) ty_int in
+    let b_term = t_const (Number.ConstInt ri.range_hi_cst) ty_int in
     let f = t_and (t_app le_int [a_term; v_term] None)
                   (t_app le_int [v_term; b_term] None)
     in
@@ -67,14 +66,14 @@ let elim le_int le_real abs_real type_kept env d (known_lit,task) =
     (* declare abstract type [t] *)
     let ty_decl = create_ty_decl fi.float_ts in
     (* declare projection to_real *)
-    let proj_decl = create_param_decl fi.float_proj in
+    let proj_decl = create_param_decl fi.float_to_real in
     (* declare predicate is_finite *)
-    let isFinite_decl = create_param_decl fi.float_isFinite in
+    let isFinite_decl = create_param_decl fi.float_is_finite in
     (* create defining axiom *)
     (* [forall v:t. is_finite v -> | to_real v | <= max] *)
     let pr = create_prsymbol (id_derive "_axiom" fi.float_ts.ts_name) in
     let v = create_vsymbol (id_fresh "dummy") (ty_app fi.float_ts []) in
-    let v_term = t_app fi.float_proj [t_var v] (Some ty_real) in
+    let v_term = t_app fi.float_to_real [t_var v] (Some ty_real) in
     (* compute max *)
     let emax = BigInt.pow_int_pos_bigint 2 (BigInt.pred fi.float_eb_val) in
     let m = BigInt.pred (BigInt.pow_int_pos_bigint 2 fi.float_sb_val) in
@@ -86,16 +85,15 @@ let elim le_int le_real abs_real type_kept env d (known_lit,task) =
     let term = t_const (Number.ConstReal
       (Number.real_const_hex m_string "" (Some e_string))) ty_real in
     (* compose axiom *)
-    let f = t_app le_real [t_app abs_real [v_term] (Some ty_real); term] None
-    in
-    let f = t_implies (t_app fi.float_isFinite [t_var v] None) f in
+    let f = t_app le_real [t_app abs_real [v_term] (Some ty_real); term] None in
+    let f = t_implies (t_app fi.float_is_finite [t_var v] None) f in
     let f = t_forall_close [v] [] f in
     let ax_decl = create_prop_decl Paxiom pr f in
     (known_lit, List.fold_left Task.add_decl task
        [ty_decl; proj_decl; isFinite_decl; ax_decl])
   | _ ->
     let (known_lit, local_decl), d =
-      decl_map_fold (abstract_terms env type_kept) (known_lit,[]) d in
+      decl_map_fold (abstract_terms kn type_kept) (known_lit,[]) d in
     let t = List.fold_left Task.add_decl task (List.rev local_decl) in
     (known_lit, Task.add_decl t d)
 

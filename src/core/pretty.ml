@@ -12,7 +12,6 @@
 open Format
 open Pp
 open Stdlib
-open Number
 open Ident
 open Ty
 open Term
@@ -131,22 +130,6 @@ let rec print_ty_node pri fmt ty = match ty.ty_node with
 
 let print_ty fmt ty = print_ty_node 0 fmt ty
 
-let print_integer_constant fmt = function
-  | IConstDec s -> fprintf fmt "%s" s
-  | IConstHex s -> fprintf fmt "0x%s" s
-  | IConstOct s -> fprintf fmt "0o%s" s
-  | IConstBin s -> fprintf fmt "0b%s" s
-
-let print_real_constant fmt = function
-  | RConstDec (i,f,None) -> fprintf fmt "%s.%s" i f
-  | RConstDec (i,f,Some e) -> fprintf fmt "%s.%se%s" i f e
-  | RConstHex (i,f,Some e) -> fprintf fmt "0x%s.%sp%s" i f e
-  | RConstHex (i,f,None) -> fprintf fmt "0x%s.%s" i f
-
-let print_const fmt = function
-  | ConstInt c -> print_integer_constant fmt c
-  | ConstReal c -> print_real_constant fmt c
-
 (* can the type of a value be derived from the type of the arguments? *)
 let unambig_fs fs =
   let rec lookup v ty = match ty.ty_node with
@@ -248,7 +231,7 @@ and print_tnode pri fmt t = match t.t_node with
   | Tvar v ->
       print_vs fmt v
   | Tconst c ->
-      print_const fmt c
+      Number.print_constant fmt c
   | Tapp (fs, tl) when is_fs_tuple fs ->
       fprintf fmt "(%a)" (print_list comma print_term) tl
   | Tapp (fs, tl) when unambig_fs fs ->
@@ -344,16 +327,16 @@ let print_ty_decl fmt ts =
 let print_range_decl fmt ri =
   fprintf fmt "@[<hov 2>type %a%a is range %a : %a .. %a@]"
     print_ts ri.range_ts print_id_labels ri.range_ts.ts_name
-    print_ls ri.range_proj
-    print_integer_constant ri.range_low_cst
-    print_integer_constant ri.range_high_cst
+    print_ls ri.range_to_int
+    Number.print_integer_constant ri.range_lo_cst
+    Number.print_integer_constant ri.range_hi_cst
 
 let print_float_decl fmt fi =
   fprintf fmt "@[<hov 2>type %a%a is float %a, %a : %a, %a@]"
     print_ts fi.float_ts print_id_labels fi.float_ts.ts_name
-    print_ls fi.float_proj print_ls fi.float_isFinite
-    print_integer_constant fi.float_eb_cst
-    print_integer_constant fi.float_sb_cst
+    print_ls fi.float_to_real print_ls fi.float_is_finite
+    Number.print_integer_constant fi.float_eb_cst
+    Number.print_integer_constant fi.float_sb_cst
 
 let print_data_decl fst fmt (ts,csl) =
   fprintf fmt "@[<hov 2>%s %a%a%a =@\n@[<hov>%a@]@]"
@@ -631,7 +614,7 @@ let () = Exn_printer.register
         id.id_string
   | Decl.NoTerminationProof ls ->
       fprintf fmt "Cannot prove the termination of %a" print_ls ls
-  | Decl.OutOfRange c ->
-      fprintf fmt "%a is out of range" print_const (ConstInt c)
+  | Decl.UnknownLiteralType ty ->
+      fprintf fmt "Unknown literal type %a" print_ty ty
   | _ -> raise exn
   end

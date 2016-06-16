@@ -280,10 +280,12 @@ let add_decl uc d =
   let uc = match d.Decl.d_node with
     | Decl.Dtype ts -> add_ts uc ts
     | Decl.Drange ri ->
-      add_ls (add_ts uc ri.Decl.range_ts) ri.Decl.range_proj
+        let uc = add_ts uc ri.Decl.range_ts in
+        add_ls uc ri.Decl.range_to_int
     | Decl.Dfloat fi ->
-      add_ls (add_ls (add_ts uc fi.Decl.float_ts) fi.Decl.float_proj)
-        fi.Decl.float_isFinite
+        let uc = add_ts uc fi.Decl.float_ts in
+        let uc = add_ls uc fi.Decl.float_to_real in
+        add_ls uc fi.Decl.float_is_finite
     | Decl.Ddata dl -> List.fold_left add_data uc dl
     | Decl.Dparam ls -> add_ls uc ls
     | Decl.Dlogic dl -> List.fold_left add_logic uc dl

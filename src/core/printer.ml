@@ -287,7 +287,7 @@ let syntax_float_literal s fmt c eb sb =
       else
         None
     in
-    let e,m = Number.float_check c eb sb in
+    let e,m = Number.compute_float c eb sb in
     match s.[b] with
     | 's' -> Number.print_in_base base digits fmt BigInt.zero
     | 'e' -> Number.print_in_base base digits fmt e
