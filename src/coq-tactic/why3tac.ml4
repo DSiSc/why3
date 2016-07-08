@@ -110,6 +110,7 @@ let find_reference t1 t2 =
   let th = lazy (find_reference t1 t2) in
   fun x -> lazy (Lazy.force th x)
 
+let coq_is_global = is_global
 let is_global c t = is_global (Lazy.force c) t
 
 DECLARE PLUGIN "why3tac"
@@ -117,6 +118,11 @@ DECLARE PLUGIN "why3tac"
 END
 
 module Why3tac = struct
+
+let rec head_of_constr_pattern = function
+  | Pattern.PRef r -> r
+  | Pattern.PApp (p, _) -> head_of_constr_pattern p
+  | _ -> error "Why3 Translate: cannot find a head symbol"
 
 open Why3
 open Call_provers
@@ -372,13 +378,15 @@ type dep = {
   dep_use_int : bool;
   dep_use_eucl: bool;
   dep_use_real: bool;
+  dep_imports : Theory.theory Ident.Mid.t;
 }
 
 let empty_dep =
   { dep_decls = Decl.Sdecl.empty;
     dep_use_int = false;
     dep_use_eucl = false;
-    dep_use_real = false; }
+    dep_use_real = false;
+    dep_imports  = Ident.Mid.empty; }
 
 let empty_dep () = ref empty_dep
 let add_dep r v = r := { !r with dep_decls = Decl.Sdecl.add v !r.dep_decls }
@@ -432,6 +440,7 @@ let rec add_local_decls d =
     if dep.dep_use_int then task := Task.use_export !task (Lazy.force th_int);
     if dep.dep_use_eucl then task := Task.use_export !task (Lazy.force th_eucl);
     if dep.dep_use_real then task := Task.use_export !task (Lazy.force th_real);
+    Ident.Mid.iter (fun _ th -> task := Task.use_export !task th) dep.dep_imports;
     try
       task := Task.add_decl !task d
     with Decl.UnknownIdent id ->
@@ -441,20 +450,42 @@ let rec add_local_decls d =
       assert false
   end
 
+(* user-defined symbol translations *)
+let global_tr = ref Refmap.empty (* ref -> (pattern * ls_symbol * theory option) list *)
+
+let theory_of_string s =
+  assert (s = "int.Int");
+  let path, m = ["int"], "Int" in (* FIXME: decode s *)
+  lazy (Env.read_theory env path m)
+
+let add_global_tr pat sym mopt =
+  let vl, pat = Constrintern.intern_constr_pattern (Global.env()) pat in
+  if vl <> [] then error "Why3 Translate: variables not allowed in patterns";
+  let r = head_of_constr_pattern pat in
+  let th = match mopt with
+    | None -> assert false (*TODO*)
+    | Some s -> theory_of_string s in
+  let ls = lazy (Theory.ns_find_ls (Lazy.force th).Theory.th_export [sym]) in
+  let old = try Refmap.find r !global_tr with Not_found -> [] in
+  global_tr := Refmap.add r ((pat, ls, th) :: old) !global_tr
+
+exception FoundLs of Why3.Term.lsymbol
+
 (* synchronization *)
 let () =
   declare_summary "Why globals"
     (fun () ->
-     !global_ts, !global_ls, !poly_arity, !global_decl, !global_dep)
-    (fun (ts,ls,pa,gdecl,gdep) ->
+     !global_ts, !global_ls, !poly_arity, !global_decl, !global_dep, !global_tr)
+    (fun (ts,ls,pa,gdecl,gdep,gtr) ->
      global_ts := ts; global_ls := ls; poly_arity := pa;
-     global_decl := gdecl; global_dep := gdep)
+     global_decl := gdecl; global_dep := gdep; global_tr := gtr)
     (fun () ->
      global_ts := Refmap.empty;
      global_ls := Refmap.empty;
      poly_arity := Mls.empty;
      global_decl := Ident.Mid.empty;
-     global_dep := Decl.Mdecl.empty)
+     global_dep := Decl.Mdecl.empty;
+     global_tr := Refmap.empty)
 
 let lookup_table table r = match Refmap.find r !table with
   | None -> raise NotFO
@@ -899,10 +930,12 @@ and tr_term dep tvm bv env evd t =
     tr_arith_constant dep t
   with NotArithConstant -> match kind_of_term t with
     (* binary operations on integers *)
+(*
     | App (c, [|a;b|]) when is_global coq_Zplus c ->
         let ls = why_constant_int dep ["infix +"] in
         Term.fs_app ls [tr_term dep tvm bv env evd a; tr_term dep tvm bv env evd b]
           Ty.ty_int
+*)
     | App (c, [|a;b|]) when is_global coq_Zminus c ->
         let ls = why_constant_int dep ["infix -"] in
         Term.fs_app ls [tr_term dep tvm bv env evd a; tr_term dep tvm bv env evd b]
@@ -987,6 +1020,7 @@ and tr_term dep tvm bv env evd t =
     | Cast (t, _, _) ->
         tr_term dep tvm bv env evd t
     | Var _ | App _ | Construct _ | Ind _ | Const _ ->
+        Format.printf "******* ICI %d ***********@." (Refmap.fold (fun _ _ -> succ) !global_tr 0);
         let f, cl = decompose_app t in
         (* a local variable cannot be applied (not FO) *)
         begin match kind_of_term f with
@@ -994,7 +1028,22 @@ and tr_term dep tvm bv env evd t =
           | _ -> ()
         end;
         let r = try global_of_constr f with _ -> raise NotFO in
-        let ls = tr_task_ls dep env evd r in
+        let test_one r1 (_pat, ls ,th) =
+          Format.eprintf "test_one %s@." (Lazy.force ls).ls_name.id_string;
+          if coq_is_global r1 f then begin
+            let ls = Lazy.force ls in
+            let th = Lazy.force th in
+            dep := { !dep with dep_imports =
+                Ident.Mid.add th.Theory.th_name th !dep.dep_imports };
+            Format.eprintf "translation: => ls = %s@." ls.ls_name.Ident.id_string;
+            raise (FoundLs ls)
+          end in
+        let test_one r1 l = List.iter (test_one r1) l in
+        let ls =
+          try
+            Refmap.iter test_one !global_tr;
+            tr_task_ls dep env evd r
+          with FoundLs ls -> ls in
         begin match ls.Term.ls_value with
           | Some _ ->
               let cl = List.filter (fun c -> not (has_WhyType env evd c)) cl in
@@ -1367,6 +1416,11 @@ end
 TACTIC EXTEND Why3
   [ "why3" string(s) ] -> [ Why3tac.why3tac s ]
 | [ "why3" string(s) "timelimit" integer(n) ] -> [ Why3tac.why3tac ~timelimit:n s ]
+  END
+
+VERNAC COMMAND EXTEND Why3Translate CLASSIFIED AS SIDEFF
+| [ "Why3" "Translate" constr_pattern(p) "=>" string(s) (*"from"*) string_opt(m) ]
+  -> [ Why3tac.add_global_tr p s m ]
 END
 
 (*

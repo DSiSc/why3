@@ -795,7 +795,7 @@ COQPDEP = $(addsuffix .dep, $(COQPMODULES))
 COQPCMO = $(addsuffix .cmo, $(COQPMODULES))
 COQPCMX = $(addsuffix .cmx, $(COQPMODULES))
 
-COQPTREES = kernel interp intf lib library parsing pretyping proofs printing tactics toplevel
+COQPTREES = kernel interp intf lib library parsing pretyping proofs printing tactics toplevel stm
 COQPINCLUDES = -I src/coq-tactic -I $(COQCAMLPLIB) $(addprefix -I @COQLIB@/, $(COQPTREES)) @ZIPINCLUDE@
 
 $(COQPDEP): DEPFLAGS += -I src/coq-tactic
