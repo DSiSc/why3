@@ -10,6 +10,7 @@ model_parser "smtv2"
 
 import "smt-libv2.drv"
 import "smt-libv2-bv.gen"
+import "smt-libv2-floats.gen"
 import "discrimination.gen"
 
 transformation "inline_trivial"
@@ -60,6 +61,28 @@ theory LitTest.T
 
   syntax function (+) "(fp.add RNE %1 %2)"
 
+end
+
+theory ieee_float.Float64
+   syntax function to_int
+ "(ite (= ((_ extract 1024 1024) ((_ fp.to_sbv 1025) RNE %1)) #b0)
+   (bv2int ((_ fp.to_sbv 1025) RNE %1))
+   (- (bv2int ((_ fp.to_sbv 1025) RNE %1)) (bv2int (bvshl (_ bv1 1026) (_ bv1025 1026)))))"
+  syntax function of_int
+      "((_ to_fp 11 53) RNE (ite (< %1 0)
+                                  ((_ int2bv 1025) (+ (bv2int (bvshl (_ bv1 1026) (_ bv1025 1026))) %1))
+                                  ((_ int2bv 1025) %1)))"
+end
+
+theory ieee_float.Float32
+   syntax function to_int
+ "(ite (= ((_ extract 128 128) ((_ fp.to_sbv 129) RNE %1)) #b0)
+           (bv2int ((_ fp.to_sbv 129) RNE %1))
+           (- (bv2int ((_ fp.to_sbv 129) RNE %1)) (bv2int (bvshl (_ bv1 130) (_ bv129 130)))))"
+  syntax function of_int
+      "((_ to_fp 8 24) RNE (ite (< %1 0)
+                            ((_ int2bv 129) (+ (bv2int (bvshl (_ bv1 130) (_ bv129 130))) %1))
+                            ((_ int2bv 129) %1)))"
 end
 
 (* div/mod of Z3 seems to be Euclidean Division *)

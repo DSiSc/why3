@@ -3,32 +3,10 @@ module Test_float
  use import real.Real
  use import real.Abs
 
- (* type f is float to_real, is_finite: 3, 3 *)
- use import LitTest.T
+ use import ieee_float.Float32
 
- (* function (&) f f : f *)
+ goal g  : forall x:t. x = (0.5 : t)
 
- (* meta "float:keep" type f *)
- (* meta "syntax_literal" type f, "au", 1 *)
- (* meta "syntax_type" type f, "Float32", 1 *)
+ goal i : not ((0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) .+ (0x199999Ap-4 : t) = (1.0 : t))
 
- (* goal g : forall x:f. x = (0.23 : f) *)
- goal g  : forall x:f. x = (0.5 : f)
-
- goal i : not ((0x199999Ap-4 : single) + (0x199999Ap-4 : single) + (0x199999Ap-4 : single) + (0x199999Ap-4 : single) + (0x199999Ap-4 : single) + (0x199999Ap-4 : single) +(0x199999Ap-4 : single) + (0x199999Ap-4 : single) + (0x199999Ap-4 : single) + (0x199999Ap-4 : single) = (1.0 : single))
-
-(* goal g' : forall x:f. x = (0x2p-5 : f) & (1.0e1 : f) & (0x2.p2 : f) &
- (0x1.p-1 : f) & (5e-1 : f) & (14.0 : f) & (12.0 : f) & (8.0 : f) &
- (4.0 : f) & (2.0 : f) & (1.0 : f) & (0.5 : f) & (0.4375 : f) & (0.375
- : f) & (0.3125 : f) & (0.25 : f) & (0.1875 : f) & (0.125 : f) &
- (0.0625 : f) & (7.0 : f) (* & (9.0 : f) *)
-
- goal h  : forall x:f. to_real x < 100.0
-
- use import int.Int
- use import bv.BV8
- use real.FromInt
-
- goal j : FromInt.from_int (to_uint (0 : t)) = to_real (0.0 : f)
-*)
 end
