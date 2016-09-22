@@ -310,7 +310,7 @@ let y = int_of_string ys
 let max_digits = 1 + max n (y / 9)
 
 (* x is initialized as z (with the digit in reverse order)*)
-let x = Array.create max_digits 0
+let x = Array.make max_digits 0
 let () = 
   for i = 0 to n - 1 do x.(n - 1 - i) <- Char.code zs.[i] - Char.code '0' done
 

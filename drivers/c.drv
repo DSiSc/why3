@@ -1,0 +1,18 @@
+printer "c"
+
+theory BuiltIn
+  syntax predicate (=) "int_eq(%1, %2)"
+end
+
+theory int.Int
+  prelude "#include \"int.c\""
+
+  syntax constant zero "miaou"
+  syntax constant one "miaou"
+
+  syntax predicate (<) "int_lt(%1, %2)"
+
+  syntax function (+) "int_add(%1, %2)"
+  syntax function (-) "int_sub(%1, %2)"
+  syntax function (*) "int_mul(%1, %2)"
+end

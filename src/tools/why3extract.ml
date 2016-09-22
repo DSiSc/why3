@@ -100,7 +100,7 @@ let opt_driver =
     exit 1
 
 let extract_to ?fname th extract =
-  let file = Filename.concat opt_output (Mlw_ocaml.extract_filename ?fname th) in
+  let file = Filename.concat opt_output (Mlw_backends.extract_filename opt_driver ?fname th) in
   let old =
     if Sys.file_exists file then begin
       let backup = file ^ ".bak" in
@@ -108,7 +108,9 @@ let extract_to ?fname th extract =
       Some (open_in backup)
     end else None in
   let cout = open_out file in
-  extract file ?old (formatter_of_out_channel cout);
+  let fmt = formatter_of_out_channel cout in
+  extract file ?old fmt;
+  Format.pp_print_flush fmt ();
   close_out cout
 
 let extract_to =
@@ -123,24 +125,18 @@ let use_iter f th =
   List.iter (fun d -> match d.td_node with Use t -> f t | _ -> ()) th.th_decls
 
 let rec do_extract_theory ?fname th =
-  let extract file ?old fmt = ignore (old);
-    let tname = th.th_name.Ident.id_string in
-    Debug.dprintf Mlw_ocaml.debug "extract theory %s to file %s@." tname file;
-    Mlw_ocaml.extract_theory opt_driver ?old ?fname fmt th
-  in
-  extract_to ?fname th extract;
   let extract_use th' =
     let fname = if th'.th_path = [] then fname else None in
     do_extract_theory ?fname th' in
-  use_iter extract_use th
+  use_iter extract_use th;
+  let extract file ?old fmt =
+    let tname = th.th_name.Ident.id_string in
+    Debug.dprintf Mlw_backends.debug "extract theory %s to file %s@." tname file;
+    Mlw_backends.extract_theory opt_driver ?old ?fname fmt th
+  in
+  extract_to ?fname th extract
 
 let rec do_extract_module ?fname m =
-  let extract file ?old fmt = ignore (old);
-    let tname = m.Mlw_module.mod_theory.th_name.Ident.id_string in
-    Debug.dprintf Mlw_ocaml.debug "extract module %s to file %s@." tname file;
-    Mlw_ocaml.extract_module opt_driver ?old ?fname fmt m
-  in
-  extract_to ?fname m.Mlw_module.mod_theory extract;
   let extract_use th' =
     let fname = if th'.th_path = [] then fname else None in
     match
@@ -148,7 +144,13 @@ let rec do_extract_module ?fname m =
     with
       | Some m' -> do_extract_module ?fname m'
       | None    -> do_extract_theory ?fname th' in
-  use_iter extract_use m.Mlw_module.mod_theory
+  use_iter extract_use m.Mlw_module.mod_theory;
+  let extract file ?old fmt =
+    let tname = m.Mlw_module.mod_theory.th_name.Ident.id_string in
+    Debug.dprintf Mlw_backends.debug "extract module %s to file %s@." tname file;
+    Mlw_backends.extract_module opt_driver ?old ?fname fmt m
+  in
+  extract_to ?fname m.Mlw_module.mod_theory extract
 
 let do_global_extract (_,p,t) =
   let env = opt_driver.Mlw_driver.drv_env in

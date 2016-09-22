@@ -55,6 +55,9 @@ val find_nth : ('a -> bool) -> 'a list -> int
     satifies the predicate [p]. [raise Not_found] if no element of [l]
     verify the predicate *)
 
+val find_with_nth : ('a -> bool) -> 'a list -> ('a * int)
+(** [find_with_nth p l] is the composition of [find p l] and [find_nth p l] *)
+
 val first_nth : ('a -> 'b option) -> 'a list -> int * 'b
 (** The combinaison of {!list_first} and {!list_find_nth}. *)
 
@@ -63,6 +66,12 @@ val iteri : (int -> 'a -> unit) -> 'a list -> unit
 val fold_lefti : ('a -> int -> 'b -> 'a) -> 'a -> 'b list -> 'a
 (** similar to List.map, List.iter and List.fold_left,
     but with element index passed as extra argument (in 0..len-1) *)
+
+val fold_lefti2 : ('a -> int -> 'b -> 'c -> 'a) -> 'a -> 'b list -> 'c list -> 'a
+(** [List.fold_lefti2 f a [b1; ...; bn] [c1; ...; cn]] is
+   [f (... (f (f a 0 b1 c1) 1 b2 c2) ...) (n-1) bn cn].
+   Raise [Invalid_argument] if the two lists have
+   different lengths. *)
 
 val prefix : int -> 'a list -> 'a list
 (** the first n elements of a list *)
@@ -73,3 +82,11 @@ val chop : int -> 'a list -> 'a list
 
 val chop_last : 'a list -> 'a list * 'a
 (** removes (and returns) the last element of a list *)
+
+val split_at : int -> 'a list -> 'a list * 'a list
+(** [split_at n l] returns two lists l1 and l2,
+    l1 containing the first n elements of l and l2 this others.
+    @raises Invalid_argument if the list is not long enough *)
+
+val make : int -> 'a -> 'a list
+(** [make n x] returns a list containing n elements x *)

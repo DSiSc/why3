@@ -89,6 +89,12 @@ let find_nth p l =
     | a::l -> if p a then n else aux p (n+1) l in
   aux p 0 l
 
+let find_with_nth p l =
+  let rec aux n = function
+    | [] -> raise Not_found
+    | a::l -> if p a then (a, n) else aux (succ n) l
+  in
+  aux 0 l
 
 let first_nth f l =
   let rec aux f n = function
@@ -119,6 +125,14 @@ let fold_lefti f acc l =
   in
   fold_left acc 0 l
 
+let fold_lefti2 f acc l1 l2 =
+  let rec fold_left2 acc i = function
+    | [], [] -> acc
+    | x::xs, y::ys -> fold_left2 (f acc i x y) (i + 1) (xs, ys)
+    | _, _ -> invalid_arg "Util.fold_lefti2"
+  in
+  fold_left2 acc 0 (l1, l2)
+
 let rec prefix n l =
   if n = 0 then []
   else if n < 0 || l = [] then invalid_arg "Util.chop"
@@ -134,3 +148,23 @@ let rec chop_last = function
   | [r] -> [], r
   | x :: s -> let s, r = chop_last s in x :: s, r
 
+let split_at n l =
+  let rec aux n acc = function
+    | l when n = 0 -> (acc, l)
+    | [] -> invalid_arg "Util.split_at"
+    | x::xs -> aux (pred n) (x :: acc) xs
+  in
+  if n < 0 then
+    invalid_arg "Util.split_at"
+  else
+    aux n [] l
+
+let make n x =
+  let rec aux acc = function
+    | 0 -> acc
+    | n -> aux (x :: acc) (pred n)
+  in
+  if n < 0 then
+    invalid_arg "Util.make"
+  else
+    aux [] n

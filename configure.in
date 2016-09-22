@@ -211,6 +211,14 @@ if test "$enable_native_code" != yes || test "$OCAMLBEST" = byte ; then
     OCAMLOPT=no
 fi
 
+# bin-annot
+case "$OCAMLVERSION" in
+  0.*|1.*|2.*|3.*)
+        enable_bin_annot=no;;
+  *)
+        enable_bin_annot=yes;;
+esac
+
 # checking for ocamlc.opt
 AC_CHECK_PROG(OCAMLCDOTOPT,ocamlc.opt,ocamlc.opt,no)
 if test "$OCAMLCDOTOPT" != no ; then
@@ -852,6 +860,7 @@ echo "    Version                 : $OCAMLVERSION"
 echo "    Library path            : $OCAMLLIB"
 echo "    Native compilation      : $enable_native_code"
 echo "    Profiling               : $enable_profiling"
+echo "    -bin-annot              : $enable_bin_annot"
 echo "Components"
 echo "    IDE command             : $enable_ide$reason_ide"
 echo "    GMP arithmetic          : $enable_zarith$reason_zarith"
