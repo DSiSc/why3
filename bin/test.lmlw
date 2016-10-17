@@ -1,0 +1,101 @@
+\documentclass{article}
+
+\usepackage{./actes}
+\usepackage{./why3lang}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath}
+\usepackage{xspace}
+
+\newcommand{\why}{\textsf{Why3}\xspace}
+\newcommand{\whyml}{\textsf{WhyML}\xspace}
+
+\title{An Introduction to Why3Literate}
+\author{Mário Pereira$^1$}
+% les titres de haut de pages
+\titlehead{An Introduction to Why3Literate}%  a droite (page impaire)
+\authorhead{Pereira}% a gauche (page paire)
+
+\affiliation{\begin{tabular}{rr}
+\\ 1:  Lab. de Recherche en Informatique,
+\\  Univ.~Paris-Saclay, CNRS, Orsay, F-91405 \\ et Inria Saclay --
+  Île-de-France, Orsay, F-91893\\
+  Mario.Parreira-Pereira@lri.fr
+\\ ~
+\end{tabular}}
+
+\begin{document}
+\maketitle
+
+\section{Hello World}
+
+A simple Hello World code.
+
+\begin{code}
+module M
+  let f (x: int) : int = x
+end
+\end{code}
+
+\section{A Function over Lists}
+
+Let's now define a logical function to compute the length of a list.
+We start by opening a new module and importing the integers theory (we will need it in
+order to perform arithmetic operations):
+\begin{code}
+module List
+  use import int.Int
+\end{code}
+
+The type of lists is defined as traditionally. A list is either empty or is an element
+followed by a list (its tail). We use here \why\ algebraic datatypes to define
+the type of lists:
+\begin{code}
+  type list 'a = Nil | Cons 'a (list 'a)
+\end{code}
+Note that this definition introduces polimorphic lists.
+
+The function to be defined shall take a list as argument and return the length of
+its parameter. The function signature is as follows:
+\begin{code}
+  function length (l: list 'a) : int
+\end{code}
+We perform a case analysis on the form of a list in order to define \of{length}.
+This is implemented using pattern-matching:
+\begin{code}
+  = match l with
+\end{code}
+The first branch treats the case when the~\of{l} is empty, and so of length zero:
+\begin{code}
+    | Nil -> 0
+\end{code}
+The second, and last branch, is executed whenever the list is non-empty. In
+such a case, the length of the list is one plus the length of the tail:
+\begin{code}
+    | Cons _ tl -> 1 + length tl
+    end
+\end{code}
+We shall make the remark that this is fact a recursive definition.
+
+Here is another logical function over lists:
+\begin{code}
+  use import option.Option
+
+  function hd (l: list 'a) : option 'a = match l with
+    | Nil      -> None
+    | Cons h _ -> Some h
+  end
+
+end
+\end{code}
+
+\section{This is not code}
+
+A small example which is not meant to be type-checked:
+\begin{spec}
+  let ff (x: int) : int =
+    if x > 0 then x * x
+    else ...
+\end{spec}
+
+\end{document}

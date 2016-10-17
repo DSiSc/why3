@@ -51,35 +51,35 @@
   let get_loc lb =
     Loc.extract (Lexing.lexeme_start_p lb, Lexing.lexeme_end_p lb)
 
-  let current_file = ref ""
+  (* let current_file = ref "" *)
 
-  let print_ident fmt lexbuf s =
-    if is_keyword1 s then
-      fprintf fmt "<span class=\"keyword1\">%s</span>" s
-    else if is_keyword2 s then
-      fprintf fmt "<span class=\"keyword2\">%s</span>" s
-    else begin
-      let (* f,l,c as *) loc = get_loc lexbuf in
-      (* Format.eprintf "  IDENT %s/%d/%d@." f l c; *)
-      (* is this a def point? *)
-      try
-        let id, def = Glob.find loc in
-        match id.Ident.id_loc with
-        | None -> raise Not_found
-        | Some _ ->
-          match def with
-          | Glob.Def ->
-            fprintf fmt "<a name=\"%a\">%a</a>"
-              Doc_def.pp_anchor id Pp.html_string s
-          | Glob.Use ->
-            fprintf fmt "<a href=\"%a\">%a</a>"
-              Doc_def.pp_locate id Pp.html_string s
-      with Not_found ->
-        (* otherwise, just print it *)
-        pp_print_string fmt s
-    end
+  (* let print_ident fmt lexbuf s = *)
+  (*   if is_keyword1 s then *)
+  (*     fprintf fmt "<span class=\"keyword1\">%s</span>" s *)
+  (*   else if is_keyword2 s then *)
+  (*     fprintf fmt "<span class=\"keyword2\">%s</span>" s *)
+  (*   else begin *)
+  (*     let (\* f,l,c as *\) loc = get_loc lexbuf in *)
+  (*     (\* Format.eprintf "  IDENT %s/%d/%d@." f l c; *\) *)
+  (*     (\* is this a def point? *\) *)
+  (*     try *)
+  (*       let id, def = Glob.find loc in *)
+  (*       match id.Ident.id_loc with *)
+  (*       | None -> raise Not_found *)
+  (*       | Some _ -> *)
+  (*         match def with *)
+  (*         | Glob.Def -> *)
+  (*           fprintf fmt "<a name=\"%a\">%a</a>" *)
+  (*             Doc_def.pp_anchor id Pp.html_string s *)
+  (*         | Glob.Use -> *)
+  (*           fprintf fmt "<a href=\"%a\">%a</a>" *)
+  (*             Doc_def.pp_locate id Pp.html_string s *)
+  (*     with Not_found -> *)
+  (*       (\* otherwise, just print it *\) *)
+  (*       pp_print_string fmt s *)
+  (*   end *)
 
-  type empty_line = PrevEmpty | CurrEmpty | NotEmpty
+  (* type empty_line = PrevEmpty | CurrEmpty | NotEmpty *)
 
 }
 
@@ -108,207 +108,50 @@ let space = [' ' '\t']
 let ident = ['A'-'Z' 'a'-'z' '_'] ['A'-'Z' 'a'-'z' '0'-'9' '_']* | operator
 let special = ['\'' '"' '<' '>' '&']
 
-rule scan fmt empty = parse
-  | "(*)" as s
-          { pp_print_string fmt s;
-            scan fmt NotEmpty lexbuf }
-  | space* "(***"
-          { comment fmt false lexbuf;
-            scan fmt empty lexbuf }
-  | space* "(**"
-          { pp_print_string fmt "</pre>\n";
-            if empty <> PrevEmpty then
-              pp_print_string fmt "<div class=\"info\">";
-            doc fmt false [] lexbuf;
-            if empty <> PrevEmpty then pp_print_string fmt "</div>";
-            pp_print_string fmt "<pre>";
-            scan fmt CurrEmpty lexbuf }
-  | "(**)"
-          { pp_print_string fmt "<span class=\"comment\">(**)</span>";
-            scan fmt NotEmpty lexbuf }
-  | "(*"
-          { pp_print_string fmt "<span class=\"comment\">(*";
-            comment fmt true lexbuf;
-            pp_print_string fmt "</span>";
-            scan fmt NotEmpty lexbuf }
-  | eof   { () }
-  | ident as s
-          { print_ident fmt lexbuf s;
-            scan fmt NotEmpty lexbuf }
-  | space* '\n'
-          { newline lexbuf;
-            if empty <> PrevEmpty then pp_print_char fmt '\n';
-            let e = if empty = NotEmpty then CurrEmpty else PrevEmpty in
-            scan fmt e lexbuf }
-  | '"'   { pp_print_string fmt "&quot;";
-            string fmt true lexbuf;
-            scan fmt NotEmpty lexbuf }
+let begin_code = "\\begin{code}"
+let end_code   = "\\end{code}"
+let begin_spec = "\\begin{spec}"
+let end_spec   = "\\end{spec}"
+
+rule scan fmt1 fmt2 = parse
+  | begin_code { pp_print_string fmt1 "\\begin{why3}";
+                 print_code fmt1 fmt2 true lexbuf;
+                 scan fmt1 fmt2 lexbuf }
+  | begin_spec { pp_print_string fmt1 "\\begin{why3}";
+                 print_code fmt1 fmt2 false lexbuf;
+                 scan fmt1 fmt2 lexbuf }
+  | eof { () }
   | "'\"'"
-  | _ as s
-          { pp_print_string fmt s;
-            scan fmt NotEmpty lexbuf }
+  | _ as s     { pp_print_string fmt1 s;
+                 scan fmt1 fmt2 lexbuf }
 
-and scan_embedded fmt depth = parse
-  | '['   { pp_print_char fmt '[';
-            scan_embedded fmt (depth + 1) lexbuf }
-  | ']'   { if depth > 0 then begin
-              pp_print_char fmt ']';
-              scan_embedded fmt (depth - 1) lexbuf
-            end }
-  | "*)"  { backtrack lexbuf }
-  | eof   { () }
-  | ident as s
-          { print_ident fmt lexbuf s;
-            scan_embedded fmt depth lexbuf }
-  | "\n"   { newline lexbuf;
-             pp_print_char fmt '\n';
-             scan_embedded fmt depth lexbuf }
-  | '"'    { pp_print_string fmt "&quot;";
-             string fmt true lexbuf;
-             scan_embedded fmt depth lexbuf }
+and print_code fmt1 fmt2 is_code = parse
+  | end_code { pp_print_string fmt1 "\\end{why3}" }
+(* TODO: use [is_code] to check if we are in a [code] or [spec] section *)
+  | end_spec { pp_print_string fmt1 "\\end{why3}" }
+  | eof { () }
   | "'\"'"
-  | _ as s { pp_print_string fmt s;
-             scan_embedded fmt depth lexbuf }
-
-and comment fmt do_output = parse
-  | "(*"   { if do_output then pp_print_string fmt "(*";
-             comment fmt do_output lexbuf;
-             comment fmt do_output lexbuf }
-  | "*)"   { if do_output then pp_print_string fmt "*)" }
-  | eof    { () }
-  | "\n"   { newline lexbuf;
-             if do_output then pp_print_char fmt '\n';
-             comment fmt do_output lexbuf }
-  | '"'    { if do_output then pp_print_string fmt "&quot;";
-             string fmt do_output lexbuf;
-             comment fmt do_output lexbuf }
-  | special as c
-           { if do_output then Pp.html_char fmt c;
-             comment fmt do_output lexbuf }
-  | "'\"'"
-  | _ as s { if do_output then pp_print_string fmt s;
-             comment fmt do_output lexbuf }
-
-and string fmt do_output = parse
-  | "\n"   { newline lexbuf;
-             if do_output then pp_print_char fmt '\n';
-             string fmt do_output lexbuf }
-  | '"'    { if do_output then pp_print_string fmt "&quot;" }
-  | special as c
-           { if do_output then Pp.html_char fmt c;
-             string fmt do_output lexbuf }
-  | "\\" _
-  | _ as s { if do_output then pp_print_string fmt s;
-             string fmt do_output lexbuf }
-
-and doc fmt block headings = parse
-  | ' '* "*)"
-           { if block then pp_print_string fmt "</p>\n" }
-  | eof    { () }
-  | "\n" space* "\n" { newline lexbuf;
-             newline lexbuf;
-             if block then pp_print_string fmt "</p>";
-             pp_print_char fmt '\n';
-             doc fmt false headings lexbuf }
-  | "\n"   { newline lexbuf;
-             pp_print_char fmt '\n';
-             doc fmt block headings lexbuf }
-  | '{' (['1'-'6'] as c) ' '*
-           { if block then pp_print_string fmt "</p>\n";
-             let n = Char.code c - Char.code '0' in
-             fprintf fmt "<h%d>" n;
-             doc fmt true (n::headings) lexbuf }
-  | '{''h' { if not block then pp_print_string fmt "<p>";
-             raw_html fmt 0 lexbuf; doc fmt true headings lexbuf }
-  | '{'    { if not block then pp_print_string fmt "<p>";
-             pp_print_char fmt '{';
-             doc fmt true (0::headings) lexbuf }
-  | '}'    { let brace r =
-               if not block then pp_print_string fmt "<p>";
-               pp_print_char fmt '}';
-               doc fmt true r lexbuf
-             in
-             match headings with
-              | [] -> brace headings
-              | n :: r ->
-                if n >= 1 then begin
-                  fprintf fmt "</h%d>" n;
-                  doc fmt (r <> []) r lexbuf
-                end else brace r
-           }
-  | '['    { if not block then pp_print_string fmt "<p>";
-             pp_print_string fmt "<code>";
-             scan_embedded fmt 0 lexbuf;
-             pp_print_string fmt "</code>";
-             doc fmt true headings lexbuf }
-  | ' '    { if block then pp_print_char fmt ' ';
-             doc fmt block headings lexbuf }
-  | special as c
-           { if not block then pp_print_string fmt "<p>";
-             Pp.html_char fmt c;
-             doc fmt true headings lexbuf }
-  | _ as c { if not block then pp_print_string fmt "<p>";
-             pp_print_char fmt c;
-             doc fmt true headings lexbuf }
-
-
-and raw_html fmt depth = parse
-  | "*)"  { backtrack lexbuf }
-  | eof    { () }
-  | "\n"   { newline lexbuf;
-             pp_print_char fmt '\n';
-             raw_html fmt depth lexbuf }
-  | '{'    { pp_print_char fmt '{'; raw_html fmt (succ depth) lexbuf }
-  | '}'    { if depth = 0 then () else
-               begin
-                 pp_print_char fmt '}';
-                 raw_html fmt (pred depth) lexbuf
-               end }
-  | _ as c { pp_print_char fmt c; raw_html fmt depth lexbuf }
-
-
-and extract_header = parse
-  | "(**" space* "{" ['1'-'6'] ([^ '}']* as header) "}"
-      { header }
-  | space+ | "\n"
-      { extract_header lexbuf }
-  | "(*"
-      { skip_comment lexbuf; extract_header lexbuf }
-  | eof | _
-      { "" }
-
-and skip_comment = parse
-  | "*)" { () }
-  | "(*" { skip_comment lexbuf; skip_comment lexbuf }
-  | eof  { () }
-  | _    { skip_comment lexbuf }
+  | _ as s     { pp_print_string fmt1 s;
+                 if is_code then pp_print_string fmt2 s;
+                 print_code fmt1 fmt2 is_code lexbuf }
 
 {
 
-  let do_file fmt fname =
-    current_file := fname;
+  let do_file fmt1 fmt2 fname =
+    (* current_file := fname; *)
     (* input *)
     let cin = open_in fname in
     let lb = Lexing.from_channel cin in
     lb.Lexing.lex_curr_p <-
       { lb.Lexing.lex_curr_p with Lexing.pos_fname = fname };
     (* output *)
-    pp_print_string fmt "<div class=\"why3doc\">\n<pre>";
-    scan fmt PrevEmpty lb;
-    pp_print_string fmt "</pre>\n</div>\n";
+    scan fmt1 fmt2 lb;
     close_in cin
-
-  let extract_header fname =
-    let cin = open_in fname in
-    let lb = Lexing.from_channel cin in
-    let h = extract_header lb in
-    close_in cin;
-    h
 
 }
 
 (*
 Local Variables:
-compile-command: "unset LANG; make -C ../.. bin/why3doc.opt"
+compile-command: "unset LANG; make -C ../.. bin/why3literate.opt"
 End:
 *)

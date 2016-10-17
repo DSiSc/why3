@@ -1431,6 +1431,56 @@ install_no_local::
 # TODO
 #install_local:: bin/why3doc
 
+##############
+# why3literate
+##############
+
+WHY3LITERATEGENERATED = src/why3lieterate/literate_lexer.ml
+
+WHY3LITERATE_FILES = literate_lexer literate_main
+
+WHY3LITERATEMODULES = $(addprefix src/why3literate/, $(WHY3LITERATE_FILES))
+
+WHY3LITERATEDEP = $(addsuffix .dep, $(WHY3LITERATEMODULES))
+WHY3LITERATECMO = $(addsuffix .cmo, $(WHY3LITERATEMODULES))
+WHY3LITERATECMX = $(addsuffix .cmx, $(WHY3LITERATEMODULES))
+
+$(WHY3LITERATEDEP): DEPFLAGS += -I src/why3literate
+$(WHY3LITERATECMO) $(WHY3LITERATECMX): INCLUDES += -I src/why3literate
+
+$(WHY3LITERATEDEP): $(WHY3LITERATEGENERATED)
+
+# build targets
+
+# TODO
+#byte: bin/why3doc.byte
+#opt:  bin/why3doc.opt
+
+bin/why3literate.opt: lib/why3/why3.cmxa $(WHY3LITERATECMX)
+	$(SHOW) 'Linking  $@'
+	$(HIDE)$(OCAMLOPT) $(OFLAGS) -o $@ $(OLINKFLAGS) $^
+
+bin/why3literate.byte: lib/why3/why3.cma $(WHY3LITERATECMO)
+	$(SHOW) 'Linking  $@'
+	$(HIDE)$(OCAMLC) $(BFLAGS) -o $@ $(BLINKFLAGS) $^
+
+# depend and clean targets
+
+ifneq "$(MAKECMDGOALS:clean%=clean)" "clean"
+-include $(WHY3LITERATEDEP)
+endif
+
+depend: $(WHY3LITERATEDEP)
+
+CLEANDIRS += src/why3literate
+GENERATED += $(WHY3LITERATEGENERATED)
+
+clean_old_install::
+	rm -f $(BINDIR)/why3literate$(EXE)
+
+install_no_local::
+	$(INSTALL) bin/why3literate.@OCAMLBEST@ $(TOOLDIR)/why3literate$(EXE)
+
 #########
 # trywhy3
 #########
