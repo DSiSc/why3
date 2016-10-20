@@ -65,6 +65,9 @@ why3.conf
 /bin/why3doc.byte
 /bin/why3doc.opt
 /bin/why3doc
+/bin/why3literate.byte
+/bin/why3literate.opt
+/bin/why3literate
 /bin/why3extract.byte
 /bin/why3extract.opt
 /bin/why3extract
