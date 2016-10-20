@@ -1,0 +1,1287 @@
+\documentclass[twoside, a4paper]{article}
+
+\usepackage{./actes}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{./why3lang}
+\usepackage{amsmath}
+\usepackage{cite}
+
+\newcommand{\noeud}{n\oe ud}
+\newcommand{\noeuds}{n\oe uds}
+\newcommand{\oeuvre}{\oe uvre}
+
+\newcommand{\why}{\textsf{Why3}\xspace}
+\newcommand{\whyml}{\textsf{WhyML}\xspace}
+
+\usepackage{hyperref}
+
+\title{Défonctionnaliser pour prouver}
+\author{Mário Pereira$^1$
+   \thanks{Ce travail est en partie soutenu par la Fondation des
+     Sciences et Technologie Portugaise (bourse
+     FCT-SFRH/BD/99432/2014) et par l'Agence National de Recherche Française
+     (projet VOCAL ANR-15-CE25-0008).}}
+% les titres de haut de pages
+\titlehead{Défonctionnaliser pour prouver}%  a droite (page impaire)
+\authorhead{Pereira}% a gauche (page paire)
+
+\affiliation{\begin{tabular}{rr}
+\\ 1:  Lab. de Recherche en Informatique,
+\\  Univ.~Paris-Saclay, CNRS, Orsay, F-91405 \\ et Inria Saclay --
+  Île-de-France, Orsay, F-91893\\
+  Mario.Parreira-Pereira@lri.fr
+\\ ~
+\end{tabular}}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+  Cet article explore l'idée d'utiliser la défonctionnalisation comme
+  une technique de preuve de programmes d'ordre supérieur. La
+  défonctionnalisation consiste à remplacer les valeurs fonctionnelles
+  par une représentation du premier ordre.  L'intérêt est alors de
+  pouvoir utiliser ensuite un outil de preuve de programmes existant,
+  sans lui ajouter de support pour l'ordre supérieur. Cet article
+  illustre et discute cette approche à l'aide de plusieurs exemples et
+  de l'outil de vérification déductive \why{}.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introduction}
+
+Un programme d'ordre supérieur est un programme qui utilise les
+fonctions comme des valeurs de première classe. Dans un tel programme,
+les fonctions peuvent être passées comme des arguments à d'autres
+fonctions ou renvoyées comme le résultat d'un certain calcul. Le
+concept d'ordre supérieur est largement connu et utilisé dans les
+langages dits \emph{fonctionnels}, tels que OCaml, Haskell ou SML.
+Plus récemment des langages tels que Java ou C++ ont introduit un
+support pour des fonctions d'ordre supérieur. %%% je suis pas sûr que
+                                %%% ça c'est exactement comme ça
+
+La preuve de correction de programmes d'ordre supérieur pose des défis
+complexes, en particulier dans le cadre de programmes avec des effets
+de bord. Certaines méthodologies
+existantes~\cite{nanevski08icfp,chargueraud11icfp} % portant sur la
+% preuve des programmes d'ordre supérieur avec des effets
+utilisent des assistants de preuve interactifs et un encodage des
+effets directement dans la logique de l'assistant de preuve. Dans le
+contexte de la preuve automatique de programmes, Kanig et
+Filliâtre~\cite{KanigFilliatre09wml} ont proposé un système de types
+et effets et un calcul de plus faibles préconditions pour spécifier et
+prouver la correction fonctionnelle de programmes d'ordre
+supérieur. Leur système semble néanmoins difficile à utiliser en
+pratique. %%% comment dire ça d'une bonne façon ???!!!
+
+Dans cet article, on propose une nouvelle méthodologie pour la
+vérification de programmes d'ordre supérieur qui comportent
+potentiellement des effets. On explore l'idée d'utiliser la technique
+de défonctionnalisation pour prouver de tels programmes. L'utilisation
+de la défonctionnalisation nous permet d'obtenir un programme du
+premier ordre équivalent au programme d'ordre supérieur original, ce
+qui nous ramène à un contexte de preuve de programmes du premier
+ordre. De cette façon, on peut utiliser des outils de preuve
+existants, sans avoir besoin de les étendre avec un support pour
+l'ordre supérieur. Cette technique présente comme limitation le fait
+qu'on doit connaître à l'avance toutes les fonctions qui seront
+utilisées comme des valeurs de première classe. Même si cela nous
+empêche d'appliquer cette technique pour prouver n'importe quel
+programme d'ordre supérieur, il semble exister, néanmoins, un ensemble
+intéressant et représentatif de programmes d'ordre supérieur auxquels
+on peut appliquer la défonctionnalisation pour prouver leur
+correction. Nous présentons notre approche à l'aide de plusieurs
+exemples écrits et vérifiés avec le système de preuve de programmes
+\why{}~\cite{filliatre13esop}.
+
+% contexte = preuve de programmes fonctionnels (OCaml) à l'aide de la
+% vérification déductive (Why3)
+
+% en particulier, on s'intéresse à des programmes contenant de l'ordre
+% supérieur, et possiblement des effets
+
+% en toute généralité, la preuve de programmes d'ordre supérieur (avec
+% effets) est difficile ; citer des travaux
+
+% dans cet article, on explore l'idée d'utiliser la technique de
+% défonctionnalisation pour prouver de tels programmes, avec plusieurs
+% exemples
+
+Le reste de l'article est organisé comme suit. La
+section~\ref{sec:defonctionnalisation} introduit la technique de
+défonctionnalisation à l'aide d'un exemple. Dans la
+section~\ref{sec:preuve-par-defonct} on explique en détail notre
+proposition d'utilisation de la défonctionnalisation comme un moyen de
+preuve. On illustre notre approche avec plusieurs exemples. L'article
+s'achève sur quelques perspectives et conclusions sur notre
+travail. Le développement \why\ présenté dans cet article peut être
+trouvé à l'adresse suivante : \url{http://www.lri.fr/~mpereira/defunc}.
+
+\section{Défonctionnalisation}
+\label{sec:defonctionnalisation}
+
+La défonctionnalisation est une technique de transformation des
+programmes d'ordre supérieur vers des programmes du premier
+ordre. Elle a été introduite par Reynolds~\cite{reynolds-98a} comme un
+moyen d'obtenir un interpréteur du premier ordre à partir d'un
+interpréteur d'ordre supérieur. Plus récemment, cette technique a été
+largement étudiée et utilisée par Danvy et ses
+étudiants~\cite{danvy01ppdp,danvy09scp}. En particulier, ils ont
+montré comment on peut dériver des machines abstraites pour
+différentes stratégies d'évaluation du lambda-calcul à partir
+d'interpréteurs compositionnels~\cite{DBLP:conf/ppdp/AgerBDM03}.
+
+Expliquons le principe de la défonctionnalisation à l'aide d'un
+exemple écrit en OCaml\footnote{Ce code peut être facilement adapté à
+  n'importe quel langage qui supporte les fonctions comme valeurs de
+  première classe.}. Considérons le programme qui calcule la hauteur
+d'un arbre binaire, écrit en style CPS~\cite{Plotkin75} :
+%% c'est pas redondant de dire 'style CPS' vu que
+%% le 'S' est déjà 'style' ?
+\begin{spec}
+  type 'a tree = E | N of 'a tree * 'a * 'a tree
+
+  let rec heigth_tree_cps (t: 'a tree) (k: int -> 'b) : 'b = match t with
+    | E -> k 0
+    | N (l, x, r) ->
+       heigth_tree_cps l (fun hl ->
+       heigth_tree_cps r (fun hr -> k (1 + max hl hr)))
+
+  let heigth_tree t = heigth_tree_cps t (fun x -> x)
+\end{spec}
+Ce programme à été sciemment écrit en style CPS pour éviter tout
+débordement de pile (\textit{stack overflow}), quelle que soit la
+forme de l'arbre.
+%% c'est pas redondant de dire 'style CPS' vu que
+%% le 'S' est déjà 'style' ?
+% À part de l'utilisation de l'ordre supérieur, un point intéressant sur ce
+% programme c'est qu'il ne fait jamais un débordement de pile
+% (\emph{stack-overflow}), même quand appliqué à un arbre avec une mauvaise
+% structure. En fait, on peut voir
+La transformation CPS est un moyen mécanique
+pour éviter les débordements de pile, dès lors que le compilateur
+optimise l'appel terminal.
+
+Remarquons la présence, dans la fonction \of{heigth_tree_cps}, de
+l'argument \of{k} du type \of{int -> 'b}. C'est l'utilisation de cet
+argument qui donne à \of{heigth_tree_cps} son caractère d'ordre
+supérieur. Cet argument joue le rôle d'une \emph{continuation},
+c'est-à-dire qu'avant de renvoyer son résultat, la fonction
+\of{heigth_tree_cps} le passe à \of{k}. Dans le cas d'un arbre vide
+(première branche du filtrage), par exemple, on applique \of{k} à 0 au
+lieu de renvoyer directement ce résultat.
+
+Notons les trois fonctions anonymes utilisées dans le code de ce
+programme. Dans l'appel \of{heigth_tree_cps l} la continuation
+\of{(fun hl -> ...)} est appliquée au résultat du calcul de la hauteur
+du sous-arbre gauche~\of{l}. L'argument~\of{hl} représente la hauteur
+de~\of{l} déjà calculée. À l'intérieur de cette continuation on trouve
+un deuxième appel récursif avec une autre continuation, cette fois
+pour le sous-arbre droit~\of{r}. Au moment d'appliquer la fonction
+anonyme \of{(fun hr -> ...)} on connaît déjà tous les ingrédients
+nécessaires pour calculer la hauteur de l'arbre initial~\of{t}. Encore
+une fois, on ne renvoie pas directement le résultat \of{1 + max hl
+  hr}, mais on le passe à \of{k}. La troisième fonction anonyme
+trouvée dans ce programme est la fonction identité \of{(fun x ->
+  x)}. L'application de cette fonction garantit que le résultat
+renvoyé par \of{heigth_tree t} est bien la hauteur de l'arbre \of{t}.
+
+Pour défonctionnaliser ce programme, il nous faut une représentation
+du premier ordre pour les trois abstractions utilisées. L'idée est de
+remplacer le type fonctionnel par un type algébrique, dans lequel on
+capture les valeurs des variables libres utilisées dans chaque
+fonction. Pour l'exemple ci-dessus, nous introduisons le type suivant
+:
+\begin{spec}
+  type 'a kont = Kid | Kleft of 'a tree * 'a | Kright of 'a kont * int
+\end{spec}
+Le constructeur \of{Kid} représente la fonction identité, et donc il
+n'y a pas de variables libres à capturer. Les constructeurs \of{Kleft}
+et \of{Kright} représentent, respectivement, les fonctions \of{(fun hl
+  -> ...)} et \of{(fun hr -> ...)}. Leurs arguments capturent les
+variables libres utilisées dans chacune de ces deux fonctions. Dans le
+cas de \of{Kleft} on garde le sous-arbre \of{r} et la continuation
+\of{k}; dans le cas de \of{Kright} le premier argument est la valeur
+de \of{k} et le deuxième représente \of{hl}, la hauteur du sous-arbre
+gauche.
+
+\begin{figure}[t]
+  \centering
+  \begin{spec}
+  type 'a tree = E | N of 'a tree * 'a * 'a tree
+
+  type 'a kont = Kid | Kleft of 'a tree * 'a kont | Kright of 'a kont * int
+
+  let rec apply (k: 'a kont) arg = match k with
+    | Kid -> let x = arg in x
+    | Kleft (r, k) -> let hl = arg in heigth_tree_cps r (Kright (k, hl))
+    | Kright (k, hl) -> let hr = arg in apply k (1 + max hl hr)
+  and heigth_tree_cps t (k: 'a kont) = match t with
+    | E -> apply k 0
+    | N (l, x, r) -> heigth_tree_cps l (Kleft (r, k))
+
+  let heigth_tree t = heigth_tree_cps t Kid
+  \end{spec}
+  \caption{Programme qui calcule la hauteur d'un arbre,
+    défonctionnalisé.}
+  \label{fig:heigth_tree_cps_def}
+\end{figure}
+
+Ayant entre les mains une représentation du premier ordre pour les
+abstractions, remplaçons toutes les abstractions par le constructeur
+de \of{'a kont} correspondants :
+\begin{spec}
+  let rec heigth_tree_cps t (k: kont 'a) = match t with
+    | E -> ??? (* application de k *?\textit{défonctionnalisé à}?* son argument *)
+    | N (l, x, r) -> heigth_tree_cps l (Kleft (r, k))
+
+  let heigth_tree t = heigth_tree_cps t Kid
+\end{spec}
+
+La deuxième étape du processus de défonctionnalisation consiste à
+introduire une fonction \of{apply} pour remplacer les applications
+dans le programme de départ. Cette fonction prend en argument une
+valeur du type \of{kont 'a} sur laquelle elle va réaliser une analyse
+par cas. Selon le constructeur, la fonction \of{apply} exécute le code
+de l'abstraction qui correspond à ce constructeur. L'argument de
+l'application est passé à \of{apply} comme un second argument.
+% Un deuxième
+% argument est donné à \of{apply}, la valeur de l'argument que nous
+% appliquerions à les abstractions originelles.
+La fonction \of{apply}
+pour notre exemple est la suivante :
+\begin{spec}
+  let rec apply (k: kont 'a) arg = match k with
+    | Kid -> let x = arg in x
+    | Kleft (r, k) -> let hl = arg in heigth_tree_cps r (Kright (k, hl))
+    | Kright (k, hl) -> let hr = arg in apply k (1 + max hl hr)
+\end{spec}
+
+Pour obtenir le programme complètement défonctionnalisé, il suffit de
+remplacer toutes les applications de la continuation \of{k} par des
+appels à la fonction \of{apply}. La
+figure~\ref{fig:heigth_tree_cps_def} contient le code complet pour cet
+exemple.
+
+% citer Reynolds et Danvy
+
+% expliquer ce qu'est la défonctionnalisation, en prenant l'exemple de
+% la fonction height dans sa version CPS (faire remarquer en passant
+% pourquoi il est intéressant de l'écrire ainsi)
+
+% code OCaml de height_cps
+
+% code OCaml du type kont et height + apply
+% trouver un meilleur nom que kont
+
+\section{Preuve par défonctionnalisation}
+\label{sec:preuve-par-defonct}
+
+Dans cette section on explore l'idée d'utiliser la
+défonctionnalisation comme une technique de preuve pour des programmes
+d'ordre supérieur avec effets. Notre proposition est la suivante :
+\begin{enumerate}
+\item étant donné un programme d'ordre supérieur (possiblement avec
+  effets), on lui ajoute une spécification logique.
+\item % à travers d'un moyen mécanique,
+  on défonctionnalise le programme et on traduit en même temps sa
+  spécification pour qu'elle devienne une spécification du programme
+  défonctionnalisé.
+\item on utilise un outil de preuve de programmes existant pour
+  prouver le programme défonctionnalisé.
+% \item par la correction de la technique de
+%   défonctionnalisation~\cite{DBLP:conf/tacs/BanerjeeHR01}, si nous arrivons à
+%   prouver que le programme défonctionnalisé respecte sa spécification, alors le
+%   programme d'ordre supérieur respect aussi la spécification de départ.
+\end{enumerate}
+On illustre cette proposition sur plusieurs exemples : le programme
+qui calcule la hauteur d'un arbre
+(section~\ref{sec:hauteur-dun-arbre}) ; un programme qui calcule le
+nombre d'éléments distincts d'un arbre
+(section~\ref{sec:nombre-delem-diff}) ; un interpréteur à petits pas
+pour un petit langage (section~\ref{sec:interpr-petits-pas}). % ; une
+% application du \noeud\ de Landin (section~\ref{sec:le-noeud-de}).
+
+Nos expériences sont réalisées à l'aide de l'outil de vérification
+déductive \why{}. Comme à l'heure actuelle \why\ ne permet pas de
+raisonner sur des programmes d'ordre supérieur, tous les exemples
+portant sur la spécification et preuve de programmes d'ordre supérieur
+sont écrits dans un système hypothétique qu'on peut voir comme une
+extension de \why{}.
+
+% Les exemples d'ordre supérieur présentés dans cette section sont
+% écrits dans un langage de programmation et spécification que si
+% rapprochent à celles du système \why{}. Comme à heure actuel \why\ ne
+% permet pas de raisonner sur des programmes d'ordre supérieur tous les
+% exemples portant sur la spécification et preuve des programmes d'ordre
+% supérieur sont écrits dans un système hypothétique, qu'on peut voir
+% comme une extension de \why\ actuel.
+
+% idée générale : on écrit des ensures dans le programme d'ordre
+% supérieur, puis on construit automatiquement un programme du premier
+% ordre (avec type kont, fonction apply, etc.)
+
+% on illustre l'idée sur plusieurs exemples, à commeancer par l'exemple
+% de la section précédente
+
+\subsection{Hauteur d'un arbre}
+\label{sec:hauteur-dun-arbre}
+
+\begin{code}
+module TreeHeight
+  use import int.Int
+  use import int.MinMax
+  use import bintree.Tree
+  use import bintree.Height
+\end{code}
+
+Reprenons l'exemple de la section~\ref{sec:defonctionnalisation}. Pour
+spécifier ce programme, on doit fournir des contrats pour les
+fonctions \of{heigth_tree_cps} et \of{heigth_tree}. La fonction
+\of{heigth_tree} renvoie la hauteur de l'arbre \of{t} passé en
+argument, comme on le spécifie dans sa postcondition :
+\begin{spec}
+  let heigth_tree (t: tree 'a) : int
+    ensures { result = height t }
+  = heigth_tree_cps t (fun x -> x)
+\end{spec}
+Ici \of{result} est un mot-clé de \why\ pour représenter la valeur
+renvoyée et \of{height} est une fonction logique qui donne la hauteur
+d'un arbre.
+
+La valeur renvoyée par la fonction \of{height_tree_cps} est le
+résultat de l'application de la continuation~\of{k} à la hauteur de
+l'arbre~\of{t}. Ce serait naturel de donner à \of{height_tree_cps} la
+postcondition suivante :
+\begin{spec}
+    ensures { result = k (height t) }
+\end{spec}
+Cependant, cette spécification pose le problème d'interpréter
+l'utilisation de fonctions du programme dans la logique. En toute
+généralité, une telle utilisation peut facilement produire des
+incohérences logiques, puisque les fonctions du programme peuvent
+avoir des effets ou ne pas terminer. On fait alors le choix de
+restreindre notre langage de spécification : on s'autorise à utiliser
+des noms des fonctions du programme, mais on impose une barrière
+d'abstraction entre le monde logique et le programme. Pour cela, on
+adopte un système dans lequel les fonctions sont abstraites par une
+paire de prédicats qui représente leur précondition et
+postcondition~\cite{regis-gianas-pottier-08}. Ainsi, à l'intérieur
+d'une formule logique, une fonction~$f$ de type
+$\tau_1\rightarrow\tau_2$ devient une paire de prédicats :
+\[
+  \begin{array}{rl}
+    \mathtt{pre} \: f : & \tau_1 \rightarrow \mathtt{prop} \\
+    \mathtt{post} \: f : & \tau_1 \rightarrow \tau_2 \rightarrow \mathtt{prop}
+  \end{array}
+\]
+On utilise $\mathtt{pre}\: f$ et $\mathtt{post}\: f$ pour faire
+référence à la précondition et à la postcondition de~$f$,
+respectivement.
+% La première composante de cette paire est la
+% précondition de la fonction. La seconde composante est la
+% postconditon, paramétrée par le même type $\tau_1$ de l'argument de la
+% fonction et $\tau_2$ de la valeur renvoyée par cette fonction.
+
+Revenons à l'exemple de la hauteur d'un arbre. Nous pouvons donc
+écrire, avec la notation ci-dessus, le contrat suivant pour la
+fonction \of{height_tree_cps} :
+\begin{spec}
+  let rec height_tree_cps (t: tree 'a) (k: int -> 'b) : 'b
+    ensures { post k (height t) result }
+\end{spec}
+Cette postconditon impose une relation entre la valeur qui est passée
+à~\of{k} (la hauteur de \of{t}) et le résultat renvoyé
+(\of{result}). En suivant cette méthode, on peut aussi donner des
+contrats aux fonctions anonymes utilisées à l'intérieur de
+\of{height_tree_cps} :
+\begin{spec}
+  let rec heigth_tree_cps (t: tree 'a) (k: int -> 'b) : 'b
+    ensures { post k (heigth t) result }
+  = match t with
+    | Empty -> k 0
+    | Node l x r ->
+       heigth_tree l (fun hl -> ensures { post k (1 + max hl (height r)) result }
+       heigth_tree r (fun hr -> ensures { post k (1 + max hl hr) result }
+         k (1 + max hl hr)))
+    end
+\end{spec}
+Pour la première abstraction, on spécifie que le résultat de son
+application est en relation avec la hauteur de l'arbre, en utilisant
+la hauteur \of{hl} du sous-arbre gauche et la hauteur du sous-arbre
+droit, qu'on n'a pas encore calculée. On ajoute à la deuxième
+abstraction une postcondition similaire, à ceci près qu'au moment
+d'appliquer cette fonction on connaît déjà la hauteur \of{hr}.
+
+% Comme on l'avait dit au début de cette section,
+On va maintenant défonctionnaliser ce programme, avec sa
+spécification, pour ensuite le prouver à l'aide de l'outil \why{}.  Le
+code obtenu est le suivant :
+\begin{code}
+  type kont 'a = Kid | Kleft (tree 'a) (kont 'a) | Kright int (kont 'a)
+
+  let rec heigth_tree_cps (t: tree 'a) (k: kont 'a) : int
+    ensures { post k (height t) result }
+  = match t with
+    | Empty -> apply k 0
+    | Node l _ r -> heigth_tree_cps l (Kleft r k)
+    end
+  with apply (k: kont 'a) (arg: int) : int
+    ensures  { post k arg result }
+  = match k with
+    | Kid -> arg
+    | Kleft r k -> heigth_tree_cps r (Kright arg k)
+    | Kright hl k -> apply k (1 + max hl arg)
+    end
+
+  let height_tree (t: tree 'a) : int
+    ensures { result = height t }
+  = heigth_tree_cps t Kid
+\end{code}
+On peut noter qu'il n'y a pas de différence avec le programme OCaml de
+la figure~\ref{fig:heigth_tree_cps_def}, si ce n'est la syntaxe de
+\why{} et les annotations logiques. Notamment, les fonctions
+\of{heigth_tree_cps} et \of{heigth_tree} restent quand même des
+fonctions mutuellement récursives.
+
+La spécification du programme défonctionnalisé est la même que celle
+du programme de départ. En particulier, on a gardé notre utilisation
+de la projection~\of{post} pour la postcondition de
+\of{heigth_tree_cps}. Il nous faut aussi donner une spécification à la
+fonction~\of{apply}, qui est nouvelle.  Comme la fonction~\of{apply}
+simule l'application d'une fonction à son argument, la seule
+spécification qu'on peut lui donner est que sa postcondition est bien
+la postcondition de la fonction~\of{k}. De même, la précondition
+pour~\of{apply} serait la précondition de~\of{k} et on pourrait y
+accéder en utilisant la projection~\of{pre}. On a choisit de ne pas le
+faire, vu qu'il s'agit ici de la précondition triviale.
+
+Enfin, il nous faut introduire le prédicat \of{post} dans notre
+spécification logique. Pour faire cela, on crée un prédicat \of{post}
+qui rassemble les postconditions fournies dans le programme de
+départ. Un peu comme pour la fonction \of{apply}, ce prédicat effectue
+un filtrage sur le type algébrique \of{kont 'a} et pour chaque
+constructeur on copie la postcondition donnée dans l'abstraction
+correspondante. Ici, le prédicat \of{post} est le suivant :
+\begin{code}
+  predicate post (k: kont 'a) (arg result: int) = match k with
+   | Kid -> let x = arg in x = result
+   | Kleft r k' -> let hl = arg in post k' (1 + max hl (height r)) result
+   | Kright hl k' -> let hr = arg in post k' (1 + max hl hr) result
+   end
+\end{code}
+Pour la postcondition du constructeur \of{Kid} on utilise la
+postcondition triviale \of{result = x}. Cette formule est la
+postcondition la plus forte de cette fonction; on pourrait ici
+l'inférer automatiquement. Quand on passe ce programme à \why\ toutes
+les obligations de preuve générées sont automatiquement prouvées en
+utilisant des démonstrateurs SMT.
+
+Nous voulons faire ici une remarque importante : la façon dont nous
+avons défonctionnalisé notre programme et sa spécification, en
+particulier la façon de construire le prédicat \of{post} et le contrat
+pour la fonction \of{apply}, peut être mécanisée. Nous pourrions tout
+à fait imaginer un outil qui prend un programme d'ordre supérieur
+annoté, qui le défonctionnalise et qui l'envoie ensuite à l'outil
+\why{}.
+
+\paragraph{Terminaison.} Un aspect important qui n'a pas été traité
+dans cet exemple est la preuve de terminaison. Il est possible de
+prouver que le programme défonctionnalisé termine en le spécifiant
+avec des mesures appropriées. Pour cela, on introduit des fonctions
+logiques pour compter le nombre de \noeuds\ d'un arbre et des
+constructeurs du type \of{kont 'a}. Ces mesures sont assez subtiles et
+nécessitent un peu d'imagination :
+\begin{code}
+  function var_tree (t: tree 'a) : int = match t with
+    | Empty -> 1
+    | Node l _ r -> 3 + var_tree l + var_tree r
+    end
+
+  function var_kont (k: kont 'a) : int = match k with
+    | Kid -> 0
+    | Kleft r k -> 2 + var_tree r + var_kont k
+    | Kright _ k -> 1 + var_kont k
+    end
+\end{code}
+On prouve qu'effectivement ces fonctions peuvent être utilisées comme
+des mesures de décroissance, vu qu'elles ne dépassent jamais une
+valeur minimum :
+\begin{code}
+  lemma var_tree_nonneg: forall t: tree 'a. var_tree t >= 0
+
+  lemma var_kont_k_nonneg: forall k: kont 'a. var_kont k >= 0
+
+end
+\end{code}
+Il nous reste à ajouter des annotations de terminaison appropriées
+dans notre programme :
+\begin{spec}
+  let rec height (t: tree 'a) (k: kont 'a) : int
+    variant { var_tree t + var_kont k }
+    ...
+  with apply (k: kont 'a) (arg: int) : int
+    variant { var_kont k }
+    ...
+\end{spec}
+Toutes les obligations de preuve générées concernant la terminaison
+sont aussi automatiquement prouvées.
+
+Il serait intéressant d'avoir un mécanisme pour écrire une
+spécification sur la terminaison d'un programme d'ordre supérieur et
+la traduire automatiquement, tel qu'on l'a fait pour le prédicat
+\of{post}.
+
+% Discuter le problème de la terminaison dans un second temps
+
+\subsection{Nombre d'éléments distincts dans un arbre}
+\label{sec:nombre-delem-diff}
+
+\begin{code}
+module DiffElts
+  use import set.Fset
+  use import bintree.Tree
+  use import ref.Ref
+
+\end{code}
+
+% une variante de l'exemple précédent avec des effets de bord
+
+Le prochain exemple est celui du calcul du nombre d'éléments distincts
+d'un arbre binaire. On adopte un style CPS pour éviter les
+débordements de pile. Ce programme diffère de celui de la section
+précédente par la présence d'effets de bord. On utilise un ensemble
+mutable (une référence vers un ensemble fini) pour stocker les
+éléments déjà vus. À la fin du programme, on renvoie le cardinal de
+cet ensemble et on obtient donc le nombre d'éléments distincts d'un
+arbre. Voici le code \why\ :
+\begin{spec}
+  let n_distinct_elements (t: tree 'a) : int =
+    let h = ref empty in
+    let rec distinct_elements_loop (t: tree 'a) (k: unit -> unit) : unit =
+      match t with
+      | Empty -> k ()
+      | Node l x r ->
+         h := add x !h;
+         distinct_elements_loop l (fun () ->
+         distinct_elements_loop r (fun () -> k ()))
+      end
+    in
+    distinct_elements_loop t (fun x -> x);
+    cardinal !h
+\end{spec}
+Les opérations sur les ensembles utilisées dans ce programme
+sont issues de la bibliothèque standard de \why{}. Les continuations
+présentes dans ce programme sont utilisées de manière similaire à
+celles du programme de la section~\ref{sec:hauteur-dun-arbre}. On
+traite le sous-arbre gauche dans l'appel \of{diff_elements_loop l (fun
+  () -> ...)}; le sous-arbre droit dans \of{diff_elements_loop r (fun
+  () -> ...)}; pour assurer qu'on renvoie le résultat correct, le
+premier appel à \of{diff_elements_loop} depuis \of{diff_elements} est
+fait avec la fonction identité.
+% La constante \of{empty} représente l'ensemble
+% vide, $\mathtt{add}\: x \: s$ ajoute l'élément $x$ à l'ensemble $s$
+% (s'il n'est pas encore là) et $\mathtt{cardinal}\: s$ renvoie le
+% cardinal de l'ensemble $s$.
+
+Étant écrit en style CPS, ce programme combine l'utilisation de
+l'ordre supérieur avec des effets de bord. On doit donc prendre en
+compte la notion d'état du programme dans sa spécification. Pour
+faire cela, on modifie la représentation des fonctions au niveau
+logique, comme dans la thèse de J.~Kanig~\cite{kanig10these}. On
+introduit d'abord un nouveau type \of{state} et on étend le type des
+fonctions dans la logique comme suit :
+\[
+  \begin{array}{rl}
+    \mathtt{pre} \: f : & \tau_1 \rightarrow\mathtt{state}\rightarrow\mathtt{prop} \\
+    \mathtt{post} \: f : &
+      \tau_1\rightarrow\mathtt{state}\rightarrow\mathtt{state}\rightarrow\tau_2
+                           \rightarrow \mathtt{prop}
+  \end{array}
+\]
+L'argument supplémentaire de la précondition correspond à l'état au
+moment de l'appel de la fonction. Les deux arguments supplémentaires
+de la postcondition représentent, respectivement, l'état \emph{avant}
+et \emph{après} l'exécution de la fonction. La nature du type
+\of{state} dépendra des fonctions considérées. Pour cet exemple,
+l'état est réduit à \of{set 'a}.
+%  Chacun de ces arguments va
+% considère juste les variables pertinentes pour l'exécution de la
+% fonction.
+
+Revenons au code de la fonction \of{diff_elements}. % Les seules effets
+% produits dans cet exemple sont les accès (pour écriture et lecture) à
+% la référence~\of{h}. Ainsi, on peut définir le type \of{state} comme
+% étant le type des valeurs pointés par~\of{h} :
+% \begin{spec}
+%   type state = set 'a
+% \end{spec}
+Pour spécifier les fonctions \of{diff_elements} et
+\of{diff_elements_loop} on introduit d'abord une fonction logique
+\of{set_of_tree}. Cette fonction calcule l'union de l'ensemble des
+éléments d'un arbre avec un ensemble~\of{s} donné, qui joue le rôle
+d'accumulateur :
+\begin{code}
+  function set_of_tree (t: tree 'a) (s: set 'a) : set 'a = match t with
+    | Empty -> s
+    | Node l x r -> set_of_tree r (set_of_tree l (add x s))
+    end
+\end{code}
+Pour calculer l'ensemble des éléments d'un arbre, il suffit d'appeler
+\of{set_of_tree} avec l'ensemble vide comme second argument. On donne le
+contrat suivant à la fonction \of{n_distinct_elements} :
+\begin{spec}
+  let n_distinct_elements (t: tree 'a) : int
+    ensures { result = cardinal (set_of_tree t empty) }
+\end{spec}
+On spécifie \of{distinct_elements_loop} et les continuations utilisées de
+façon similaire :
+\begin{spec}
+  let rec distinct_elements_loop (t: tree 'a) (k: unit -> unit) : unit
+    ensures { post k () (set_of_tree t (old !h)) !h () }
+  = match t with
+    | Empty -> k ()
+    | Node l x r ->
+       h := add x !h;
+       distinct_elements_loop l (fun () -> ensures { post k () (set_of_tree r (old !h)) !h () }
+       distinct_elements_loop r (fun () -> ensures { post k () (old !h) !h () }
+         k ()))
+    end
+\end{spec}
+La postcondition de \of{distinct_elements_loop} mérite une explication
+détaillée. Due au fait qu'on utilise la continuation~\of{k} à
+l'intérieur de \of{distinct_elements_loop}, la postcondition de cette
+fonction dépend de la postcondition de~\of{k}. Il faut alors
+caractériser l'état du programme quand on appelle~\of{k} et l'état
+après son exécution. Ce dernier est l'état après l'exécution toute
+entière de la fonction \of{distinct_elements_loop}, représenté par la
+valeur contenue dans la référence~\of{h}. L'état initial est plus
+subtil. Rappelons-nous qu'au moment d'appliquer~\of{k} ou aura déjà
+parcouru tout l'arbre~\of{t}. Alors, l'état avec lequel on
+appelle~\of{k} est l'ensemble de tous les éléments de~\of{t} réunis
+avec la valeur contenue dans~\of{h} au moment de l'appel à
+\of{distinct_elements_loop}. On récupère cette valeur en utilisant
+l'étiquette \of{old} de \why{}, ce qui nous permet d'accéder à la
+valeur contenue dans une référence à l'entrée d'une fonction.
+
+La spécification des continuations utilisées à l'intérieur des appels
+récursifs à \of{distinct_elements_loop} suit le raisonnement qu'on
+vient de décrire. Les postconditions de ces deux abstractions
+dépendent aussi de la postcondition de~\of{k}. Dans l'appel
+\of{distinct_elements_loop l}, on spécifie dans la postcondition de sa
+continuation que l'état avec lequel on appellera la continuation est
+\of{set_of_tree r (old !h)}. Ici, \of{old !h} représente l'état avant
+d'appeler la continuation, c'est-à-dire après avoir parcouru le
+sous-arbre~\of{l}. Comme cette continuation est utilisée pour
+parcourir tout le sous-arbre droit, alors au moment d'appliquer~\of{k}
+la référence~\of{h} contiendra l'ensemble des éléments distincts
+de~\of{r} réunis avec l'ensemble des éléments distincts de~\of{l}
+et~\of{x} ajouté initialement.  Finalement, pour
+\of{distinct_elements_loop r}, sa continuation ne fait
+qu'appeler~\of{k} et on fait donc cet appel avec l'état
+initial~\of{old !h}, qui est l'état exactement avant d'appeler~\of{k}.
+
+Pour défonctionnaliser ce programme et traduire sa spécification, on
+commence par introduire le type algébrique qui représente les
+continuations :
+\begin{code}
+  type kont 'a = Kid | Kleft (tree 'a) (kont 'a) | Kright (kont 'a)
+\end{code}
+Les seules effets produits dans cet exemple sont les accès (en
+écriture et lecture) à la référence~\of{h}. Ainsi, on peut définir le
+type \of{state} comme étant le type des valeurs pointées par~\of{h} :
+\begin{code}
+  type state 'a = set 'a
+\end{code}
+Finalement, on introduit le prédicat \of{post} :
+\begin{code}
+  predicate post (k: kont 'a) (arg: unit) (old cur: state 'a) (result: unit)
+  = match k with
+    | Kid -> let () = arg in old == cur
+    | Kleft r k -> let () = arg in post k () (set_of_tree r old) cur result
+    | Kright k -> let () = arg in post k () old cur result
+    end
+\end{code}
+Pour le cas de la fonction identité, ce prédicat spécifie que l'état
+de sortie de la fonction est le même qu'à l'entrée. Le symbole
+\of{(==)} représente l'égalité extensionnelle de deux ensembles. En
+utilisant cette définition de \of{post}, on produit la fonction
+\of{apply} avec sa spécification. On arrive ainsi au code suivant :
+\begin{code}
+  let n_distinct_elements (t: tree 'a) : int
+    ensures { result = cardinal (set_of_tree t empty) }
+  = let h = ref empty in
+    let rec apply (k: kont 'a) (arg: unit) : unit
+      ensures { post k arg (old !h) !h () }
+    = match k with
+      | Kid -> let x = arg in x
+      | Kleft r k -> let _ = arg in distinct_elements_loop r (Kright k)
+      | Kright k -> let _ = arg in apply k arg
+      end
+    with distinct_elements_loop (t: tree 'a) (k: kont 'a) : unit
+      ensures { post k () (set_of_tree t (old !h)) !h () }
+    = match t with
+      | Empty -> apply k ()
+      | Node l x r ->
+         h := add x !h;
+         distinct_elements_loop l (Kleft r k)
+      end
+    in
+    distinct_elements_loop t Kid;
+    cardinal !h
+\end{code}
+% On note que les fonctions \of{diff_elements_loop} et \of{apply} sont
+% mutuellement récursifs.
+Une fois passé à \why{}, toutes les obligations de preuve engendrées
+pour ce programme sont automatiquement prouvées. La terminaison de ce
+programme pourrait aussi être prouvée, en utilisant des arguments de
+terminaison identiques à ceux qu'on a utilisés pour l'exemple
+précédent. En fait, les mesures de décroissance introduites pour le
+programme de la section précédente pourraient aussi être utilisées
+pour ce programme, à la différence près des deux types \of{kont}.
+
+\begin{code}
+end
+\end{code}
+
+\subsection{Interprète à petits pas}
+\label{sec:interpr-petits-pas}
+
+\begin{code}
+module SmallStepInterp
+
+  use import int.Int
+
+\end{code}
+
+Le dernier exemple qu'on présente est celui d'un interpréteur à petits
+pas pour un mini langage d'expressions arithmétiques. Il s'agit d'un
+langage limité aux littéraux et à des soustractions :
+\begin{code}
+  type exp = Const int | Sub exp exp
+\end{code}
+On peut munir ce langage avec une notion d'évaluation d'une expression
+vers une valeur. On la définit comme une fonction logique \of{eval} :
+% Pour caractériser le résultat de l'application de \of{head_reduction}
+% à un redex~\of{e} il nous faut une notion d'évaluation des expressions
+% vers une valeur.
+\begin{code}
+  function eval (e: exp) : int = match e with
+    | Const n -> n
+    | Sub e1 e2 -> (eval e1) - (eval e2)
+    end
+\end{code}
+Cette fonction est la sémantique naturelle (à grands pas) pour notre
+langage.
+
+Pour définir notre relation de réduction, on commence par définir la
+relation $\xrightarrow \epsilon$, correspondant à une réduction en
+tête d'une expression. Pour ce langage, il y a qu'une seule règle de
+réduction en tête :
+\[
+\mathtt{Sub} \; (\mathtt{Const}\: \mathtt{v_1})\; (\mathtt{Const}\: \mathtt{v_2})  \quad
+\xrightarrow \epsilon \quad \mathtt{Const}\: (\mathtt{v_1 - v_2})
+\]
+Pour traduire $\xrightarrow \epsilon$ en \why\ on introduit une
+fonction \of{head_reduction} :
+%pas d'implantation car sinon il faudrais expliquer 'absurd'
+\begin{spec}
+  let head_reduction (e: exp) : exp = match e with
+    | Sub (Const v1) (Const v2) -> Const (v1 - v2)
+    | _ -> absurd
+    end
+\end{spec}
+La seconde branche du filtrage représente le cas où l'expression
+passée en argument n'est pas un redex. Comme on souhaite appliquer
+\of{head_reduction} uniquement à des expressions qui peuvent être
+réduites en tête, on utilise le mot-clé \of{absurd} de \why\ pour
+marquer cette branche comme un point inaccessible du code. Pour
+prouver que cette branche est effectivement inatteignable\footnote{La
+  construction \of{absurd} exige de prouver faux.}, il faut exiger que
+l'argument passé à \of{head_reduction} soit un redex. Pour cela, on
+introduit le prédicat \of{is_redex} :
+\begin{code}
+  predicate is_redex (e: exp) = match e with
+    | Sub (Const _) (Const _) -> true
+    | _ -> false
+    end
+\end{code}
+On peut maintenant ajouter à \of{head_reduction} la précondition
+souhaitée :
+\begin{spec}
+  let head_reduction (e: exp) : exp
+    requires { is_redex e }
+    ...
+\end{spec}
+Le résultat de l'appel \of{head_reduction e} est une
+expression~\of{e'} dont sa valeur est la même que celle de~\of{e}. On
+ajoute à \of{head_reduction} une postcondition qui spécifie exactement
+ce raisonnement :
+\begin{code}
+  let head_reduction (e: exp) : exp
+    requires { is_redex e }
+    ensures  { eval result = eval e }
+  = match e with
+    | Sub (Const v1) (Const v2) -> Const (v1 - v2)
+    | _ -> absurd
+    end
+\end{code}
+On peut montrer facilement que la fonction \of{head_reduction}
+respecte la spécification donnée.
+
+Pour réduire en profondeur, on introduit la règle d'inférence
+\[
+\frac{\mathtt{e}\xrightarrow \epsilon \mathtt{e'}}{C[\mathtt{e}]\rightarrow C[\mathtt{e'}]}
+\]
+où $C$ représente un contexte de réduction, qui est défini par la
+grammaire suivante :
+\[
+  \begin{array}{crl}
+    C & ::= & \square \\
+      & |   & C[\mathtt{Sub} \; \square \; \mathtt{e}] \\
+      & |   & C[\mathtt{Sub} \; (\mathtt{Const} \: \mathtt{v}) \; \square]
+  \end{array}
+\]
+Le symbole $\square$ représente le trou. On définit $C[\mathtt{e}]$
+comme étant le contexte $C$ dans lequel le trou à été remplacé par
+l'expression~\of{e} et on appelle cette opération
+\emph{composition}. Le résultat de cette opération est une
+expression. La grammaire présentée induit une construction des
+contextes de bas en haut. Tels qu'on les a choisis, les contextes
+imposent ici une évaluation en appel par valeur et de gauche à droite.
+
+Le point intéressant de cet exemple est la façon que nous allons
+choisir de représenter les contextes. Au lieu de représenter un
+contexte comme un type algébrique à trois constructeurs, on choisit
+ici de représenter un contexte par une fonction. Un contexte~\of{c}
+est ainsi une fonction qui prend en argument une expression~\of{e} et
+qui renvoie l'expression obtenue en remplaçant le trou de~\of{c} par
+l'expression~\of{e} :
+\begin{spec}
+  type context = exp -> exp
+\end{spec}
+Le contexte vide, le trou, est représenté par la fonction identité :
+\begin{spec}
+  let hole = fun x -> x
+\end{spec}
+Les contextes pour une réduction sur le premier ou sur le second
+argument de \of{Sub} sont représentés, respectivement, comme suit :
+\begin{spec}
+  let sub_left e2 c = fun e1 -> c (Sub e1 e2)
+  let sub_right v c = fun e1 -> c (Sub (Const v) e1)
+\end{spec}
+Cette façon de représenter les contextes nous amène à un code d'ordre
+supérieur élégant, plus compact qu'un code utilisant un type concret
+pour les contextes, tel qu'on le verra par la suite.
+
+Les contextes étant définis, la prochaine étape pour implémenter un
+interprète à petits pas pour notre langage consiste à implémenter une
+fonction qui décompose une expression~\of{e} en un redex~\of{e'} et un
+contexte~$C$ tel que $C[\mathtt{e'}]=\mathtt{e}$. Pour notre langage
+cette décomposition est unique. Cette fonction utilise une fonction
+récursive auxiliaire \of{decompose_term}, dont le code \why\ est le
+suivant :
+\begin{spec}
+  let rec decompose_term (e: exp) (c: context) : (context, exp) = match e with
+    | Const _ -> absurd
+    | Sub (Const v1, Const v2) -> (c, e)
+    | Sub (Const v, e) -> decompose_term (fun x -> c (Sub (Const v) x)) e
+    | Sub (e1, e2) -> decompose_term (fun x -> c (Sub x e2)) e1
+    end
+\end{spec}
+Expliquons plus en détail le fonctionnement de la fonction
+\of{decompose_term}. Cette fonction prend en argument un
+contexte~\of{c} et une expression~\of{e} qu'il faut décomposer. Pour
+cela, on procède par une analyse par cas sur la forme de
+l'expression~\of{e}. On ne peut pas décomposer une valeur, alors on
+utilise \of{absurd} pour marquer la première branche comme
+innatteignable. Si l'expression est de la forme \of{Sub (Const v1)
+  (Const v2)}, elle est un redex. Dans ce cas-ci, on a trouvé la
+décomposition qu'on cherchait et la fonction renvoie ce redex et le
+contexte~\of{c}. Si, en revanche, il y a dans~\of{e} des
+sous-expressions qu'on peut encore réduire, alors on continue le
+processus de décomposition. Si la première sous-expression de \of{Sub}
+est déjà réduite, on continue la décomposition sur la seconde
+sous-expression avec un nouveau contexte de réduction sur la seconde
+sous-expression. Si la première sous-expression de \of{Sub} n'est pas
+encore réduite, la décomposition continue avec un contexte de
+réduction sur la première sous-expression\footnote{Le lecteur peut
+  remarquer qu'on a expansé le code de \of{hole}, \of{sub_left} et
+  \of{sub_right} pour construire les contextes.}.
+
+On présente ensuite la spécification logique pour la fonction
+\of{decompose_term}. On veut appliquer \of{decompose_term} uniquement
+à des expressions qui sont pas encore des valeurs. À cet effet, on
+introduit une fonction logique \of{is_value} qui teste si une
+expression est une constante :
+\begin{code}
+  predicate is_value (e: exp) = match e with
+    | Const _ -> true
+    | _ -> false
+    end
+\end{code}
+On ajoute alors un contrat à \of{decompose_term} et aux abstractions
+utilisées à l'intérieur :
+\begin{spec}
+  let rec decompose_term (e: exp) (c: context) : (context, exp)
+    requires { not (is_value e) }
+    ensures  { let (c', e') = result in
+                 is_redex e' && forall res. post c e res -> post c' e' res }
+  = match e with
+    ...
+    | Sub (Const v, e) ->
+       decompose_term e (fun x -> ensures { post c (Sub (Const v) x) result } ...)
+    | Sub (e1, e2) ->
+       decompose_term e1 (fun x -> ensures { post c (Sub x e) result } ...)
+    end
+\end{spec}
+Notons qu'il n'y a pas d'effets de bord dans ce programme. En
+conséquence, on utilise une projection \of{post} à deux arguments,
+comme dans la section~\ref{sec:hauteur-dun-arbre}. La fonction
+\of{decompose_term} doit vérifier la propriété
+$C'[\mathtt{e'}] = C[\mathtt{e}]$, $C'$ et $\mathtt{e'}$ étant le
+contexte et l'expression renvoyés et $C$ et $\mathtt{e}$ les
+arguments. Or, comme on a choisi de représenter les contextes comme
+des fonctions, cette composition correspond précisément à
+l'application d'un contexte à son argument. Pour spécifier cela, on
+utilise la projection \of{post} sur un contexte et la quantification
+universelle pour dire que pour toute expression~\of{res} qui vérifie
+\of{post c e res}, alors \of{post c' e' res} est également
+vérifiée. Par ailleurs, la postcondition de \of{decompose_term} assure
+(à gauche du symbole \of{&&}) que l'expression~\of{e'} renvoyée est un
+redex.
+
+On introduit maintenant la fonction \of{decompose} et sa
+spécification. Cette fonction prend en argument une expression et ne
+fait qu'appeler \of{decompose_term} en lui passant le contexte vide,
+ici représenté par la fonction identité :
+\begin{spec}
+  let decompose (e: exp) : (context, exp)
+    requires { not (is_value e) }
+    ensures  { let (c', e') = result in is_redex e' && post c' e' e  }
+  = decompose_term e (fun x -> x)
+\end{spec}
+
+Pour évaluer une expression~\of{e} en une valeur on introduit une
+fonction d'itération qui se comporte comme la clôture transitive de la
+relation~$\rightarrow$. Son code \why\ est le suivant
+: %% pas terrible cette phrase
+\begin{spec}
+  let rec red (e: exp) : int = match e with
+    | Const v -> v
+    | _ ->
+      let (c, r) = decompose e in
+      let     r' = head_reduction r in
+      red (c r')
+    end
+\end{spec}
+Si l'expression~\of{e} est de la forme \of{Const v}, elle est en forme
+normale et elle ne peut plus être réduite. Si, en revanche,~\of{e}
+n'est pas encore une constante on (1) décompose cette expression en le
+redex~\of{r} et le contexte~\of{c}; (2) on réduit~\of{r} en tête et on
+obtient l'expression~\of{r'}; (3) on continue l'itération avec
+l'expression obtenue par la composition de~\of{c} et~\of{r'}. La
+composition se matérialise, d'une façon élégante, comme l'application
+de \of{c} à \of{r'}. % , grâce à la représentation des
+% contextes comme des fonctions
+La valeur renvoyée par l'appel \of{red e} doit être la même que celle
+renvoyée par une évaluation à grands pas. On munit donc \of{red}
+du contrat suivant :
+\begin{spec}
+  let rec red (e: exp) : int
+    ensures { result = eval e }
+\end{spec}
+
+On procède à la défonctionnalisation de cet exemple pour montrer sa
+correction avec \why{}. On commence par introduire le type
+\of{context} défonctionnalisé :
+\begin{code}
+  type context = CHole | CApp_left context exp | CApp_right int context
+\end{code}
+À partir des abstractions présentes dans le programme de départ, on
+engendre la fonction \of{apply} conjointement avec sa spécification :
+\begin{code}
+  let rec apply (c: context) (arg: exp) : exp
+    ensures { post c arg result }
+  = match c with
+    | CHole -> let x = arg in x
+    | CApp_left c e -> let x = arg in apply c (Sub x e)
+    | CApp_right v c -> let x = arg in apply c (Sub (Const v) x)
+    end
+\end{code}
+où le prédicat \of{post} peut être déduit des postconditions également
+présentes dans le programme de départ :
+\begin{code}
+  predicate post (c: context) (arg result: exp) = match c with
+    | CHole -> let x = arg in x = result
+    | CApp_left c e -> let x = arg in post c (Sub x e) result
+    | CApp_right v c -> let x = arg in post c (Sub (Const v) x) result
+    end
+\end{code}
+Pour obtenir le programme défonctionnalisé final, il suffit, comme
+montré pour les exemples précédents, de remplacer toutes les
+applications des abstractions par des appels à \of{apply} et toutes
+les occurrences de ces mêmes abstractions par le constructeur
+respectif du type \of{context} défonctionnalisé.
+
+Si on donnait le programme défonctionnalisé et sa spécification à
+\why\ on arriverait à prouver toutes les obligations de preuve
+engendrées, sauf la postcondition de la fonction
+\of{red}. %  Rappelons-nous que cette postcondition affirme que la valeur
+% renvoyée par \of{red} est la même que celle obtenue par une évaluation
+% à grands pas.
+Pour aider les démonstrateurs à prouver cette postcondition, on
+introduit le lemme suivant :
+\begin{spec}
+  lemma post_eval: forall c arg1 arg2 r1 r2.
+    eval arg1 = eval arg2 -> post c arg1 r1 -> post c arg2 r2 -> eval r1 = eval r2
+\end{spec}
+Ce lemme exprime que pour toutes expressions~\of{arg1} et~\of{arg2}
+dont l'évaluation produit la même valeur, alors les expressions
+obtenues par la composition de \of{arg1} et \of{arg2} avec le même
+contexte~\of{c} doivent s'évaluer en la même valeur. On prouve ce
+résultat par récurrence sur~\of{c} et on écrit pour cela une
+\emph{lemma function}, c'est-à-dire, un programme fantôme qui termine
+et qui n'a pas d'effet de bord observable, dont le contrat sera
+automatiquement traduit en l'énoncé donné plus haut :
+\begin{code}
+  let rec lemma post_eval (c: context) (arg1 arg2 r1 r2: exp)
+    requires { eval arg1 = eval arg2 }
+    requires { post c arg1 r1 && post c arg2 r2 }
+    ensures  { eval r1 = eval r2 }
+    variant  { c }
+  = match c with
+    | CHole -> ()
+    | CApp_left c e -> post_eval c (Sub arg1 e) (Sub arg2 e) r1 r2
+    | CApp_right n c -> post_eval c (Sub (Const n) arg1) (Sub (Const n) arg2) r1 r2
+    end
+
+\end{code}
+
+\begin{code}
+  let rec decompose_term (e: exp) (c: context) : (context, exp)
+    requires { not (is_value e) }
+    returns  { (c', e') ->
+                 is_redex e' && forall res. post c e res -> post c' e' res }
+    variant  { e }
+  = match e with
+    | Const _ ->
+       absurd
+    | Sub (Const _) (Const _) ->
+       (c, e)
+    | Sub (Const v1) e ->
+       decompose_term e (KApp_right v1 c)
+    | Sub e1 e2 ->
+       decompose_term e1 (KApp_left c e2)
+    end
+
+  let decompose (e: exp) : (context, exp)
+    requires { not (is_value e) }
+    returns  { (c', e') -> post c' e' e && is_redex e' }
+  = decompose_term e KHole
+
+  let rec red (e: exp) : int
+    ensures { result = eval e }
+    diverges
+  = match e with
+    | Const v -> v
+    | _ ->
+       let (cxt, e') = decompose e in
+       let       r' = head_reduction e' in
+       red (apply cxt r')
+    end
+
+end
+\end{code}
+Les appels récursifs de ce programme simulent l'application des
+hypothèses de récurrence. Avec ce lemme auxiliaire, la postcondition
+de~\of{red} est prouvée automatiquement par des démonstrateurs
+SMTs. L'énoncé de ce lemme quantifie universellement sur les valeurs
+du type \of{context}. Écrire un tel énoncé directement dans le
+programme d'ordre supérieur pourrait introduire une contradiction, vu
+qu'on ne peut pas affirmer ce résultat pour n'importe quelle fonction
+du type $\mathtt{exp}\rightarrow\mathtt{exp}$. Ce serait, néanmoins,
+intéressant d'avoir un moyen d'écrire ce genre d'énoncés dans le code
+de départ (en contraignant les fonctions abstraites acceptées) et les
+traduire automatiquement pour le code défonctionnalisé.
+
+Notons que le type des contextes défonctionnalisés correspond à un
+\emph{zipper}~\cite{zipper} pour les expressions de notre
+langage. Cette façon de représenter les contextes nous permettrait de
+mettre en \oeuvre\ une fonction d'évaluation efficace. Un telle
+fonction est normalement appelée
+\emph{refocusing}~\cite{DBLP:journals/tcs/DanvyN01}. En utilisant des
+contextes comme des fonctions, nos opérations de décomposition et
+composition ont une complexité linéaire dans le pire des cas, ce qui
+donne à la fonction \of{red} un coût potentiellement quadratique en la
+taille d'une expression.
+
+% On peut observer que le type de contextes défonctionnalisés % est le
+% % type concret qu'on écrirait si jamais on aurait produit cet exemple
+% % directement comme un programme du premier ordre.
+% correspond
+% à un \emph{zipper}~\cite{zipper} pour le type des expressions de notre
+% langage. Cette façon de représenter les contextes nous permettrait de
+% mettre en \oeuvre une fonction d'évaluation efficiente. Un telle
+% fonction est normalement appelée
+% \emph{refocusing}~\cite{DBLP:journals/tcs/DanvyN01}, parce que les
+% successives opérations de décomposition et recomposition d'expressions
+% et contextes sont remplacer par une seule fonction \emph{refocus}, qui
+% nous permet de trouver le prochain redex pendant la
+% décomposition. Notre façon de utiliser les contextes dans le programme
+% d'ordre supérieur, et qui est suivie dans le programme
+% défonctionnalisé, ne nous permet pas de réaliser une fonction aussi
+% efficace. En utilisant des contextes comme des fonctions, pour
+% décomposer une expression on réalise un parcours en profondeur sur
+% cette expression jusqu'au moment qu'on trouve le premier redex
+% possible, ce qui rends une complexité linéaire à cette
+% opération. Pareille, chaque fois qu'on recompose une expression avec
+% un contexte on reconstruit toute l'expression de bas en haut, donc
+% cette opération a aussi associé un coût linéaire et qui oblige à que
+% la décomposition recommence depuis le sommet de l'expression. Notre
+% fonction de évaluation présente ainsi un coût potentiellement
+% quadratique sur la taille d'un expression.
+
+% élégant, car moins de lignes de code qu'en utilisant un type concret
+% pour les contextes ; pas CPS
+
+% quelque part, le type kont obtenu après défonctionnalisation est ce
+% type concret, mais on n'a jamais eu besoin de l'écrire
+
+% ajouter l'argument de Olivier Danvy du papier ``Refunctionalization at work''
+
+% citer l'exemple dans la galerie qui utilise un type concret ?
+
+\section{Discussion et perspectives}
+\label{sec:conclusion}
+
+Dans cet article nous avons exploré l'utilisation de la
+défonctionnalisation comme une technique de preuve pour des programmes
+d'ordre supérieur contenant potentiellement des effets. L'idée est
+d'annoter directement un programme d'ordre supérieur et ensuite de
+défonctionnaliser ce programme et sa spécification vers un programme
+du premier ordre. Un outil de vérification déductive existant peut
+être alors utilisé pour montrer la correction de ce programme. Cette
+façon de procéder nous permet d'utiliser des outils de vérification
+déductive de programmes du premier ordre existants, sans avoir besoin
+de leur ajouter le support de l'ordre supérieur (ce qui impliquerait,
+très probablement, un changement profond dans les noyaux de ces
+outils, tel que leur langage de programmation, leur logique et leur
+calcul d'obligations de preuve).  Nous avons illustré cette approche à
+l'aide de plusieurs exemples écrits et entièrement vérifiés dans le
+système \why{}. L'utilisation de la défonctionnalisation dans un
+contexte de preuve est, à notre connaissance, nouvelle.
+
+La défonctionnalisation est généralement considérée comme une
+technique globale de transformation de programme, %% whole-program
+                                %% transformation
+%%% est-ce qu'il vaut la peine de citer Fourtounis, Papaspyrou et
+%%% Theofilopoulos ?
+c'est-à-dire qu'on doit connaître toutes les fonctions utilisées comme
+des valeurs de première classe dans un programme au moment d'appliquer
+cette transformation. Cela implique qu'on ne peut pas espérer prouver
+tous les programmes d'ordre supérieur en les
+défonctionnalisant. Néanmoins, il semble que la méthode proposée peut
+être appliquée avec succès au moins aux programmes écrits en style
+CPS, vu qu'ils s'agit de programmes dont on connaît toutes les
+abstractions utilisées dans les fonctions d'ordre supérieur.
+
+\paragraph{Perspectives.} Le travail présenté dans cet article reste,
+pour l'instant, exploratoire. On a utilisé la défonctionnalisation
+pour prouver plusieurs exemples de programmes d'ordre supérieur et les
+résultats nous encouragent à suivre l'exploration de cette
+méthodologie. Notre objectif est d'améliorer et de formaliser notre
+utilisation de la défonctionnalisation sur des programmes d'ordre
+supérieur, afin qu'on puisse comprendre si la défonctionnalisation
+peut être utilisée comme une méthode robuste de preuve de programmes
+d'ordre supérieur contenant des effets.
+
+La fonction~\of{apply}, engendrée pendant la défonctionnalisation,
+simule l'application d'une fonction (représentée par une valeur du
+type algébrique obtenue par défonctionnalisation) à son argument. La
+fonction \of{apply} procède par une analyse par cas sur chaque
+fonction trouvée dans le programme de départ, où chaque branche
+correspond à la définition de l'abstraction correspondante. Ainsi,
+chacune de ces branches doit renvoyer une valeur du même type, ce qui
+est vrai uniquement lorsque toutes les abstractions du programme ont
+le même type $\tau_1\rightarrow\tau_2$. Pour régler ce problème,
+Pottier et Gauthier~\cite{pottier-gauthier-hosc} ont proposé
+l'utilisation des \emph{types algébriques généralisés} (de l'anglais
+\emph{generalized algebraic data types}, GADT) pour défonctionnaliser
+un programme avec des abstractions de différents types. Cette solution
+nous intéresse et nous étudions des moyens possibles pour étendre le
+langage et la logique du système \why\ pour ajouter le support des
+GADT. Pour l'instant, nous introduisons plusieurs fonctions \of{apply}
+si jamais le programme initial possède des abstractions de plusieurs
+types différents. %% ce qui ne règle pas vraiment le problème...
+
+Pour donner des garanties fortes sur la fiabilité d'un programme, sa
+preuve de terminaison joue un rôle fondamental. Dans cet article on a
+mentionné comment on pourrait montrer que le programme
+défonctionnalisé termine, mais au prix d'une intervention sur le
+programme généré. Il serait plutôt souhaitable de pouvoir spécifier
+directement la terminaison dans le programme d'ordre supérieur avec
+des mesures de décroissance appropriées, qui seraient % automatiquement
+traduites vers le programme défonctionnalisé.
+
+Les itérateurs sont des exemples de fonctions d'ordre supérieur très
+souvent utilisés pour réaliser le parcours des éléments d'une
+structure de données. Dans des travaux
+précédents~\cite{pereira16nfm,pereira16jfla}, nous avons proposé des
+techniques pour prouver la correction de programmes qui mettent en
+\oeuvre\ de tels itérateurs et des programmes qui les utilisent. À cet
+effet, nous avons commencé le développement d'un outil qui prend en
+entrée des programmes d'ordre supérieur annotés et qui se servait de
+\why\ pour engendrer des obligations de preuve. Nous envisageons
+d'étendre cet outil avec le support pour la défonctionnalisation et
+d'augmenter ainsi l'ensemble des programmes d'ordre supérieur acceptés
+par l'outil.
+
+Finalement, pour mieux évaluer son utilité, nous souhaitons appliquer
+la preuve par défonctionnalisation sur un exemple plus complexe. Un
+bon candidat est l'algorithme de Koda-Ruskey~\cite{KodaRuskey93} pour
+l'énumération de tous les idéaux d'un ensemble partiellement
+ordonné. Une implantation d'ordre supérieur existe pour cet
+algorithme~\cite{Filliatre01a} et nous envisageons de reprendre ce
+code et prouver sa correction à l'aide de notre méthodologie.
+
+% réinsister sur le fait que la méthode ne s'applique pas à *tous* les
+% programmes d'ordre supérieur, mais à certains seulement
+
+% néanmoins, il semble qu'elle puisse s'appliquer mécaniquement au moins
+% aux programmes CPS-transformés
+
+% question des appels polymorphes (papier Pottier et
+% Gauthier~\cite{pottier-gauthier-hosc})
+
+% et les fonctions comme fold et iter ?
+% citer l'article NFM \cite{pereira16jfla,pereira16nfm}
+
+% terminaison ?
+
+% construction d'un outil ?
+
+% un exemple plus complexe, où cette méthode pourrait être appliquée :
+% Koda-Ruskey \cite{Filliatre01a}
+
+\paragraph{Remerciements.} Je remercie Lucas Baudin, Richard Bonichon,
+Martin Clochard et Léon Gondelman pour leurs remarques et suggestions
+pendant la préparation de cet article. Je tiens à remercier très
+chaleureusement Jean-Christophe Filliâtre. Ses conseils, ses
+relectures attentives et ses corrections ont été précieux pour
+l'achèvement de ce travail.
+
+\bibliographystyle{plain}
+\bibliography{abbrevs,demons,demons2,demons3,team,crossrefs}
+
+\end{document}
+
+
+%%
+%% Local Variables:
+%% ispell-local-dictionary: "francais"
+%% End:
+%  LocalWords:  défonctionnalisation Landin NFM défonctionnaliser préconditions
+%  LocalWords:  postcondition précondition postconditons
+%  LocalWords:  postconditions

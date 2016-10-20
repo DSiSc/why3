@@ -7,159 +7,36 @@
 \lstdefinelanguage{why3}
 {
 basicstyle=\ttfamily\small,
-morekeywords=[1]{predicate,constant,function,goal,type,use,%
-import,theory,end,module,in,%
-mutable,invariant,model,requires,ensures,raises,returns,reads,writes,diverges,%
-variant,let,val,while,for,loop,abstract,private,any,assume,check,assert,%
-begin,rec,clone,if,then,else,ghost,true,false,do,done,try,raise,absurd,%
-axiom,lemma,export,forall,exists,match,with,and,inductive,coinductive,fun,exception},%
-keywordstyle=[1]{\color{blue}},%
-%keywordstyle=\bfseries,%
-otherkeywords={},%
-commentstyle=\itshape,%
-columns=[l]fullflexible,%
-sensitive=true,%
-morecomment=[s]{(*}{*)},%
-escapeinside={*?}{?*},%
+morekeywords=[1]{predicate,constant,function,goal,type,use,
+import,theory,end,module,in,
+mutable,invariant,model,requires,ensures,raises,returns,reads,writes,diverges,
+variant,let,val,while,for,loop,abstract,private,any,assume,check,assert,
+begin,rec,clone,if,then,else,ghost,true,false,do,done,try,raise,absurd,
+axiom,lemma,export,forall,exists,match,with,and,inductive,coinductive,fun,exception},
+keywordstyle=[1]{\color{blue}},
+otherkeywords={},
+commentstyle=\itshape,
+columns=[l]fullflexible,
+sensitive=true,
+morecomment=[s]{(*}{*)},
+escapeinside={*?}{?*},
 keepspaces=true,
-literate=%
-%{'a}{$\alpha$}{1}%
-%{'b}{$\beta$}{1}%
-{<}{$<$}{1}%
-{>}{$>$}{1}%
-{<=}{$\le$}{1}%
-{>=}{$\ge$}{1}%
-{<>}{$\ne$}{1}%
-{/\\}{$\land$}{1}%
-{\\/}{ $\lor$ }{3}%
-{\ or(}{ $\lor$(}{3}%
-% {not\ }{$\lnot$ }{1}%
-% {not(}{$\lnot$(}{1}%
-{+->}{\texttt{+->}}{2}%
-% {+->}{$\mapsto$}{2}%
-{-->}{\texttt{-\relax->}}{2}%
-%{-->}{$\longrightarrow$}{2}%
-{->}{$\rightarrow$}{2}%
-{<-}{$\leftarrow$}{2}%
-{<->}{$\leftrightarrow$}{2}%
-%
-%
+literate=
+{<}{$<$}{1}
+{>}{$>$}{1}
+{<=}{$\le$}{1}
+{>=}{$\ge$}{1}
+{<>}{$\ne$}{1}
+{/\\}{$\land$}{1}
+{\\/}{ $\lor$ }{3}
+{ or(}{ $\lor$(}{3}
+{+->}{\texttt{+->}}{2}
+{-->}{\texttt{-\relax->}}{2}
+{->}{$\rightarrow$}{2}
+{<-}{$\leftarrow$}{2}
+{<->}{$\leftrightarrow$}{2}
 }
-
 \lstnewenvironment{why3}{\lstset{language=why3}}{}
-\lstnewenvironment{why3tiny}
-{\lstset{language=why3,basicstyle=\ttfamily\scriptsize}}{}
-
-
-\lstdefinelanguage{why3lightgray}
-{
-basicstyle=\ttfamily\small\lightgray,
-morekeywords=[1]{predicate,constant,function,goal,type,use,%
-import,theory,end,module,in,%
-mutable,invariant,model,requires,ensures,raises,returns,reads,writes,diverges,%
-variant,let,val,while,for,loop,abstract,private,any,assume,check,%
-rec,clone,if,then,else,result,old,ghost,true,false%
-axiom,lemma,export,forall,exists,match,with,not,inductive,coinductive},%
-keywordstyle=[1]{\color{lightgray}},%
-morekeywords=[2]{assert},%
-keywordstyle=[2]{\color{red}},%
-otherkeywords={},%
-commentstyle=\itshape,%
-columns=[l]fullflexible,%
-sensitive=true,%
-morecomment=[s]{(*}{*)},%
-escapeinside={*?}{?*},%
-keepspaces=true,
-literate=%
-%{'a}{$\alpha$}{1}%
-%{'b}{$\beta$}{1}%
-{<}{$<$}{1}%
-{>}{$>$}{1}%
-{<=}{$\le$}{1}%
-{>=}{$\ge$}{1}%
-{<>}{$\ne$}{1}%
-{/\\}{$\land$}{1}%
-{\\/}{ $\lor$ }{3}%
-{\ or(}{ $\lor$(}{3}%
-% {not\ }{$\lnot$ }{1}%
-% {not(}{$\lnot$(}{1}%
-{+->}{\texttt{+->}}{2}%
-% {+->}{$\mapsto$}{2}%
-{-->}{\texttt{-\relax->}}{2}%
-%{-->}{$\longrightarrow$}{2}%
-{->}{$\rightarrow$}{2}%
-{<-}{$\leftarrow$}{2}%
-{<->}{$\leftrightarrow$}{2}%
-%
-%
-}
-
-\lstnewenvironment{why3lightgray}{\lstset{language=why3lightgray}}{}
-
-
-
-\lstdefinelanguage{why3gray}
-{
-basicstyle=\ttfamily\small\gray,
-morekeywords=[1]{predicate,constant,function,goal,type,use,%
-import,theory,end,module,in,%
-mutable,invariant,model,requires,ensures,raises,returns,reads,writes,diverges,%
-variant,let,val,while,for,loop,abstract,private,any,assume,check,%
-rec,clone,if,then,else,result,old,ghost,true,false%
-axiom,lemma,export,forall,exists,match,with,not,inductive,coinductive},%
-keywordstyle=[1]{\color{gray}},%
-morekeywords=[2]{assert},%
-keywordstyle=[2]{\color{red}},%
-otherkeywords={},%
-commentstyle=\itshape,%
-columns=[l]fullflexible,%
-sensitive=true,%
-morecomment=[s]{(*}{*)},%
-escapeinside={*?}{?*},%
-keepspaces=true,
-literate=%
-%{'a}{$\alpha$}{1}%
-%{'b}{$\beta$}{1}%
-{<}{$<$}{1}%
-{>}{$>$}{1}%
-{<=}{$\le$}{1}%
-{>=}{$\ge$}{1}%
-{<>}{$\ne$}{1}%
-{/\\}{$\land$}{1}%
-{\\/}{ $\lor$ }{3}%
-{\ or(}{ $\lor$(}{3}%
-% {not\ }{$\lnot$ }{1}%
-% {not(}{$\lnot$(}{1}%
-{+->}{\texttt{+->}}{2}%
-% {+->}{$\mapsto$}{2}%
-{-->}{\texttt{-\relax->}}{2}%
-%{-->}{$\longrightarrow$}{2}%
-{->}{$\rightarrow$}{2}%
-{<-}{$\leftarrow$}{2}%
-{<->}{$\leftrightarrow$}{2}%
-%
-%
-}
-
-\lstnewenvironment{why3gray}{\lstset{language=why3gray}}{}
 \newcommand{\whyf}[1]{\lstinline[language=why3]{#1}}
 \let\of\whyf
 
-
-\lstdefinelanguage{pseudo}
-{
-basicstyle=\ttfamily\small,
-morekeywords=[1]{while,do},%
-keywordstyle=[1]{\color{blue}},%
-otherkeywords={},%
-commentstyle=\itshape,%
-columns=[l]fullflexible,%
-sensitive=true,%
-morecomment=[s]{(*}{*)},%
-escapeinside={*?}{?*},%
-keepspaces=true,
-literate=%
-{<-}{$\leftarrow$}{2}%
-%
-%
-}

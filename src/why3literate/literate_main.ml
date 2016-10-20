@@ -43,6 +43,9 @@ let print_position fmt (bpos, epos) =
   let e = epos.Lexing.pos_cnum - epos.Lexing.pos_bol in
   fprintf fmt "File %S, line %d, characters %d-%d:" fname bpos.Lexing.pos_lnum b e
 
+let why3_lang_sty =
+  Literate_sty.style_why3lang "why3lang.sty"
+
 let () =
   let fmt1_name = (Filename.chop_extension fname ^ ".tex") in
   let fmt2_name = (Filename.chop_extension fname ^ ".mlw") in

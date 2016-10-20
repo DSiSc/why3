@@ -51,6 +51,7 @@ The type of lists is defined as traditionally. A list is either empty or is an e
 followed by a list (its tail). We use here \why\ algebraic datatypes to define
 the type of lists:
 \begin{code}
+
   type list 'a = Nil | Cons 'a (list 'a)
 \end{code}
 Note that this definition introduces polimorphic lists.
@@ -58,6 +59,7 @@ Note that this definition introduces polimorphic lists.
 The function to be defined shall take a list as argument and return the length of
 its parameter. The function signature is as follows:
 \begin{code}
+
   function length (l: list 'a) : int
 \end{code}
 We perform a case analysis on the form of a list in order to define \of{length}.
@@ -74,6 +76,10 @@ such a case, the length of the list is one plus the length of the tail:
 \begin{code}
     | Cons _ tl -> 1 + length tl
     end
+
+
+
+
 \end{code}
 We shall make the remark that this is fact a recursive definition.
 

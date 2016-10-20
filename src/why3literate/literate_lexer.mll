@@ -126,9 +126,9 @@ rule scan fmt1 fmt2 = parse
                  scan fmt1 fmt2 lexbuf }
 
 and print_code fmt1 fmt2 is_code = parse
-  | end_code { pp_print_string fmt1 "\\end{why3}" }
+  | space* "\n"? end_code { pp_print_string fmt1 "\\end{why3}" }
 (* TODO: use [is_code] to check if we are in a [code] or [spec] section *)
-  | end_spec { pp_print_string fmt1 "\\end{why3}" }
+  | space* "\n"? end_spec { pp_print_string fmt1 "\\end{why3}" }
   | eof { () }
   | "'\"'"
   | _ as s     { pp_print_string fmt1 s;

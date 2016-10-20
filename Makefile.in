@@ -1437,7 +1437,7 @@ install_no_local::
 
 WHY3LITERATEGENERATED = src/why3lieterate/literate_lexer.ml
 
-WHY3LITERATE_FILES = literate_lexer literate_main
+WHY3LITERATE_FILES = literate_lexer literate_sty literate_main
 
 WHY3LITERATEMODULES = $(addprefix src/why3literate/, $(WHY3LITERATE_FILES))
 
