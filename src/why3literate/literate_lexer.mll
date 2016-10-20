@@ -29,38 +29,56 @@
   let get_loc lb =
     Loc.extract (Lexing.lexeme_start_p lb, Lexing.lexeme_end_p lb)
 
+  let print_sharp lb fmt =
+    let loc = get_loc lb in
+    let (f, line, bchar, _) = Loc.get loc in
+    fprintf fmt "## %S %d %d ##" f line bchar
+
 }
 
 let space = [' ' '\t']
 
-let begin_code = "\\begin{code}"
-let end_code   = "\\end{code}"
-let begin_spec = "\\begin{spec}"
-let end_spec   = "\\end{spec}"
+let begin_why3 = "\\begin{why3}"
+let end_why3   = "\\end{why3}"
+let begin_wtex = "\\begin{why3tex}"
+let end_wtex   = "\\end{why3tex}"
+let begin_mlw  = "\\begin{why3mlw}"
+let end_mlw    = "\\end{why3mlw}"
 
-rule scan fmt1 fmt2 = parse
-  | begin_code { pp_print_string fmt1 "\\begin{why3}";
-                 print_code fmt1 fmt2 true lexbuf;
-                 scan fmt1 fmt2 lexbuf }
-  | begin_spec { pp_print_string fmt1 "\\begin{why3}";
-                 print_code fmt1 fmt2 false lexbuf;
-                 scan fmt1 fmt2 lexbuf }
-  | eof { () }
-  | _ as s     { pp_print_char fmt1 s;
-                 scan fmt1 fmt2 lexbuf }
+rule scan tex mlw = parse
+  | '\n'       { newline lexbuf;
+                 pp_print_newline tex ();
+                 scan tex mlw lexbuf }
+  | begin_why3 { pp_print_string tex "\\begin{why3}";
+                 print_sharp lexbuf mlw;
+                 print_code tex mlw true true lexbuf;
+                 scan tex mlw lexbuf }
+  | begin_wtex { pp_print_string tex "\\begin{why3}";
+                 print_code tex mlw true false lexbuf;
+                 scan tex mlw lexbuf }
+  | begin_mlw  { print_code tex mlw false true lexbuf;
+                 scan tex mlw lexbuf }
+  | eof        { () }
+  | _ as s     { pp_print_char tex s;
+                 scan tex mlw lexbuf }
 
-and print_code fmt1 fmt2 is_code = parse
-  | space* "\n"? end_code { pp_print_string fmt1 "\\end{why3}" }
+and print_code tex mlw is_tex is_mlw = parse
+  | '\n'       { newline lexbuf;
+                 if is_tex then pp_print_newline tex ();
+                 if is_mlw then pp_print_newline mlw ();
+                 print_code tex mlw is_tex is_mlw lexbuf }
+  | end_why3   { pp_print_string tex "\\end{why3}" }
 (* TODO: use [is_code] to check if we are in a [code] or [spec] section *)
-  | space* "\n"? end_spec { pp_print_string fmt1 "\\end{why3}" }
-  | eof { () }
-  | _ as s     { pp_print_char fmt1 s;
-                 if is_code then pp_print_char fmt2 s;
-                 print_code fmt1 fmt2 is_code lexbuf }
+  | end_wtex   { pp_print_string tex "\\end{why3}" }
+  | end_mlw    { () }
+  | eof        { () }
+  | _ as s     { if is_tex then pp_print_char tex s;
+                 if is_mlw then pp_print_char mlw s;
+                 print_code tex mlw is_tex is_mlw lexbuf }
 
 {
 
-  let do_file fmt1 fmt2 fname =
+  let do_file tex mlw fname =
     (* current_file := fname; *)
     (* input *)
     let cin = open_in fname in
@@ -68,7 +86,7 @@ and print_code fmt1 fmt2 is_code = parse
     lb.Lexing.lex_curr_p <-
       { lb.Lexing.lex_curr_p with Lexing.pos_fname = fname };
     (* output *)
-    scan fmt1 fmt2 lb;
+    scan tex mlw lb;
     close_in cin
 
 }

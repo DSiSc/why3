@@ -27,7 +27,7 @@ let usage = fun () ->
 let fname = ref None
 
 let set_file f = match !fname with
-  | None when Filename.check_suffix f ".lmlw" -> fname := Some f
+  | None -> fname := Some f
   | _ -> usage ()
 
 let () =
