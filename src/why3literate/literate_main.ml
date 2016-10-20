@@ -10,9 +10,8 @@
 (********************************************************************)
 
 open Format
-open Why3
 
-let () = Debug.set_flag Glob.flag
+(* let () = Debug.set_flag Glob.flag *)
 
 (* command line parsing *)
 
@@ -43,9 +42,13 @@ let print_position fmt (bpos, epos) =
   let e = epos.Lexing.pos_cnum - epos.Lexing.pos_bol in
   fprintf fmt "File %S, line %d, characters %d-%d:" fname bpos.Lexing.pos_lnum b e
 
-let why3_lang_sty =
-  Literate_sty.style_why3lang "why3lang.sty"
+(* FIXME: add a command-line option to force the production of why3lang.sty *)
+let why3lang_file = "why3lang.sty"
+let () =
+  if not (Sys.file_exists why3lang_file) then
+    Literate_sty.style_why3lang why3lang_file
 
+(* FIXME: add command-line options to produce only one of the two files *)
 let () =
   let fmt1_name = (Filename.chop_extension fname ^ ".tex") in
   let fmt2_name = (Filename.chop_extension fname ^ ".mlw") in

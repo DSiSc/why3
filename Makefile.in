@@ -1435,7 +1435,7 @@ install_no_local::
 # why3literate
 ##############
 
-WHY3LITERATEGENERATED = src/why3lieterate/literate_lexer.ml
+WHY3LITERATEGENERATED = src/why3literate/literate_lexer.ml
 
 WHY3LITERATE_FILES = literate_lexer literate_sty literate_main
 
