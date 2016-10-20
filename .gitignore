@@ -187,6 +187,9 @@ pvsbin/
 # /src/why3doc/
 /src/why3doc/doc_lexer.ml
 
+# /src/why3literate/
+/src/why3literate/literate_lexer.ml
+
 # /src/util/
 /src/util/config.ml
 /src/util/lexlib.ml
