@@ -17,6 +17,8 @@
 
   let output_comments = ref true
 
+  let inter_mlw = ref false
+
   let newline lexbuf =
     let pos = lexbuf.lex_curr_p in
     lexbuf.lex_curr_p <-
@@ -51,30 +53,72 @@ rule scan tex mlw = parse
                  scan tex mlw lexbuf }
   | begin_why3 { pp_print_string tex "\\begin{why3}";
                  print_sharp lexbuf mlw;
-                 print_code tex mlw true true lexbuf;
+                 print_why3 tex mlw lexbuf;
                  scan tex mlw lexbuf }
   | begin_wtex { pp_print_string tex "\\begin{why3}";
-                 print_code tex mlw true false lexbuf;
+                 print_tex tex lexbuf;
                  scan tex mlw lexbuf }
-  | begin_mlw  { print_code tex mlw false true lexbuf;
+  | begin_mlw  { print_sharp lexbuf mlw;
+                 print_mlw mlw lexbuf;
                  scan tex mlw lexbuf }
   | eof        { () }
   | _ as s     { pp_print_char tex s;
                  scan tex mlw lexbuf }
 
-and print_code tex mlw is_tex is_mlw = parse
+and print_why3 tex mlw = parse
   | '\n'       { newline lexbuf;
-                 if is_tex then pp_print_newline tex ();
-                 if is_mlw then pp_print_newline mlw ();
-                 print_code tex mlw is_tex is_mlw lexbuf }
+                 List.iter (fun fmt -> pp_print_newline fmt ())
+                           [tex; mlw];
+                 print_why3 tex mlw lexbuf }
+  | begin_mlw  { print_sharp lexbuf mlw;
+                 print_mlw mlw lexbuf;
+                 print_why3 tex mlw lexbuf }
   | end_why3   { pp_print_string tex "\\end{why3}" }
-(* TODO: use [is_code] to check if we are in a [code] or [spec] section *)
-  | end_wtex   { pp_print_string tex "\\end{why3}" }
-  | end_mlw    { () }
   | eof        { () }
-  | _ as s     { if is_tex then pp_print_char tex s;
-                 if is_mlw then pp_print_char mlw s;
-                 print_code tex mlw is_tex is_mlw lexbuf }
+  | _ as c     { pp_print_char tex c;
+                 pp_print_char mlw c;
+                 print_why3 tex mlw lexbuf
+             (* List.iter (fun fmt -> pp_print_char fmt c) *)
+             (*               [tex; mlw] *) }
+
+and print_mlw mlw = parse
+  | '\n'       { newline lexbuf;
+                 pp_print_newline mlw ();
+                 print_mlw mlw lexbuf }
+  | end_mlw space* '\n'
+               { newline lexbuf }
+  | eof        { () }
+  | _ as c     { pp_print_char mlw c;
+                 print_mlw mlw lexbuf }
+
+and print_tex tex = parse
+  | '\n'       { newline lexbuf;
+                 pp_print_newline tex ();
+                 print_tex tex lexbuf }
+  | end_wtex   { pp_print_string tex "\\end{why3}" }
+  | eof        { () }
+  | _ as c     { pp_print_char tex c;
+                 print_tex tex lexbuf }
+(* and print_code tex mlw is_tex is_mlw = parse *)
+(*   | '\n'       { newline lexbuf; *)
+(*                  if is_tex && not !inter_mlw then pp_print_newline tex (); *)
+(*                  if is_mlw then pp_print_newline mlw (); *)
+(*                  print_code tex mlw is_tex is_mlw lexbuf } *)
+(*   | end_why3   { inter_mlw := false; *)
+(*                  pp_print_string tex "\\end{why3}" } *)
+(* (\* TODO: use [is_code] to check if we are in a [code] or [spec] section *\) *)
+(*   | end_wtex   { pp_print_string tex "\\end{why3}" } *)
+(*   | end_mlw    { if !inter_mlw then *)
+(*                    print_code tex mlw true true lexbuf } *)
+(*   | begin_mlw  { if !inter_mlw then begin *)
+(*                      print_sharp lexbuf mlw; *)
+(*                      print_code tex mlw false true lexbuf; *)
+(*                    end *)
+(*                  else () (\* TODO: raise an exception *\) } *)
+(*   | eof        { () } *)
+(*   | _ as s     { if is_tex then pp_print_char tex s; *)
+(*                  if is_mlw then pp_print_char mlw s; *)
+(*                  print_code tex mlw is_tex is_mlw lexbuf } *)
 
 {
 
