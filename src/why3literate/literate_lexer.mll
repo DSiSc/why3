@@ -33,8 +33,8 @@
 
   let print_sharp lb fmt =
     let loc = get_loc lb in
-    let (f, line, bchar, _) = Loc.get loc in
-    fprintf fmt "## %S %d %d ##" f line bchar
+    let (f, line, _, _) = Loc.get loc in
+    fprintf fmt "## %S %d %d ##" f line 0
 
 }
 
@@ -73,19 +73,20 @@ and print_why3 tex mlw = parse
   | begin_mlw  { print_sharp lexbuf mlw;
                  print_mlw mlw lexbuf;
                  print_why3 tex mlw lexbuf }
+  | begin_wtex { pp_print_string tex "*?";
+                 print_escape tex lexbuf;
+                 print_why3 tex mlw lexbuf }
   | end_why3   { pp_print_string tex "\\end{why3}" }
   | eof        { () }
-  | _ as c     { pp_print_char tex c;
-                 pp_print_char mlw c;
-                 print_why3 tex mlw lexbuf
-             (* List.iter (fun fmt -> pp_print_char fmt c) *)
-             (*               [tex; mlw] *) }
+  | _ as c     { List.iter (fun fmt -> pp_print_char fmt c)
+                           [tex; mlw];
+                 print_why3 tex mlw lexbuf }
 
 and print_mlw mlw = parse
   | '\n'       { newline lexbuf;
                  pp_print_newline mlw ();
                  print_mlw mlw lexbuf }
-  | end_mlw space* '\n'
+  | end_mlw space* '\n'?
                { newline lexbuf }
   | eof        { () }
   | _ as c     { pp_print_char mlw c;
@@ -99,6 +100,15 @@ and print_tex tex = parse
   | eof        { () }
   | _ as c     { pp_print_char tex c;
                  print_tex tex lexbuf }
+
+and print_escape tex = parse
+  | '\n'       { newline lexbuf;
+                 pp_print_newline tex ();
+                 print_escape tex lexbuf }
+  | end_wtex   { pp_print_string tex "?*" }
+  | eof        { () }
+  | _ as c     { pp_print_char tex c;
+                 print_escape tex lexbuf }
 (* and print_code tex mlw is_tex is_mlw = parse *)
 (*   | '\n'       { newline lexbuf; *)
 (*                  if is_tex && not !inter_mlw then pp_print_newline tex (); *)
