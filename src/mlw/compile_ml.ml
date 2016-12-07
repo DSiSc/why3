@@ -17,7 +17,7 @@
 
   - 2 drivers for nums and zarith
 
-  - no delcaration at all for a module -> no file produced
+  - no declaration at all for a module -> no file produced
     (e.g. ref.Ref)
 
   - suggest a command line to compile the extracted code
@@ -40,6 +40,6 @@
     then extract "module type B_sig = ..." (as well as "module B = ...")
 
   - use a black list in printer to avoid clash with Pervasives symbols
-    (e.g. ref, (!), etc.)
+    (e.g. ref, (!), etc.) and module Names (Int, String, Array, etc.)
 
 *)
