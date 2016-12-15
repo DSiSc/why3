@@ -1,0 +1,3367 @@
+module N
+
+ (**)
+  use import array.Array
+  use import map.Map
+  use import mach.int.Int32
+  use import ref.Ref
+  use import map.Map
+  use map.MapEq
+  use map.Const
+  use import int.Int
+
+  predicate map_eq_sub_shift (x y:map int 'a) (xi yi sz:int) =
+    forall i. 0 <= i < sz -> x[xi+i] = y[yi+i]
+
+  let lemma map_eq_shift (x y:map int 'a) (xi yi sz k:int)
+    requires { map_eq_sub_shift x y xi yi sz }
+    requires { 0 <= k < sz }
+    ensures { x[xi+k] = y[yi+k] }
+  = ()
+
+  let rec lemma map_eq_shift_zero (x y: map int 'a) (n m: int)
+    requires { map_eq_sub_shift x y n n (m-n) }
+    variant { m - n }
+    ensures { MapEq.map_eq_sub x y n m }
+  =
+    if n < m then
+    begin
+      assert { forall i. 0 <= i < m-n -> x[n+i] = y[n+i] };
+      assert { forall i. n <= i < m ->
+                 let j = i - n in 0 <= j < m-n ->
+                     x[n+j] = y[n+j] -> x[i] = y[i]};
+      map_eq_shift_zero x y (n+1) m;
+    end
+    else assert { 1+2=3 }
+
+  use import mach.int.UInt64 as Limb
+  use import int.Int
+  use import int.Power
+
+  type limb = uint64
+
+  lemma limb_max_bound: 1 <= max_uint64
+
+  function l2i (x:limb) : int = Limb.to_int x
+
+  function p2i (i:int32) : int = Int32.to_int i
+
+  exception Return32 int32(** {2 Integer value of a natural number} *)
+
+  let lemma prod_compat_strict_r (a b c:int)
+    requires { 0 <= a < b }
+    requires { 0 < c }
+    ensures { c * a < c * b }
+  = ()
+
+  (** [value_sub x n m] denotes the integer represented by
+     the digits x[n..m-1] with lsb at index n *)
+  let rec ghost function value_sub (x:map int limb) (n:int) (m:int) : int
+     variant {m - n}
+   =
+     if n < m then
+       l2i x[n] + radix * value_sub x (n+1) m
+       else 0
+
+  let rec lemma value_sub_frame (x y:map int limb) (n m:int)
+    requires { MapEq.map_eq_sub x y n m }
+    variant  { m - n }
+    ensures  { value_sub x n m = value_sub y n m }
+  =
+    if n < m then value_sub_frame x y (n+1) m else ()
+
+  let rec lemma value_sub_frame_shift (x y:map int limb) (xi yi sz:int)
+    requires { map_eq_sub_shift x y xi yi sz }
+    variant { sz }
+    ensures { value_sub x xi (xi+sz) = value_sub y yi (yi+sz) }
+ =
+    if sz>0
+    then begin
+      map_eq_shift x y xi yi sz 0;
+      assert { forall i. 0 <= i < sz-1 ->
+                 0 <= 1+i < sz ->
+                 let j = 1+i in x[xi+j] = y[yi+j] ->
+                   x[xi+1+i] = y[yi+1+i]  };
+      value_sub_frame_shift x y (xi+1) (yi+1) (sz-1)
+      end
+    else assert { 1+2 = 3 }
+
+  let rec lemma value_sub_tail (x:map int limb) (n m:int)
+    requires { n <= m }
+    variant  { m - n }
+    ensures  {
+      value_sub x n (m+1) =
+        value_sub x n m + l2i (Map.get x m) * power radix (m-n) }
+  = "vc:sp" if n < m then value_sub_tail x (n+1) m else ()(*assert { 1+2=3 }*)
+
+  let rec lemma value_sub_concat (x:map int limb) (n m l:int)
+    requires { n <= m <= l}
+    variant  { m - n }
+    ensures  {
+      value_sub x n l =
+        value_sub x n m + value_sub x m l * power radix (m-n) }
+  =
+  if n < m then
+     begin
+     assert {n<m};
+     value_sub_concat x (n+1) m l
+     end
+  else ()
+
+  let lemma value_sub_head (x:map int limb) (n m:int)
+    requires { n < m }
+    ensures { value_sub x n m = l2i x[n] + radix * value_sub x (n+1) m }
+  = value_sub_concat x n (n+1) m
+
+  let lemma value_sub_update (x:map int limb) (i n m:int) (v:limb)
+    requires { n <= i < m }
+    ensures {
+      value_sub (Map.set x i v) n m =
+      value_sub x n m + power radix (i - n) * (l2i v - l2i (Map.get x i))
+    }
+  = assert { MapEq.map_eq_sub x (Map.set x i v) n i };
+    assert { MapEq.map_eq_sub x (Map.set x i v) (i+1) m };
+    value_sub_concat x n i m;
+    value_sub_concat (Map.set x i v) n i m
+
+  let rec lemma value_zero (x:map int limb) (n m:int)
+    requires { MapEq.map_eq_sub x (Const.const Limb.zero_unsigned) n m }
+    variant  { m - n }
+    ensures  { value_sub x n m = 0 }
+  = if n < m then value_zero x (n+1) m else ()
+
+  let lemma value_sub_update_no_change (x: map int limb) (i n m: int) (v:limb)
+     requires { n <= m }
+     requires { i < n \/ m <= i }
+     ensures { value_sub x n m = value_sub (Map.set x i v) n m }
+  = value_sub_frame x (Map.set x i v) n m
+
+  let lemma value_sub_shift_no_change (x:map int limb) (ofs i sz:int) (v:limb)
+     requires { i < 0 \/ sz <= i }
+     requires { 0 <= sz }
+     ensures { value_sub x ofs (ofs + sz) =
+               value_sub (Map.set x (ofs+i) v) ofs (ofs+sz) }
+  = value_sub_frame_shift x (Map.set x (ofs+i) v) ofs ofs sz
+
+  (** {2 Comparisons} *)
+
+    let rec lemma value_sub_lower_bound (x:map int limb) (x1 x2:int)
+    variant  { x2 - x1 }
+    ensures  { 0 <= value_sub x x1 x2 }
+  = if x2 <= x1 then () else
+      begin
+        assert { value_sub x x1 x2 = l2i (Map.get x x1) + radix * value_sub x (x1+1) x2};
+        value_sub_lower_bound x (x1+1) x2
+      end
+
+  let rec lemma value_sub_upper_bound (x:map int limb) (x1 x2:int)
+    requires { x1 <= x2 }
+    variant  { x2 - x1 }
+    ensures  { value_sub x x1 x2 < power radix (x2 - x1) }
+  = if x1 = x2 then () else
+      begin
+      assert { value_sub x x1 x2 <= value_sub x x1 (x2-1) + power radix (x2-x1-1) * (radix - 1) };
+      value_sub_upper_bound x x1 (x2-1)
+      end
+
+  let lemma value_sub_lower_bound_tight (x:map int limb) (x1 x2:int)
+    requires { x1 < x2 }
+    ensures  { power radix (x2-x1-1) *  l2i (Map.get x (x2-1)) <= value_sub x x1 x2 }
+  = assert   { value_sub x x1 x2 = value_sub x x1 (x2-1)
+               + power radix (x2-x1-1) * l2i (Map.get x (x2-1)) }
+
+  let lemma value_sub_upper_bound_tight (x:map int limb) (x1 x2:int)
+    requires { x1 < x2 }
+    ensures  { value_sub x x1 x2 < power radix (x2-x1-1) *  (l2i (Map.get x (x2-1)) + 1) }
+  = value_sub_upper_bound x x1 (x2-1)
+
+  use import mach.c.C
+  type t = ptr limb
+
+  function value (x:t) : int =
+     value_sub (pelts x) 0 (plength x)
+
+  function value_sub_shift (x:t) (sz:int) : int =
+     value_sub (pelts x) x.offset (x.offset + sz)
+  function compare_int (x y:int) : int =
+    if x < y then -1 else if x=y then 0 else 1
+
+  (** [compare_same_size] compares [x[0..sz-1]] and [y[0..sz-1]] as unsigned integers. It corresponds to [GMPN_CMP]. *)
+  let compare_same_size (x y:t) (sz:int32) : int32
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { valid_ptr_itv y (p2i sz) }
+    ensures { p2i result = compare_int (value_sub_shift x (p2i sz))
+              (value_sub_shift y (p2i sz))
+              }
+  =
+   let i = ref sz in
+   let zero = Int32.of_int 0 in
+   let uzero = Limb.of_int 0 in
+   let lx = ref uzero in
+   let ly = ref uzero in
+   let res = ref zero in
+   try
+     while Int32.(>=) !i (Int32.of_int 1) do
+       variant { p2i !i }
+       invariant { 0 <= p2i !i <= p2i sz }
+       invariant { forall j. p2i !i <= j < p2i sz ->
+                   (pelts x)[x.offset+j] = (pelts y)[y.offset+j] }
+       assert { forall j. 0 <= j < p2i sz - (p2i !i) ->
+                let k = p2i !i+j in
+                p2i !i <= k < p2i sz ->
+                (pelts x)[x.offset+k] = (pelts y)[y.offset+k] /\
+                (pelts x)[p2i !i+x.offset+j] = (pelts y)[p2i !i+y.offset+j] };
+       value_sub_frame_shift (pelts x) (pelts y) (p2i !i+x.offset) (p2i !i+y.offset) ((p2i sz) - (p2i !i));
+       let ghost k = p2i !i in
+       i := Int32.(-) !i (Int32.of_int 1);
+
+       assert { 0 <= p2i !i < p2i sz };
+       lx := get_ofs x !i;
+       ly := get_ofs y !i;
+       if (Limb.ne !lx !ly)
+       then begin
+            value_sub_concat (pelts x) x.offset (x.offset+k) (x.offset+ p2i sz);
+            value_sub_concat (pelts y) y.offset (y.offset+k) (y.offset+ p2i sz);
+            assert { compare_int (value_sub_shift x (p2i sz))
+                       (value_sub_shift y (p2i sz))
+                   = compare_int (value_sub_shift x k) (value_sub_shift y k) };
+            value_sub_tail (pelts x) x.offset (x.offset+k-1);
+            value_sub_tail (pelts y) y.offset (y.offset+k-1);
+            if Limb.(>) !lx !ly
+            then begin
+             value_sub_upper_bound (pelts y) y.offset (y.offset+k-1);
+             value_sub_lower_bound (pelts x) x.offset (x.offset+k-1);
+             assert { value_sub_shift x k - value_sub_shift y k =
+                      (l2i !lx - l2i !ly) * (power radix (k-1))
+                    - ((value_sub_shift y (k-1)) - (value_sub_shift x (k-1)))
+                       };
+             assert { (l2i !lx - l2i !ly) * (power radix (k-1))
+                      >= power radix (k-1)
+                      > ((value_sub_shift y (k-1)) - (value_sub_shift x (k-1)))
+                       };
+             res := Int32.of_int 1
+            end
+            else begin
+             assert { l2i !ly > l2i !lx };
+             value_sub_upper_bound (pelts x) x.offset (x.offset+k-1);
+             value_sub_lower_bound (pelts y) y.offset (y.offset+k-1);
+             assert { value_sub_shift y k - value_sub_shift x k =
+                    (l2i !ly - l2i !lx) * (power radix (k-1))
+                    - ((value_sub_shift x (k-1)) - (value_sub_shift y (k-1)))
+                     };
+             assert { (l2i !ly - l2i !lx) * (power radix (k-1))
+                      >= power radix (k-1)
+                      > ((value_sub_shift x (k-1)) - (value_sub_shift y (k-1)))
+                     };
+            res := Int32.(-_) (Int32.of_int 1)
+            end;
+         raise Return32 !res;
+         end
+       else ()
+     done;
+     value_sub_frame_shift (pelts x) (pelts y) x.offset y.offset (p2i sz);
+     zero
+   with Return32 r -> r
+   end
+
+   (* [is_zero] checks if [x[0..sz-1]] is zero. It corresponds to [mpn_zero_p]. *)
+   let is_zero (x:t) (sz:int32) : int32
+     requires { valid_ptr_itv x (p2i sz) }
+     ensures { 0 <= Int32.to_int result <= 1 }
+     ensures { Int32.to_int result = 1 <-> value_sub_shift x (p2i sz) = 0 }
+   =
+     let i = ref sz in
+     let uzero = Limb.of_int 0 in
+     let lx = ref uzero in
+     try
+       while Int32.(>=) !i (Int32.of_int 1) do
+         variant { p2i !i }
+         invariant { 0 <= p2i !i <= p2i sz }
+         invariant { value_sub (pelts x) (x.offset + p2i !i) (x.offset + p2i sz)=0 }
+         let ghost k = p2i !i in
+         i := Int32.(-) !i (Int32.of_int 1);
+         assert { 0 <= p2i !i < p2i sz };
+         lx := get_ofs x !i;
+         if (Limb.ne !lx uzero)
+         then begin
+           value_sub_concat (pelts x) x.offset (x.offset+k) (x.offset + p2i sz);
+           value_sub_lower_bound_tight (pelts x) x.offset (x.offset+k);
+           value_sub_lower_bound (pelts x) (x.offset+k) (x.offset + p2i sz);
+           raise Return32 (Int32.of_int 0);
+         end
+         else begin
+           assert { 1+2=3 };
+         end
+       done;
+       Int32.of_int 1
+     with Return32 r -> r
+     end
+
+  (** [zero r sz] sets [(r,sz)] to zero. Corresponds to [mpn_zero]. *)
+  let zero (r:t) (sz:int32) : unit
+    requires { valid_ptr_itv r (p2i sz) }
+    ensures { value_sub_shift r (p2i sz) = 0 }
+  =
+    let i = ref (Int32.of_int 0) in
+    let lzero = Limb.of_int 0 in
+    while Int32.(<) !i sz do
+      invariant { 0 <= p2i !i <= p2i sz }
+      variant { p2i sz - p2i !i }
+      invariant { value_sub_shift r (p2i !i) = 0 }
+      set_ofs r !i lzero;
+      value_sub_tail (pelts r) r.offset (r.offset + p2i !i);
+      i := Int32.(+) !i (Int32.of_int 1);
+    done
+
+  (** {2 Addition} *)
+
+  (** [add_limb r x y sz] adds to [x] the value of the limb [y],
+      writes the result in [r] and returns the carry. [r] and [x]
+      have size [sz]. This corresponds to the function [mpn_add_1] *)
+  (* r and x must be separated. This is enforced by Why3 regions in typing *)
+  let add_limb (r x:t) (y:limb) (sz:int32) : limb
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { valid_ptr_itv r (p2i sz) }
+    requires { p2i sz > 0 } (* ? GMP does the same for 0 and 1*)
+    ensures { value_sub_shift r (p2i sz) + (power radix (p2i sz)) * l2i result =
+              value_sub_shift x (p2i sz) + l2i y }
+    ensures { 0 <= l2i result <= 1 }
+    writes { r.data.contents.elts }
+  =
+    let limb_zero = Limb.of_int 0 in
+    let c = ref y in
+    let lx = ref limb_zero in
+    let i = ref (Int32.of_int 0) in
+    while Int32.(<) !i sz && Limb.ne !c limb_zero do
+      invariant { 0 <= p2i !i <= p2i sz }
+      invariant { p2i !i > 0 -> 0 <= l2i !c <= 1 }
+      invariant { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                  value_sub_shift x (p2i !i) + l2i y}
+      variant { p2i sz - p2i !i }
+      label StartLoop in
+      lx := get_ofs x !i;
+      let (res, carry) = add_with_carry !lx !c limb_zero in
+      set_ofs r !i res;
+      assert { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                  value_sub_shift x (p2i !i) + l2i y };
+      c := carry;
+      let ghost k = p2i !i in
+      i := Int32.(+) !i (Int32.of_int 1);
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+      let ghost m = power radix k in
+      assert { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c
+             = value_sub_shift x (p2i !i) + l2i y
+             by
+             value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c
+             = value_sub_shift r k + (power radix k) * l2i res
+                               + (power radix (p2i !i)) * l2i !c
+             = value_sub_shift r k + (power radix k) * l2i res
+                               + (power radix k) * radix * l2i !c
+             = value_sub_shift r k + (power radix k) * (l2i res + radix * l2i !c)
+             = value_sub_shift r k +
+               (power radix k) * (l2i !lx + l2i (!c at StartLoop))
+             = value_sub_shift r k + (power radix k) * l2i (!c at StartLoop)
+                               + (power radix k) * l2i !lx
+             = value_sub_shift x k + l2i y + (power radix k) * l2i !lx
+             = value_sub_shift x (p2i !i) + l2i y }
+    done;
+    if Int32.eq !i sz then !c
+    else begin
+    while Int32.(<) !i sz do
+      invariant { l2i !c  = 0 }
+      invariant { 0 <= p2i !i <= p2i sz }
+      invariant { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                  value_sub_shift x (p2i !i) + l2i y}
+      variant { p2i sz - p2i !i }
+      lx := get_ofs x !i;
+      set_ofs r !i !lx;
+      assert { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                  value_sub_shift x (p2i !i) + l2i y };
+      let ghost k = p2i !i in
+      i := Int32.(+) !i (Int32.of_int 1);
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+    done;
+    !c
+    end
+
+
+  (** [add_limbs r x y sz] adds [x[0..sz-1]] and [y[0..sz-1]] and writes the result in [r].
+      Returns the carry, either [0] or [1]. Corresponds to the function [mpn_add_n]. *)
+
+  let add_limbs (r x y:t) (sz:int32) : limb
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { valid_ptr_itv y (p2i sz) }
+    requires { valid_ptr_itv r (p2i sz) }
+    ensures { 0 <= l2i result <= 1 }
+    ensures { value_sub_shift r (p2i sz) + (power radix (p2i sz)) * l2i result =
+            value_sub_shift x (p2i sz) + value_sub_shift y (p2i sz) }
+    writes { r.data.contents.elts }
+    =
+    let limb_zero = Limb.of_int 0 in
+    let lx = ref limb_zero in
+    let ly = ref limb_zero in
+    let c = ref limb_zero in
+    let i = ref (Int32.of_int 0) in
+    while Int32.(<) !i sz do
+      variant { p2i sz - p2i !i }
+      invariant { 0 <= p2i !i <= p2i sz }
+      invariant { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                value_sub_shift x (p2i !i) + value_sub_shift y (p2i !i) }
+      invariant { 0 <= l2i !c <= 1 }
+      label StartLoop in
+      lx := get_ofs x !i;
+      ly := get_ofs y !i;
+      let res, carry = add_with_carry !lx !ly !c in
+      set_ofs r !i res;
+      assert { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                value_sub_shift x (p2i !i) + value_sub_shift y (p2i !i) };
+      c := carry;
+      let ghost k = p2i !i in
+      i := Int32.(+) !i (Int32.of_int 1);
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+      value_sub_tail (pelts y) y.offset (y.offset + k);
+      assert { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                value_sub_shift x (p2i !i) + value_sub_shift y (p2i !i)
+              by
+              value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c
+              = value_sub_shift r k + (power radix k) * l2i res
+                   + (power radix (p2i !i)) * l2i !c
+              = value_sub_shift r k + (power radix k) * l2i res
+                   + (power radix k) * radix * l2i !c
+              = value_sub_shift r k + (power radix k) * (l2i res + radix * l2i !c)
+              = value_sub_shift r k +
+                  (power radix k) * (l2i !lx + l2i !ly + l2i (!c at StartLoop))
+              = value_sub_shift r k + (power radix k) * l2i (!c at StartLoop)
+                 + (power radix k) * (l2i !lx + l2i !ly)
+              = value_sub_shift x k + value_sub_shift y k
+                 + (power radix k) * (l2i !lx + l2i !ly)
+              = value_sub_shift x k + (power radix k) * l2i !lx
+                 + value_sub_shift y k + (power radix k) * l2i !ly
+              = value_sub_shift x (p2i !i)
+                 + value_sub_shift y k + (power radix k) * l2i !ly
+              = value_sub_shift x (p2i !i)
+                 + (value_sub_shift y k + (power radix k) * l2i !ly)
+              = value_sub_shift x (p2i !i) + value_sub_shift y (p2i !i) }
+    done;
+    !c
+
+  (** [add r x y sx sy] adds [(x, sx)] to [(y,sy)] and writes the
+      result in [(r, sx)].  [sx] must be greater than or equal to
+      [sy]. Returns carry, either 0 or 1. Corresponds to [mpn_add]. *)
+  let add (r x y:t) (sx sy:int32) : limb
+    requires { 0 <= p2i sy <= p2i sx }
+    requires { valid_ptr_itv x (p2i sx) }
+    requires { valid_ptr_itv y (p2i sy) }
+    requires { valid_ptr_itv r (p2i sx) }
+    ensures { value_sub_shift r (p2i sx) + (power radix (p2i sx)) * l2i result =
+              value_sub_shift x (p2i sx) + value_sub_shift y (p2i sy) }
+    ensures { 0 <= l2i result <= 1 }
+    writes { r.data.contents.elts }
+ =
+    let limb_zero = Limb.of_int 0 in
+    let lx = ref limb_zero in
+    let ly = ref limb_zero in
+    let c = ref limb_zero in
+    let i = ref (Int32.of_int 0) in
+    while Int32.(<) !i sy do
+      variant { p2i sy - p2i !i }
+      invariant { 0 <= p2i !i <= p2i sy }
+      invariant { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                value_sub_shift x (p2i !i) + value_sub_shift y (p2i !i) }
+      invariant { 0 <= l2i !c <= 1 }
+      label StartLoop in
+      lx := get_ofs x !i;
+      ly := get_ofs y !i;
+      let res, carry = add_with_carry !lx !ly !c in
+      set_ofs r !i res;
+      assert { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                value_sub_shift x (p2i !i) + value_sub_shift y (p2i !i) };
+      c := carry;
+      let ghost k = p2i !i in
+      i := Int32.(+) !i (Int32.of_int 1);
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+      value_sub_tail (pelts y) y.offset (y.offset + k);
+      assert { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                value_sub_shift x (p2i !i) + value_sub_shift y (p2i !i)
+              by
+              value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c
+              = value_sub_shift r k + (power radix k) * l2i res
+                   + (power radix (p2i !i)) * l2i !c
+              = value_sub_shift r k + (power radix k) * l2i res
+                   + (power radix k) * radix * l2i !c
+              = value_sub_shift r k + (power radix k) * (l2i res + radix * l2i !c)
+              = value_sub_shift r k +
+                  (power radix k) * (l2i !lx + l2i !ly + l2i (!c at StartLoop))
+              = value_sub_shift r k + (power radix k) * l2i (!c at StartLoop)
+                 + (power radix k) * (l2i !lx + l2i !ly)
+              = value_sub_shift x k + value_sub_shift y k
+                 + (power radix k) * (l2i !lx + l2i !ly)
+              = value_sub_shift x k + (power radix k) * l2i !lx
+                 + value_sub_shift y k + (power radix k) * l2i !ly
+              = value_sub_shift x (p2i !i)
+                 + value_sub_shift y k + (power radix k) * l2i !ly
+              = value_sub_shift x (p2i !i)
+                 + (value_sub_shift y k + (power radix k) * l2i !ly)
+              = value_sub_shift x (p2i !i) + value_sub_shift y (p2i !i) };
+    done;
+    while Int32.(<) !i sx do
+      variant { p2i sx - p2i !i }
+      invariant { p2i sy <= p2i !i <= p2i sx }
+      invariant { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                value_sub_shift x (p2i !i) + value_sub_shift y (p2i sy) }
+      invariant { 0 <= l2i !c <= 1 }
+      label StartLoop2 in
+      lx := get_ofs x !i;
+      let res, carry = add_with_carry !lx limb_zero !c in
+      set_ofs r !i res;
+      assert { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                value_sub_shift x (p2i !i) + value_sub_shift y (p2i sy) };
+      c := carry;
+      let ghost k = p2i !i in
+      i := Int32.(+) !i (Int32.of_int 1);
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+      assert { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                value_sub_shift x (p2i !i) + value_sub_shift y (p2i sy)
+              by
+              value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c
+              = value_sub_shift r k + (power radix k) * l2i res
+                   + (power radix (p2i !i)) * l2i !c
+              = value_sub_shift r k + (power radix k) * l2i res
+                   + (power radix k) * radix * l2i !c
+              = value_sub_shift r k + (power radix k) * (l2i res + radix * l2i !c)
+              = value_sub_shift r k +
+                  (power radix k) * (l2i !lx + 0 + l2i (!c at StartLoop2))
+              = value_sub_shift r k + (power radix k) * l2i (!c at StartLoop2)
+                 + (power radix k) * l2i !lx
+              = value_sub_shift x k + value_sub_shift y (p2i sy)
+                 + (power radix k) * l2i !lx
+              = value_sub_shift x (p2i !i)
+                 + value_sub_shift y (p2i sy) }
+    done;
+    !c
+
+  (** [sub_limb r x y sz] substracts [y] from [(x, sz)] and writes
+      the result to [(r, sz)]. Returns borrow, either 0 or
+      1. Corresponds to [mpn_sub_1]. *)
+  let sub_limb (r x:t) (y:limb) (sz:int32) : limb
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { valid_ptr_itv r (p2i sz) }
+    requires { 0 < p2i sz }
+    ensures { value_sub_shift r (p2i sz) - power radix (p2i sz) * l2i result
+              = value_sub_shift x (p2i sz) - l2i y }
+    ensures { 0 <= l2i result <= 1 }
+    writes { r.data.contents.elts }
+  =
+    let limb_zero = Limb.of_int 0 in
+    let b = ref y in
+    let lx = ref limb_zero in
+    let i = ref (Int32.of_int 0) in
+    while Int32.(<) !i sz && Limb.ne !b limb_zero do
+      invariant { 0 <= p2i !i <= p2i sz }
+      invariant { p2i !i > 0 -> 0 <= l2i !b <= 1 }
+      invariant { value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b
+                  = value_sub_shift x (p2i !i) - l2i y }
+      variant { p2i sz - p2i !i }
+      label StartLoop in
+      lx := get_ofs x !i;
+      let (res, borrow) = sub_with_borrow !lx !b limb_zero in
+      set_ofs r !i res;
+      assert { value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b =
+                 value_sub_shift x (p2i !i) - l2i y };
+      b := borrow;
+      let ghost k = p2i !i in
+      i := Int32.(+) !i (Int32.of_int 1);
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+      assert { value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b
+                  = value_sub_shift x (p2i !i) - l2i y
+             by
+               value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b
+             = value_sub_shift r k + power radix k * l2i res
+                 - power radix (p2i !i) * l2i !b
+             = value_sub_shift r k + power radix k * l2i res
+                 - power radix k * radix * l2i !b
+             = value_sub_shift r k + power radix k * (l2i res - radix * l2i !b)
+             = value_sub_shift r k +
+                 (power radix k) * (l2i !lx - l2i (!b at StartLoop))
+             = value_sub_shift r k - power radix k * l2i (!b at StartLoop)
+                 + power radix k * l2i !lx
+             = value_sub_shift x k - l2i y + power radix k * l2i !lx
+             = value_sub_shift x (p2i !i) - l2i y
+      };
+    done;
+    if Int32.eq !i sz then !b
+    else begin
+    while Int32.(<) !i sz do
+      invariant { l2i !b = 0 }
+      invariant { 0 <= p2i !i <= p2i sz }
+      invariant { value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b
+                   = value_sub_shift x (p2i !i) - l2i y }
+      variant { p2i sz - p2i !i }
+      lx := get_ofs x !i;
+      set_ofs r !i !lx;
+      assert { value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b
+                   = value_sub_shift x (p2i !i) - l2i y };
+      let ghost k = p2i !i in
+      i := Int32.(+) !i (Int32.of_int 1);
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+    done;
+    !b
+  end
+
+  (** [sub_limbs r x y sz] substracts [(y, sz)] from [(x, sz)] and
+      writes the result to [(r, sz)]. Returns borrow, either 0 or
+      1. Corresponds to [mpn_sub_n]. *)
+  let sub_limbs (r x y:t) (sz:int32) : limb
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { valid_ptr_itv y (p2i sz) }
+    requires { valid_ptr_itv r (p2i sz) }
+    ensures { 0 <= l2i result <= 1 }
+    ensures { value_sub_shift r (p2i sz) - power radix (p2i sz) * l2i result
+              = value_sub_shift x (p2i sz) - value_sub_shift y (p2i sz) }
+    writes { r.data.contents.elts }
+  =
+    let limb_zero = Limb.of_int 0 in
+    let lx = ref limb_zero in
+    let ly = ref limb_zero in
+    let b = ref limb_zero in
+    let i = ref (Int32.of_int 0) in
+    while Int32.(<) !i sz do
+      variant { p2i sz - p2i !i }
+      invariant { 0 <= p2i !i <= p2i sz }
+      invariant { value_sub_shift r (p2i !i) - (power radix (p2i !i)) * l2i !b
+                  = value_sub_shift x (p2i !i) - value_sub_shift y (p2i !i) }
+      invariant { 0 <= l2i !b <= 1 }
+      label StartLoop in
+      lx := get_ofs x !i;
+      ly := get_ofs y !i;
+      let res, borrow = sub_with_borrow !lx !ly !b in
+      set_ofs r !i res;
+      assert { value_sub_shift r (p2i !i) - (power radix (p2i !i)) * l2i !b =
+      value_sub_shift x (p2i !i) - value_sub_shift y (p2i !i) };
+      b := borrow;
+      let ghost k = p2i !i in
+      i := Int32.(+) !i (Int32.of_int 1);
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+      value_sub_tail (pelts y) y.offset (y.offset + k);
+      assert { value_sub_shift r (p2i !i) - (power radix (p2i !i)) * l2i !b
+                  = value_sub_shift x (p2i !i) - value_sub_shift y (p2i !i)
+               by
+                 value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b
+               = value_sub_shift r k + power radix k * l2i res
+                   - power radix (p2i !i) * l2i !b
+               = value_sub_shift r k + power radix k * l2i res
+                   - power radix k * radix * l2i !b
+               = value_sub_shift r k
+                 + power radix k * (l2i res - radix * l2i !b)
+               = value_sub_shift r k
+                 + power radix k * (l2i !lx - l2i !ly - l2i (!b at StartLoop))
+               = value_sub_shift r k - power radix k * l2i (!b at StartLoop)
+                 + power radix k * (l2i !lx - l2i !ly)
+               = value_sub_shift x k - value_sub_shift y k
+                 + power radix k * (l2i !lx - l2i !ly)
+               = value_sub_shift x k - value_sub_shift y k
+                 + power radix k * l2i !lx - power radix k * l2i !ly
+               = value_sub_shift x k + power radix k * l2i !lx
+                 - (value_sub_shift y k + power radix k * l2i !ly)
+               = value_sub_shift x (p2i !i)
+                 - (value_sub_shift y k + power radix k * l2i !ly)
+               = value_sub_shift x (p2i !i) - value_sub_shift y (p2i !i)
+        };
+      done;
+      !b
+
+  (** [sub r x y sx sy] substracts [(y,sy)] from [(x, sx)] and writes the
+      result in [(r, sx)]. [sx] must be greater than or equal to
+      [sy]. Returns borrow, either 0 or 1. Corresponds to [mpn_sub]. *)
+  let sub (r x y:t) (sx sy:int32) : limb
+    requires { 0 <= p2i sy <= p2i sx }
+    requires { valid_ptr_itv x (p2i sx) }
+    requires { valid_ptr_itv y (p2i sy) }
+    requires { valid_ptr_itv r (p2i sx) }
+    ensures { value_sub_shift r (p2i sx)  - power radix (p2i sx) * l2i result
+              = value_sub_shift x (p2i sx) - value_sub_shift y (p2i sy) }
+    ensures { 0 <= l2i result <= 1 }
+    writes { r.data.contents.elts }
+  =
+    let limb_zero = Limb.of_int 0 in
+    let lx = ref limb_zero in
+    let ly = ref limb_zero in
+    let b = ref limb_zero in
+    let i = ref (Int32.of_int 0) in
+    let one = Int32.of_int 1 in
+    while Int32.(<) !i sy do
+      variant { p2i sy - p2i !i }
+      invariant { 0 <= p2i !i <= p2i sy }
+      invariant { value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b =
+                  value_sub_shift x (p2i !i) - value_sub_shift y (p2i !i) }
+      invariant { 0 <= l2i !b <= 1 }
+      label StartLoop in
+      lx := get_ofs x !i;
+      ly := get_ofs y !i;
+      let res, borrow = sub_with_borrow !lx !ly !b in
+      set_ofs r !i res;
+      assert { value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b =
+                  value_sub_shift x (p2i !i) - value_sub_shift y (p2i !i) };
+      b := borrow;
+      let ghost k = p2i !i in
+      i := Int32.(+) !i one;
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+      value_sub_tail (pelts y) y.offset (y.offset + k);
+      assert { value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b =
+              value_sub_shift x (p2i !i) - value_sub_shift y (p2i !i)
+              by
+              value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b
+              = value_sub_shift r k + power radix k * l2i res
+                - power radix (p2i !i) * l2i !b
+              = value_sub_shift r k + power radix k * l2i res
+                - (power radix k) * radix * l2i !b
+              = value_sub_shift r k
+                + power radix k * (l2i res - radix * l2i !b)
+              = value_sub_shift r k
+                + power radix k * (l2i !lx - l2i !ly - l2i (!b at StartLoop))
+              = value_sub_shift r k - (power radix k) * l2i (!b at StartLoop)
+                + power radix k * (l2i !lx - l2i !ly)
+              = value_sub_shift x k - value_sub_shift y k
+                + power radix k * (l2i !lx - l2i !ly)
+              = value_sub_shift x k + power radix k * l2i !lx
+                - value_sub_shift y k - power radix k * l2i !ly
+              = value_sub_shift x (p2i !i)
+                - (value_sub_shift y k + power radix k * l2i !ly)
+              = value_sub_shift x (p2i !i) - value_sub_shift y (p2i !i) };
+    done;
+    while Int32.(<) !i sx do
+      variant { p2i sx - p2i !i }
+      invariant { p2i sy <= p2i !i <= p2i sx }
+      invariant { value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b =
+                  value_sub_shift x (p2i !i) - value_sub_shift y (p2i sy) }
+      invariant { 0 <= l2i !b <= 1 }
+      label StartLoop2 in
+      lx := get_ofs x !i;
+      let res, borrow = sub_with_borrow !lx limb_zero !b in
+      set_ofs r !i res;
+      assert { value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b =
+      value_sub_shift x (p2i !i) - value_sub_shift y (p2i sy) };
+      b := borrow;
+      let ghost k = p2i !i in
+      i := Int32.(+) !i one;
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+      assert { value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b =
+               value_sub_shift x (p2i !i) - value_sub_shift y (p2i sy)
+            by
+              value_sub_shift r (p2i !i) - power radix (p2i !i) * l2i !b
+            = value_sub_shift r k + power radix k * l2i res
+              - (power radix (p2i !i)) * l2i !b
+            = value_sub_shift r k + power radix k * l2i res
+              - (power radix k) * radix * l2i !b
+            = value_sub_shift r k + power radix k * (l2i res - radix * l2i !b)
+            = value_sub_shift r k
+              + power radix k * (l2i !lx - 0 - l2i (!b at StartLoop2))
+            = value_sub_shift r k - (power radix k) * l2i (!b at StartLoop2)
+              + (power radix k) * l2i !lx
+            = value_sub_shift x k - value_sub_shift y (p2i sy)
+              + (power radix k) * l2i !lx
+            = value_sub_shift x (p2i !i)
+              - value_sub_shift y (p2i sy) }
+    done;
+    !b
+
+    (** {2 Multiplication} *)
+
+    (** [mul_limb r x y sz] multiplies [x[0..sz-1]] by the limb [y] and
+    writes the n least significant limbs in [r], and returns the most
+    significant limb. It corresponds to [mpn_mul_1]. *)
+  let mul_limb (r x:t) (y:limb) (sz:int32) : limb
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { valid_ptr_itv r (p2i sz) }
+    ensures { value_sub_shift r (p2i sz) + (power radix (p2i sz)) * l2i result
+                = value_sub_shift x (p2i sz) * l2i y }
+    writes { r.data.contents.elts }
+  =
+    let limb_zero = Limb.of_int 0 in
+    let lx = ref limb_zero in
+    let c = ref limb_zero in
+    let i = ref (Int32.of_int 0) in
+    while Int32.(<) !i sz do
+      variant { p2i sz - p2i !i }
+      invariant { 0 <= p2i !i <= p2i sz }
+      invariant { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                  value_sub_shift x (p2i !i) * l2i y }
+      label StartLoop in
+      lx := get_ofs x !i;
+      let rl, rh = Limb.mul_double !lx y in
+      let res, carry = Limb.add_with_carry rl !c limb_zero in
+      label BeforeWrite in
+      value_sub_shift_no_change (pelts r) r.offset (p2i !i) (p2i !i) res;
+      set_ofs r !i res;
+      assert { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+                  value_sub_shift x (p2i !i) * l2i y };
+      assert { l2i rh < radix - 1
+               by
+               (l2i !lx * l2i y <= l2i !lx * (radix-1) <= (radix-1)*(radix-1)
+                 by
+                0 <= l2i !lx <= radix - 1 /\ 0 <= l2i y <= radix -1)
+                 /\
+               (radix * l2i rh <= l2i !lx * l2i y
+                 by
+               l2i rl + radix * l2i rh = l2i !lx * l2i y)
+               so
+               radix * l2i rh <= (radix -1) * (radix -1)
+               };
+      c := Limb.(+) rh carry;
+      let ghost k = p2i !i in
+      i := Int32.(+) !i (Int32.of_int 1);
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+      assert { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c =
+               value_sub_shift x (p2i !i) * l2i y
+               by
+                 value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c
+               = value_sub_shift r k + (power radix k) * l2i res
+                     + (power radix (p2i !i)) * l2i !c
+               = value_sub_shift r k + (power radix k) * l2i res
+                     + (power radix k) * radix * l2i !c
+               = value_sub_shift r k + (power radix k) * (l2i res + radix * l2i !c)
+               = value_sub_shift r k + (power radix k) *
+                                   (l2i res + radix * (l2i rh + l2i carry))
+               = value_sub_shift r k + (power radix k) *
+                                   (l2i res + radix * l2i carry + radix * l2i rh)
+               = value_sub_shift r k + (power radix k) *
+                                   (l2i (!c at StartLoop) + l2i rl + radix*l2i rh)
+               = value_sub_shift r k + (power radix k) *
+                                   (l2i (!c at StartLoop) + l2i !lx * l2i y)
+               = value_sub_shift r k + (power radix k) * l2i (!c at StartLoop)
+                                 + (power radix k) * l2i !lx * l2i y
+               = value_sub_shift x k * l2i y + (power radix k) * l2i !lx * l2i y
+               = (value_sub_shift x k + (power radix k) * l2i !lx) * l2i y
+               = value_sub_shift x (p2i !i) * l2i y
+               };
+    done;
+    !c
+
+  (** [addmul_limb r x y sz] multiplies [(x, sz)] by [y], adds the [sz]
+      least significant limbs to [(r, sz)] and writes the result in [(r,sz)].
+      Returns the most significant limb of the product plus the carry
+      of the addition. Corresponds to [mpn_addmul_1].*)
+  let addmul_limb (r x:t) (y:limb) (sz:int32):limb
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { valid_ptr_itv r (p2i sz) }
+    ensures { value_sub_shift r (p2i sz) + (power radix (p2i sz)) * l2i result
+            = value_sub_shift (old r) (p2i sz)
+              + value_sub_shift x (p2i sz) * l2i y }
+    writes { r.data.contents.elts }
+    ensures { forall j. j < r.offset \/ r.offset + p2i sz <= j ->
+              (pelts r)[j] = (pelts (old r))[j] }
+  =
+    let limb_zero = Limb.of_int 0 in
+    let lx = ref limb_zero in
+    let lr = ref limb_zero in
+    let c = ref limb_zero in
+    let i = ref (Int32.of_int 0) in
+    while Int32.(<) !i sz do
+      variant { p2i sz - p2i !i }
+      invariant { 0 <= p2i !i <= p2i sz }
+      invariant { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c
+                 = value_sub_shift (old r) (p2i !i)
+                   + value_sub_shift x (p2i !i) * l2i y }
+      invariant { forall j. p2i !i <= j < p2i sz ->
+                 (pelts (old r)) [r.offset+j] = (pelts r)[r.offset + j]  }
+      invariant { forall j. j < r.offset \/ r.offset + p2i sz <= j ->
+                 (pelts r)[j] = (pelts (old r))[j] }
+      label StartLoop in
+      let ghost k = p2i !i in
+      lx := get_ofs x !i;
+      lr := get_ofs r !i;
+      assert { l2i !lr = l2i (pelts (old r))[r.offset + p2i !i] };
+      let rl, rh = Limb.mul_double !lx y in
+      let res, carry = Limb.add3 !lr rl !c in
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+      value_sub_update (pelts r) (r.offset + p2i !i) r.offset (r.offset + p2i !i +1) res;
+      set_ofs r !i res;
+      assert { forall j. (p2i !i + 1) <= j < p2i sz ->
+               (pelts (old r))[r.offset+j] = (pelts r)[r.offset+j]
+               by
+               (pelts r)[r.offset+j] = ((pelts r) at StartLoop)[r.offset+j]
+                                  = (pelts (old r))[r.offset+j] };
+      assert { value_sub_shift r (p2i !i + 1)
+              = value_sub_shift (r at StartLoop) (p2i !i + 1)
+                + (power radix (p2i !i)) * (l2i res - l2i !lr)
+               };
+      assert { l2i rl + radix * l2i rh <= (radix-1)*(radix-1)
+               by
+               (l2i !lx * l2i y <= l2i !lx * (radix-1) <= (radix-1)*(radix-1)
+                 by
+                0 <= l2i !lx <= radix - 1 /\ 0 <= l2i y <= radix -1)
+                /\
+                l2i rl + radix * l2i rh = l2i !lx * l2i y
+                };
+      assert { l2i rh < radix - 1
+               by
+               l2i rl + radix * l2i rh  <= (radix -1) * (radix -1)
+               so
+               radix * l2i rh <= (radix -1) * (radix -1)
+               };
+      assert { l2i rh = radix - 2 -> l2i rl <= 1
+               by
+               l2i rl + radix * l2i rh <= (radix-1)*(radix-1) };
+      assert { l2i rh = radix - 2 -> l2i carry <= 1
+               by l2i rl <= 1 };
+      c := Limb.(+) rh carry;
+      i := Int32.(+) !i (Int32.of_int 1);
+      assert { value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c
+                 = value_sub_shift (old r) (p2i !i)
+                   + value_sub_shift x (p2i !i) * l2i y
+               by
+                (value_sub_shift r (p2i !i) + (power radix (p2i !i)) * l2i !c
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i res - l2i !lr)
+                   + (power radix (p2i !i)) * l2i !c
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i res - l2i !lr)
+                   + (power radix (p2i !i)) * (l2i rh + l2i carry)
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i res - l2i !lr)
+                   + (power radix k) * radix * (l2i rh + l2i carry)
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i res - l2i !lr
+                                   + radix * (l2i rh + l2i carry))
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i res + radix * l2i carry
+                          - l2i !lr + radix * l2i rh)
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i rl + l2i !lr + l2i (!c at StartLoop)
+                          - l2i !lr + radix * l2i rh)
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i rl + radix * l2i rh + l2i (!c at StartLoop))
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i !lx * l2i y + l2i (!c at StartLoop))
+                = value_sub_shift (r at StartLoop) k
+                    + (power radix k) * l2i !lr
+                    + (power radix k) * (l2i !lx * l2i y + l2i (!c at StartLoop))
+                = value_sub_shift (r at StartLoop) k
+                    + (power radix k) * l2i (!c at StartLoop)
+                    + (power radix k) * (l2i !lx * l2i y + l2i !lr)
+                = value_sub_shift (old r) k
+                    + value_sub_shift x k * l2i y
+                    + (power radix k) * (l2i !lx * l2i y + l2i !lr)
+                = value_sub_shift (old r) k
+                    + (power radix k) * l2i !lr
+                    + (value_sub_shift x k + (power radix k)*l2i !lx) * l2i y
+                = value_sub_shift (old r) (p2i !i)
+                    + (value_sub_shift x k + (power radix k)*l2i !lx) * l2i y
+                = value_sub_shift (old r) (p2i !i)
+                    + value_sub_shift x (p2i !i) * l2i y
+                    by
+                  value_sub_shift (old r) (p2i !i) = value_sub_shift (old r) k
+                     + (power radix k) * l2i !lr
+                     )
+                    };
+    done;
+    !c
+
+  (** [mul_limbs r x y sz] multiplies [(x, sz)] and [(y, sz)] and
+  writes the result to [(r, 2*sz)]. [r] must not overlap with either
+  [x] or [y]. Corresponds to [mpn_mul_n].  *)
+  let mul_limbs (r x y:t) (sz:int32) : unit
+    requires { p2i sz > 0 }
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { valid_ptr_itv y (p2i sz) }
+    requires { valid_ptr_itv r (p2i sz +  p2i sz) }
+    writes { r.data.contents.elts }
+    ensures { value_sub_shift r (p2i sz + p2i sz)
+              = value_sub_shift x (p2i sz) * value_sub_shift y (p2i sz) }
+  =
+    zero r sz;
+    let limb_zero = Limb.of_int 0 in
+    let one = Int32.of_int 1 in
+    let rp = ref r in
+    let ly = ref limb_zero in
+    let c = ref limb_zero in
+    let i = ref (Int32.of_int 0) in
+    while Int32.(<) !i sz do
+      invariant { 0 <= p2i !i <= p2i sz }
+      invariant { value_sub_shift r (p2i !i + p2i sz)
+                    + (power radix (p2i !i + p2i sz)) * l2i !c
+                  = value_sub_shift x (p2i sz)
+                      * value_sub_shift y (p2i !i) }
+      invariant { (!rp).offset = r.offset + p2i !i }
+      invariant { plength !rp = plength r }
+      invariant { pelts !rp = pelts r }
+      invariant { 0 <= l2i !c <= 1 }
+      variant { p2i sz - p2i !i }
+      label StartLoop in
+      let ghost k = p2i !i in
+      value_sub_concat (pelts r) r.offset (r.offset + k)
+                       (r.offset + k + p2i sz);
+      assert { value_sub_shift r k
+             + (power radix k) * value_sub (pelts r) (r.offset + k)
+                                                   (r.offset + k + p2i sz)
+             = value_sub_shift r (k + p2i sz) };
+      ly := get_ofs y !i;
+      let c' =  addmul_limb !rp x !ly sz in
+      assert { value_sub_shift !rp (p2i sz) + power radix (p2i sz) * l2i c'
+              = value_sub_shift (!rp at StartLoop) (p2i sz)
+                + value_sub_shift x (p2i sz) * l2i !ly };
+      assert { MapEq.map_eq_sub (pelts r) (pelts r at StartLoop)
+                r.offset (!rp).offset
+                by (!rp).offset = r.offset + p2i !i
+                so forall j. r.offset <= j < (!rp).offset
+                   ->
+                   (j < (!rp).offset
+                    so (pelts !rp)[j] = (pelts !rp at StartLoop)[j]
+                         = (pelts r at StartLoop)[j]) };
+      let (res, carry) = add_with_carry c' limb_zero !c in
+      label BeforeCarry in
+      value_sub_update_no_change (pelts r) ((!rp).offset + p2i sz)
+                        r.offset  (r.offset + p2i !i) res;
+      set_ofs !rp sz res;
+      c:= carry;
+      i := Int32.(+) !i one;
+      assert { value_sub_shift r k = value_sub_shift (r at BeforeCarry) k
+             = value_sub_shift (r at StartLoop) k};
+      value_sub_tail (pelts r) r.offset (r.offset + p2i sz + k);
+      value_sub_tail (pelts y) y.offset (y.offset + k);
+      value_sub_concat (pelts r) r.offset (r.offset + k) (r.offset + k + p2i sz);
+      assert { value_sub (pelts r) (r.offset+k) (r.offset+k+p2i sz)
+               = value_sub_shift !rp (p2i sz) };
+      assert { value_sub_shift r (p2i !i + p2i sz)
+                    + (power radix (p2i !i + p2i sz)) * l2i !c
+                  = value_sub_shift x (p2i sz)
+                      * value_sub_shift y (p2i !i)
+               by
+                 power radix (k + p2i sz) = power radix k * power radix (p2i sz)
+               so
+                 value_sub_shift (r at StartLoop) k
+                 + (power radix k) * value_sub (pelts r at StartLoop)
+                                   (r.offset + k) (r.offset + k + p2i sz)
+                 = value_sub_shift (r at StartLoop) (k + p2i sz)
+               so
+                 value_sub_shift r (p2i !i + p2i sz)
+                    + (power radix (p2i !i + p2i sz)) * l2i !c
+               = value_sub_shift r (k + p2i sz)
+                    + (power radix (k + p2i sz)) * l2i res
+                    + (power radix (p2i !i + p2i sz)) * l2i !c
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sz)
+                    + (power radix (k + p2i sz)) * l2i res
+                    + (power radix (p2i !i + p2i sz)) * l2i !c
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sz)
+                    + (power radix k) * (power radix (p2i sz)) * l2i res
+                    + (power radix (p2i !i + p2i sz)) * l2i !c
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sz)
+                    + (power radix k) * (power radix (p2i sz)) * l2i res
+                    + (power radix k) * (power radix (p2i sz)) * radix * l2i !c
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sz)
+                    + (power radix k) * (power radix (p2i sz))
+                             * (l2i res + radix * l2i !c)
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sz)
+                    + (power radix k) * (power radix (p2i sz))
+                             * (l2i c' + l2i (!c at StartLoop))
+               = value_sub_shift r k + (power radix k)
+                    * (value_sub_shift !rp (p2i sz)
+                      + power radix (p2i sz) * l2i c'
+                      + (power radix (p2i sz)) * l2i (!c at StartLoop))
+               = value_sub_shift r k + (power radix k)
+                    * (value_sub_shift (!rp at StartLoop) (p2i sz)
+                       + value_sub_shift x (p2i sz) * l2i !ly
+                       + (power radix (p2i sz)) * l2i (!c at StartLoop))
+               = value_sub_shift r k
+                 + power radix k * (value_sub_shift (!rp at StartLoop) (p2i sz))
+                 + power radix k * (value_sub_shift x (p2i sz) * l2i !ly
+                    + (power radix (p2i sz)) * (l2i (!c at StartLoop)))
+               = value_sub_shift (r at StartLoop) k
+                 + power radix k * (value_sub_shift (!rp at StartLoop) (p2i sz))
+                 + power radix k * (value_sub_shift x (p2i sz) * l2i !ly
+                    + (power radix (p2i sz)) * (l2i (!c at StartLoop)))
+               = value_sub_shift (r at StartLoop) k
+                 + power radix k * (value_sub (pelts r at StartLoop) (r.offset+k)
+                                              (r.offset+k+ p2i sz))
+                 + power radix k * (value_sub_shift x (p2i sz) * l2i !ly
+                    + (power radix (p2i sz)) * (l2i (!c at StartLoop)))
+               = value_sub_shift (r at StartLoop) (k + p2i sz)
+                 + power radix k * (value_sub_shift x (p2i sz) * l2i !ly
+                    + (power radix (p2i sz)) * (l2i (!c at StartLoop)))
+               = value_sub_shift (r at StartLoop) (k + p2i sz)
+                 + power radix k * value_sub_shift x (p2i sz) * l2i !ly
+                 + power radix k * power radix (p2i sz) * (l2i (!c at StartLoop))
+               = value_sub_shift (r at StartLoop) (k + p2i sz)
+                 + power radix k * power radix (p2i sz) * (l2i (!c at StartLoop))
+                 + power radix k * value_sub_shift x (p2i sz) * l2i !ly
+               = value_sub_shift (r at StartLoop) (k + p2i sz)
+                 + power radix (k + p2i sz) * (l2i (!c at StartLoop))
+                 + power radix k * value_sub_shift x (p2i sz) * l2i !ly
+               = value_sub_shift x (p2i sz) * value_sub_shift y k
+                + power radix k * value_sub_shift x (p2i sz) * l2i !ly
+               = value_sub_shift x (p2i sz) *
+                 (value_sub_shift y k + power radix k * l2i !ly)
+               = value_sub_shift x (p2i sz) * value_sub_shift y (p2i !i)
+             };
+      rp := C.incr !rp one;
+    done;
+    value_sub_lower_bound (pelts r) r.offset (r.offset + p2i sz + p2i sz);
+    value_sub_upper_bound (pelts x) x.offset (x.offset + p2i sz);
+    value_sub_upper_bound (pelts y) y.offset (y.offset + p2i sz);
+    assert { 0 <= value_sub_shift x (p2i sz) < power radix (p2i sz) };
+    assert { 0 <= value_sub_shift y (p2i sz) < power radix (p2i sz) };
+    prod_compat_strict_r (value_sub_shift y (p2i sz)) (power radix (p2i sz))
+                         (power radix (p2i sz));
+    assert { l2i !c = 0 by
+             0 < power radix (p2i sz)
+             so
+             value_sub_shift r (p2i sz + p2i sz)
+                    + (power radix (p2i sz + p2i sz)) * l2i !c
+                  = value_sub_shift x (p2i sz)
+                      * value_sub_shift y (p2i sz)
+             so
+             (power radix (p2i sz + p2i sz))*l2i !c <=
+                    value_sub_shift x (p2i sz)
+                    * value_sub_shift y (p2i sz)
+                    <= (power radix (p2i sz)) * value_sub_shift y (p2i sz)
+                    < (power radix (p2i sz))*(power radix (p2i sz))
+             so
+             (power radix (p2i sz + p2i sz))*l2i !c <
+                    (power radix (p2i sz))*(power radix (p2i sz))  }
+
+ let addmul_limbs (r x y:t) (sz:int32) : limb
+    requires { p2i sz > 0 }
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { valid_ptr_itv y (p2i sz) }
+    requires { valid_ptr_itv r (p2i sz +  p2i sz) }
+    writes { r.data.contents.elts }
+    ensures { value_sub_shift r (p2i sz + p2i sz)
+                + power radix (p2i sz + p2i sz) * l2i result
+              = value_sub_shift (old r) (p2i sz + p2i sz)
+                + value_sub_shift x (p2i sz) * value_sub_shift y (p2i sz) }
+  =
+    let limb_zero = Limb.of_int 0 in
+    let one = Int32.of_int 1 in
+    let rp = ref r in
+    let ly = ref limb_zero in
+    let lr = ref limb_zero in
+    let c = ref limb_zero in
+    let i = ref (Int32.of_int 0) in
+    let rec lemma old_tail_shift (i:int)
+      requires { i >= 0 }
+      variant { i }
+      ensures { value_sub_shift (old r) (i+1) = value_sub_shift (old r) i
+              + power radix i * l2i (pelts (old r))[r.offset+i] }
+      =
+        if i > 0 then old_tail_shift (i-1) else assert {1+2=3}  in
+    while Int32.(<) !i sz do
+      invariant { 0 <= p2i !i <= p2i sz }
+      invariant { value_sub_shift r (p2i !i + p2i sz)
+                    + (power radix (p2i !i + p2i sz)) * l2i !c
+                  = value_sub_shift (old r) (p2i !i + p2i sz)
+                    + value_sub_shift x (p2i sz) * value_sub_shift y (p2i !i) }
+      invariant { (!rp).offset = r.offset + p2i !i }
+      invariant { r.data = (!rp).data }
+      invariant { 0 <= l2i !c <= 1 }
+      invariant { forall j. (!rp).offset + p2i sz <= j ->
+                 (pelts (old r)) [j] = (pelts r)[j]  }
+      variant { p2i sz - p2i !i }
+      label StartLoop in
+      let ghost k = p2i !i in
+      value_sub_concat (pelts r) r.offset (r.offset + k)
+                       (r.offset + k + p2i sz);
+      assert { value_sub_shift r k
+             + (power radix k) * value_sub (pelts r) (r.offset + k)
+                                                   (r.offset + k + p2i sz)
+             = value_sub_shift r (k + p2i sz) };
+      ly := get_ofs y !i;
+      let c' =  addmul_limb !rp x !ly sz in
+      assert { value_sub_shift !rp (p2i sz) + power radix (p2i sz) * l2i c'
+              = value_sub_shift (!rp at StartLoop) (p2i sz)
+                + value_sub_shift x (p2i sz) * l2i !ly };
+      assert { MapEq.map_eq_sub (pelts r) (pelts r at StartLoop)
+                r.offset (!rp).offset
+                by (!rp).offset = r.offset + p2i !i
+                so forall j. r.offset <= j < (!rp).offset
+                   ->
+                   (j < (!rp).offset
+                    so (pelts !rp)[j] = (pelts !rp at StartLoop)[j]
+                         = (pelts r at StartLoop)[j]) };
+      lr := get_ofs !rp sz;
+      assert { l2i !lr = l2i (pelts (old r))[r.offset+ p2i !i + p2i sz] };
+      let (res, carry) = add_with_carry c' !lr !c in
+      label BeforeCarry in
+      value_sub_update_no_change (pelts r) ((!rp).offset + p2i sz)
+                        r.offset  (r.offset + p2i !i) res;
+      set_ofs !rp sz res;
+      assert { value_sub_shift !rp (p2i sz) = value_sub_shift (!rp at BeforeCarry) (p2i sz) };
+      c:= carry;
+      i := Int32.(+) !i one;
+      assert { value_sub_shift r k = value_sub_shift (r at BeforeCarry) k
+             = value_sub_shift (r at StartLoop) k};
+      value_sub_tail (pelts r) r.offset (r.offset + p2i sz + k);
+      value_sub_tail (pelts y) y.offset (y.offset + k);
+      old_tail_shift (k+p2i sz);
+      value_sub_concat (pelts r) r.offset (r.offset + k) (r.offset + k + p2i sz);
+      assert { value_sub (pelts r) (r.offset+k) (r.offset+k+p2i sz)
+               = value_sub_shift !rp (p2i sz) };
+      assert { value_sub_shift r (p2i !i + p2i sz)
+                    + (power radix (p2i !i + p2i sz)) * l2i !c
+                  = value_sub_shift (old r) (p2i !i + p2i sz)
+                    + value_sub_shift x (p2i sz)
+                      * value_sub_shift y (p2i !i)
+               by
+                 power radix (k + p2i sz) = power radix k * power radix (p2i sz)
+               so
+                 value_sub_shift (r at StartLoop) k
+                 + (power radix k) * value_sub (pelts r at StartLoop)
+                                   (r.offset + k) (r.offset + k + p2i sz)
+                 = value_sub_shift (r at StartLoop) (k + p2i sz)
+               so (value_sub_shift (old r) (p2i !i+p2i sz)
+                  = value_sub_shift (old r) (k+p2i sz)
+                  + power radix (k+p2i sz) * l2i !lr
+                  by l2i !lr = l2i (pelts (old r))[r.offset + k + p2i sz])
+               so
+                  value_sub_shift !rp (p2i sz) + (power radix (p2i sz)) * l2i c' =
+                  value_sub_shift (!rp at StartLoop) (p2i sz)
+                  + value_sub_shift x (p2i sz) * l2i !ly
+               so
+                 value_sub_shift r (p2i !i + p2i sz)
+                    + (power radix (p2i !i + p2i sz)) * l2i !c
+               = value_sub_shift r (k + p2i sz)
+                    + (power radix (k + p2i sz)) * l2i res
+                    + (power radix (p2i !i + p2i sz)) * l2i !c
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sz)
+                    + (power radix (k + p2i sz)) * l2i res
+                    + (power radix (p2i !i + p2i sz)) * l2i !c
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sz)
+                    + (power radix k) * (power radix (p2i sz)) * l2i res
+                    + (power radix (p2i !i + p2i sz)) * l2i !c
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sz)
+                    + (power radix k) * (power radix (p2i sz)) * l2i res
+                    + (power radix k) * (power radix (p2i sz)) * radix * l2i !c
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sz)
+                    + (power radix k) * (power radix (p2i sz))
+                             * (l2i res + radix * l2i !c)
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sz)
+                    + (power radix k) * (power radix (p2i sz))
+                             * (l2i c' + l2i (!c at StartLoop) + l2i !lr)
+               = value_sub_shift r k + (power radix k)
+                    * (value_sub_shift !rp (p2i sz)
+                      + power radix (p2i sz) * (l2i c'+ l2i (!c at StartLoop) + l2i !lr))
+               = value_sub_shift r k + (power radix k)
+                    * (value_sub_shift !rp (p2i sz)
+                      + power radix (p2i sz) * l2i c'
+                      + power radix (p2i sz) * (l2i (!c at StartLoop) + l2i !lr))
+               = value_sub_shift r k + (power radix k)
+                    * (value_sub_shift (!rp at StartLoop) (p2i sz)
+                       + value_sub_shift x (p2i sz) * l2i !ly
+                       + (power radix (p2i sz)) * (l2i (!c at StartLoop) + l2i !lr))
+               = value_sub_shift r k
+                 + power radix k * (value_sub_shift (!rp at StartLoop) (p2i sz))
+                 + power radix k * (value_sub_shift x (p2i sz) * l2i !ly
+                    + (power radix (p2i sz)) * (l2i (!c at StartLoop) + l2i !lr))
+               = value_sub_shift (r at StartLoop) k
+                 + power radix k * (value_sub_shift (!rp at StartLoop) (p2i sz))
+                 + power radix k * (value_sub_shift x (p2i sz) * l2i !ly
+                    + (power radix (p2i sz)) * (l2i (!c at StartLoop) + l2i !lr))
+               = value_sub_shift (r at StartLoop) k
+                 + power radix k * (value_sub (pelts r at StartLoop) (r.offset+k)
+                                              (r.offset+k+ p2i sz))
+                 + power radix k * (value_sub_shift x (p2i sz) * l2i !ly
+                    + (power radix (p2i sz)) * (l2i (!c at StartLoop) + l2i !lr))
+               = value_sub_shift (r at StartLoop) (k + p2i sz)
+                 + power radix k * (value_sub_shift x (p2i sz) * l2i !ly
+                    + (power radix (p2i sz)) * (l2i (!c at StartLoop) + l2i !lr))
+               = value_sub_shift (r at StartLoop) (k + p2i sz)
+                 + power radix k * value_sub_shift x (p2i sz) * l2i !ly
+                 + power radix k * power radix (p2i sz) * (l2i (!c at StartLoop) + l2i !lr)
+               = value_sub_shift (r at StartLoop) (k + p2i sz)
+                 + power radix k * power radix (p2i sz) * (l2i (!c at StartLoop) + l2i !lr)
+                 + power radix k * value_sub_shift x (p2i sz) * l2i !ly
+               = value_sub_shift (r at StartLoop) (k + p2i sz)
+                 + power radix (k + p2i sz) * (l2i (!c at StartLoop) + l2i !lr)
+                 + power radix k * value_sub_shift x (p2i sz) * l2i !ly
+               = value_sub_shift (r at StartLoop) (k + p2i sz)
+                 + power radix (k + p2i sz) * (l2i (!c at StartLoop))
+                 + power radix (k + p2i sz) * l2i !lr
+                 + power radix k * value_sub_shift x (p2i sz) * l2i !ly
+               = value_sub_shift (old r) (k+p2i sz)
+                 + value_sub_shift x (p2i sz) * value_sub_shift y k
+                 + power radix (k + p2i sz) * l2i !lr
+                 + power radix k * value_sub_shift x (p2i sz) * l2i !ly
+               = value_sub_shift (old r) (k+p2i sz)
+                 + power radix (k + p2i sz) * l2i !lr
+                 + value_sub_shift x (p2i sz) * value_sub_shift y k
+                 + power radix k * value_sub_shift x (p2i sz) * l2i !ly
+               = value_sub_shift (old r) (k+p2i sz)
+                 + power radix (k + p2i sz) * l2i !lr
+                 + value_sub_shift x (p2i sz) * (value_sub_shift y k + power radix k * l2i !ly)
+               = value_sub_shift (old r) (k+p2i sz)
+                 + power radix (k + p2i sz) * l2i !lr
+                 + value_sub_shift x (p2i sz) * value_sub_shift y (p2i !i)
+               = value_sub_shift (old r) (p2i !i +p2i sz)
+                 + value_sub_shift x (p2i sz) * value_sub_shift y (p2i !i)
+             };
+      rp := C.incr !rp one;
+    done;
+    !c
+
+  (** [mul r x y sx sy] multiplies [(x, sx)] and [(y,sy)] and writes
+  the result in [(r, sx+sy)]. [sx] must be greater than or equal to
+  [sy]. Corresponds to [mpn_mul]. *)
+  let mul (r x y:t) (sx sy:int32) : unit
+    requires { 0 < p2i sy <= p2i sx }
+    requires { valid_ptr_itv x (p2i sx) }
+    requires { valid_ptr_itv y (p2i sy) }
+    requires { valid_ptr_itv r (p2i sy + p2i sx) }
+    writes { r.data.contents.elts }
+    ensures { value_sub_shift r (p2i sy + p2i sx)
+              = value_sub_shift x (p2i sx) * value_sub_shift y (p2i sy) }
+  =
+    zero r sx;
+    let limb_zero = Limb.of_int 0 in
+    let one = Int32.of_int 1 in
+    let rp = ref r in
+    let ly = ref limb_zero in
+    let c = ref limb_zero in
+    let i = ref (Int32.of_int 0) in
+    while Int32.(<) !i sy do
+      invariant { 0 <= p2i !i <= p2i sy }
+      invariant { value_sub_shift r (p2i !i + p2i sx)
+                    + (power radix (p2i !i + p2i sx)) * l2i !c
+                  = value_sub_shift x (p2i sx)
+                      * value_sub_shift y (p2i !i) }
+      invariant { (!rp).offset = r.offset + p2i !i }
+      invariant { plength !rp = plength r }
+      invariant { pelts !rp = pelts r }
+      invariant { 0 <= l2i !c <= 1 }
+      variant { p2i sy - p2i !i }
+      label StartLoop in
+      let ghost k = p2i !i in
+      value_sub_concat (pelts r) r.offset (r.offset + k)
+                       (r.offset + k + p2i sx);
+      assert { value_sub_shift r k
+             + (power radix k) * value_sub (pelts r) (r.offset + k)
+                                                   (r.offset + k + p2i sx)
+             = value_sub_shift r (k + p2i sx) };
+      ly := get_ofs y !i;
+      let c' =  addmul_limb !rp x !ly sx in
+      assert { value_sub_shift !rp (p2i sx) + power radix (p2i sx) * l2i c'
+              = value_sub_shift (!rp at StartLoop) (p2i sx)
+                + value_sub_shift x (p2i sx) * l2i !ly };
+      assert { MapEq.map_eq_sub (pelts r) (pelts r at StartLoop)
+                r.offset (!rp).offset
+                by (!rp).offset = r.offset + p2i !i
+                so forall j. r.offset <= j < (!rp).offset
+                   ->
+                   (j < (!rp).offset
+                    so (pelts !rp)[j] = (pelts !rp at StartLoop)[j]
+                         = (pelts r at StartLoop)[j]) };
+      let (res, carry) = add_with_carry c' limb_zero !c in
+      label BeforeCarry in
+      value_sub_update_no_change (pelts r) ((!rp).offset + p2i sx)
+                        r.offset  (r.offset + p2i !i) res;
+      set_ofs !rp sx res;
+      c:= carry;
+      i := Int32.(+) !i one;
+      assert { value_sub_shift r k = value_sub_shift (r at BeforeCarry) k
+             = value_sub_shift (r at StartLoop) k};
+      value_sub_tail (pelts r) r.offset (r.offset + p2i sx + k);
+      value_sub_tail (pelts y) y.offset (y.offset + k);
+      value_sub_concat (pelts r) r.offset (r.offset + k) (r.offset + k + p2i sx);
+      assert { value_sub (pelts r) (r.offset+k) (r.offset+k+p2i sx)
+               = value_sub_shift !rp (p2i sx) };
+      assert { value_sub_shift r (p2i !i + p2i sx)
+                    + (power radix (p2i !i + p2i sx)) * l2i !c
+                  = value_sub_shift x (p2i sx)
+                      * value_sub_shift y (p2i !i)
+               by
+                 power radix (k + p2i sx) = power radix k * power radix (p2i sx)
+               so
+                 value_sub_shift (r at StartLoop) k
+                 + (power radix k) * value_sub (pelts r at StartLoop)
+                                   (r.offset + k) (r.offset + k + p2i sx)
+                 = value_sub_shift (r at StartLoop) (k + p2i sx)
+               so
+                 value_sub_shift r (p2i !i + p2i sx)
+                    + (power radix (p2i !i + p2i sx)) * l2i !c
+               = value_sub_shift r (k + p2i sx)
+                    + (power radix (k + p2i sx)) * l2i res
+                    + (power radix (p2i !i + p2i sx)) * l2i !c
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sx)
+                    + (power radix (k + p2i sx)) * l2i res
+                    + (power radix (p2i !i + p2i sx)) * l2i !c
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sx)
+                    + (power radix k) * (power radix (p2i sx)) * l2i res
+                    + (power radix (p2i !i + p2i sx)) * l2i !c
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sx)
+                    + (power radix k) * (power radix (p2i sx)) * l2i res
+                    + (power radix k) * (power radix (p2i sx)) * radix * l2i !c
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sx)
+                    + (power radix k) * (power radix (p2i sx))
+                             * (l2i res + radix * l2i !c)
+               = value_sub_shift r k
+                    + (power radix k) * value_sub_shift !rp (p2i sx)
+                    + (power radix k) * (power radix (p2i sx))
+                             * (l2i c' + l2i (!c at StartLoop))
+               = value_sub_shift r k + (power radix k)
+                    * (value_sub_shift !rp (p2i sx)
+                      + power radix (p2i sx) * l2i c'
+                      + (power radix (p2i sx)) * l2i (!c at StartLoop))
+               = value_sub_shift r k + (power radix k)
+                    * (value_sub_shift (!rp at StartLoop) (p2i sx)
+                       + value_sub_shift x (p2i sx) * l2i !ly
+                       + (power radix (p2i sx)) * l2i (!c at StartLoop))
+               = value_sub_shift r k
+                 + power radix k * (value_sub_shift (!rp at StartLoop) (p2i sx))
+                 + power radix k * (value_sub_shift x (p2i sx) * l2i !ly
+                    + (power radix (p2i sx)) * (l2i (!c at StartLoop)))
+               = value_sub_shift (r at StartLoop) k
+                 + power radix k * (value_sub_shift (!rp at StartLoop) (p2i sx))
+                 + power radix k * (value_sub_shift x (p2i sx) * l2i !ly
+                    + (power radix (p2i sx)) * (l2i (!c at StartLoop)))
+               = value_sub_shift (r at StartLoop) k
+                 + power radix k * (value_sub (pelts r at StartLoop) (r.offset+k)
+                                              (r.offset+k+ p2i sx))
+                 + power radix k * (value_sub_shift x (p2i sx) * l2i !ly
+                    + (power radix (p2i sx)) * (l2i (!c at StartLoop)))
+               = value_sub_shift (r at StartLoop) (k + p2i sx)
+                 + power radix k * (value_sub_shift x (p2i sx) * l2i !ly
+                    + (power radix (p2i sx)) * (l2i (!c at StartLoop)))
+               = value_sub_shift (r at StartLoop) (k + p2i sx)
+                 + power radix k * value_sub_shift x (p2i sx) * l2i !ly
+                 + power radix k * power radix (p2i sx) * (l2i (!c at StartLoop))
+               = value_sub_shift (r at StartLoop) (k + p2i sx)
+                 + power radix k * power radix (p2i sx) * (l2i (!c at StartLoop))
+                 + power radix k * value_sub_shift x (p2i sx) * l2i !ly
+               = value_sub_shift (r at StartLoop) (k + p2i sx)
+                 + power radix (k + p2i sx) * (l2i (!c at StartLoop))
+                 + power radix k * value_sub_shift x (p2i sx) * l2i !ly
+               = value_sub_shift x (p2i sx) * value_sub_shift y k
+                + power radix k * value_sub_shift x (p2i sx) * l2i !ly
+               = value_sub_shift x (p2i sx) *
+                 (value_sub_shift y k + power radix k * l2i !ly)
+               = value_sub_shift x (p2i sx) * value_sub_shift y (p2i !i)
+             };
+      rp := C.incr !rp one;
+    done;
+    value_sub_lower_bound (pelts r) r.offset (r.offset + p2i sy + p2i sx);
+    value_sub_upper_bound (pelts x) x.offset (x.offset + p2i sx);
+    value_sub_upper_bound (pelts y) y.offset (y.offset + p2i sy);
+    assert { 0 <= value_sub_shift x (p2i sx) < power radix (p2i sx) };
+    assert { 0 <= value_sub_shift y (p2i sy) < power radix (p2i sy) };
+    prod_compat_strict_r (value_sub_shift y (p2i sy)) (power radix (p2i sy))
+                         (power radix (p2i sx));
+    assert { l2i !c = 0 by
+             0 < power radix (p2i sx)
+             so
+             value_sub_shift r (p2i sy + p2i sx)
+                    + (power radix (p2i sy + p2i sx)) * l2i !c
+                  = value_sub_shift x (p2i sx)
+                      * value_sub_shift y (p2i sy)
+             so
+             (power radix (p2i sy + p2i sx))*l2i !c <=
+                    value_sub_shift x (p2i sx)
+                    * value_sub_shift y (p2i sy)
+                    <= (power radix (p2i sx)) * value_sub_shift y (p2i sy)
+                    < (power radix (p2i sx))*(power radix (p2i sy))
+             so
+             (power radix (p2i sx + p2i sy))*l2i !c <
+                    (power radix (p2i sx))*(power radix (p2i sy))  }
+
+
+  (** {2 Logical operations} *)
+
+  use import int.EuclideanDivision
+
+ let lemma pow2_64 ()
+   ensures { power 2 64 = radix }
+ =
+   assert { power 2 2 = 4 };
+   assert { power 2 4 = (power 2 2)*(power 2 2) };
+   assert { power 2 8 = (power 2 4)*(power 2 4) };
+   assert { power 2 16 = (power 2 8)*(power 2 8) };
+   assert { power 2 32 = (power 2 16)*(power 2 16) };
+   assert { power 2 64 = (power 2 32)*(power 2 32) = radix}
+
+  (* is a logical lemma in ComputerDivision*)
+  let lemma mod_mult (x y z:int)
+    requires { x > 0 }
+    ensures { mod (x * y + z) x = mod z x }
+  =
+    ()
+
+  let lsld_ext (x cnt:limb) : (limb,limb)
+    requires { 0 <= l2i cnt < Limb.length }
+    returns { (r,d) -> l2i r + radix * l2i d =
+              (power 2 (l2i cnt)) * l2i x }
+    returns { (r,_d) ->  mod (l2i r) (power 2 (l2i cnt)) = 0 }
+    returns { (r,_d) ->  l2i r <= radix - (power 2 (l2i cnt)) }
+    returns { (_r,d) -> l2i d < power 2 (l2i cnt) }
+  =
+    let r,d = lsld x cnt in
+    let p = power 2 (l2i cnt) in
+    let q = power 2 (Limb.length - l2i cnt) in
+    assert { p > 0 /\ q > 0 };
+    assert { radix = p * q by
+                radix = power 2 Limb.length = power 2 (l2i cnt + (Limb.length - l2i cnt))
+                = p*q };
+    assert { mod radix p = 0
+             by mod radix p
+                = mod (p * q + 0) p
+                = mod 0 p
+                = 0 };
+    assert { l2i r < radix };
+    mod_mult p (q*l2i d) (l2i r);
+    mod_mult p (l2i x) 0;
+    assert { mod (l2i r) p = 0
+             by
+             mod (l2i r) p = mod (p * (q * l2i d) + l2i r) p
+             so p * (q * l2i d) = radix * l2i d
+             so mod (l2i r) p = mod (radix * l2i d + l2i r) p
+                = mod (p * l2i x) p
+                = mod 0 p
+                = 0 };
+    assert { l2i r <= radix - p
+             by
+             l2i r = p * (div (l2i r) p) + (mod (l2i r) p)
+                   = p * (div (l2i r) p)
+             so
+             radix = p * q
+             so
+             l2i r < radix
+             so (div (l2i r) p >= q -> (l2i r = p * div (l2i r) p >= p*q = radix)
+                                   -> false)
+             so div (l2i r) p <= q-1
+             so l2i r = p * div (l2i r) p <= p * (q-1) = p*q - p = radix - p };
+    assert { l2i d < p
+             by
+             l2i r + radix * l2i d = p * l2i x
+             so
+             radix * l2i d <= p * l2i x
+             so
+             l2i x < radix /\ p > 0
+             so p * l2i x < p * radix
+             so radix * l2i d < p * radix
+             so l2i d < p
+             };
+    (r,d)
+
+  (** [lshift r x sz cnt] shifts [(x,sz)] [cnt] bits to the left and
+      writes the result in [(r, sz)]. Returns the [cnt] most significant
+      bits of [(x, sz)]. Corresponds to [mpn_lshift]. *)
+  (*TODO overlapping allowed if r >= x*)
+  let lshift (r x:t) (sz:int32) (cnt:limb) : limb
+    requires { 0 < l2i cnt < Limb.length }
+    requires { valid_ptr_itv r (p2i sz) }
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { 0 < p2i sz }
+    ensures { value_sub_shift r (p2i sz) + (power radix (p2i sz)) * l2i result =
+              value_sub_shift x (p2i sz) * (power 2 (l2i cnt)) }
+  =
+    let limb_zero = Limb.of_int 0 in
+    let zero = Int32.of_int 0 in
+    let one = Int32.of_int 1 in
+    let minus_one = Int32.(-_) one in
+    let msb = Int32.(-) sz one in
+    let xp = ref (C.incr x msb) in
+    let rp = ref (C.incr r msb) in
+    let high = ref limb_zero in
+    let low = ref (C.get !xp) in
+    let i = ref msb in
+    let l, retval = lsld_ext !low cnt in
+    high := l;
+    while (Int32.(>) !i zero) do
+      variant { p2i !i }
+      invariant { 0 <= p2i !i < p2i sz }
+      invariant { radix * value_sub (pelts r) (r.offset + 1 + p2i !i) (r.offset + p2i sz)
+                  + (power radix (p2i sz - p2i !i)) * l2i retval + l2i !high
+                = value_sub_shift !xp (p2i sz - p2i !i)
+                  * (power 2 (l2i cnt)) }
+      invariant { (!rp).offset = r.offset + p2i !i }
+      invariant { (!xp).offset = x.offset + p2i !i }
+      invariant { plength !rp = plength r }
+      invariant { pelts !rp = pelts r }
+      invariant { plength !xp = plength x }
+      invariant { pelts !xp = pelts x }
+      invariant { l2i !high <= radix - power 2 (l2i cnt) }
+      label StartLoop in
+      xp := C.incr !xp minus_one;
+      low := C.get !xp;
+      let l,h = lsld_ext !low cnt in
+      assert { l2i !high + l2i h < radix  };
+      let ghost v = Limb.(+) !high h in
+      value_sub_update_no_change (pelts r) (!rp).offset (r.offset + 1 + p2i !i)
+                                 (r.offset + p2i sz) v;
+      C.set !rp (Limb.(+) !high h);
+      rp := C.incr !rp minus_one;
+      high := l;
+      let ghost k = p2i !i in
+      i := Int32.(-) !i one;
+      value_sub_head (pelts r) (r.offset + k) (r.offset + p2i sz);
+      value_sub_head (pelts !xp) (!xp).offset (x.offset + p2i sz);
+      assert { radix
+               * value_sub (pelts r) (r.offset + k) (r.offset + p2i sz)
+               + (power radix (p2i sz - p2i !i)) * l2i retval + l2i !high
+              = value_sub_shift !xp (p2i sz - p2i !i)
+                * (power 2 (l2i cnt))
+             by
+               l2i (pelts r)[r.offset + k]
+             = l2i (pelts r)[(!rp.offset at StartLoop)]
+             = l2i (!high at StartLoop) + l2i h
+             so
+                power radix (p2i sz - p2i !i)
+              = power radix (p2i sz - (k - 1))
+              = power radix ((p2i sz - k) +1)
+              = radix * power radix (p2i sz - k)
+             so
+              l2i !low = l2i (pelts x)[(!xp).offset]
+             so
+               radix * value_sub (pelts r) (r.offset + k) (r.offset + p2i sz)
+                + (power radix (p2i sz - p2i !i)) * l2i retval + l2i !high
+             = radix * value_sub (pelts r) (r.offset + k) (r.offset + p2i sz)
+                + radix * (power radix (p2i sz - k)) * l2i retval + l2i !high
+             = radix * ( l2i (pelts r)[r.offset + k]
+                          + radix * (value_sub (pelts r)
+                                         (r.offset + 1 + k) (r.offset + p2i sz)))
+               + radix * (power radix (p2i sz - k)) * l2i retval + l2i !high
+             =  radix * ( l2i (!high at StartLoop) + l2i h
+                          + radix * (value_sub (pelts r)
+                                         (r.offset + 1 + k) (r.offset + p2i sz)))
+               + radix * (power radix (p2i sz - k)) * l2i retval + l2i !high
+             = radix * ( l2i (!high at StartLoop)
+                          + radix * (value_sub (pelts r)
+                                         (r.offset + 1 + k) (r.offset + p2i sz)))
+               + radix * l2i h
+               + radix * (power radix (p2i sz - k)) * l2i retval + l2i !high
+             = radix * ( l2i (!high at StartLoop)
+                          + radix * (value_sub (pelts r)
+                                         (r.offset + 1 + k) (r.offset + p2i sz)))
+               + radix * l2i h
+               + radix * (power radix (p2i sz - k)) * l2i retval + l2i l
+             = radix * ( l2i (!high at StartLoop)
+                          + radix * (value_sub (pelts r)
+                                         (r.offset + 1 + k) (r.offset + p2i sz)))
+               + radix * (power radix (p2i sz - k)) * l2i retval + l2i l
+               + radix * l2i h
+             = radix * ( l2i (!high at StartLoop)
+                          + radix * (value_sub (pelts r)
+                                         (r.offset + 1 + k) (r.offset + p2i sz)))
+               + radix * (power radix (p2i sz - k)) * l2i retval
+               + (power 2 (l2i cnt)) * l2i !low
+             = radix * ( l2i (!high at StartLoop)
+                          + radix * (value_sub (pelts r)
+                                         (r.offset + 1 + k) (r.offset + p2i sz)))
+               + radix * (power radix (p2i sz - k)) * l2i retval
+               + (power 2 (l2i cnt)) * l2i (pelts x)[(!xp).offset]
+             = radix * ( l2i (!high at StartLoop)
+                          + radix * (value_sub (pelts r)
+                                         (r.offset + 1 + k) (r.offset + p2i sz))
+                          + power radix (p2i sz - k) * l2i retval )
+               + (power 2 (l2i cnt)) * l2i (pelts x)[(!xp).offset]
+             = radix * ( radix * (value_sub (pelts r)
+                                         (r.offset + 1 + k) (r.offset + p2i sz))
+                         + power radix (p2i sz - k) * l2i retval
+                         + l2i (!high at StartLoop) )
+               + (power 2 (l2i cnt)) * l2i (pelts x)[(!xp).offset]
+             = radix * value_sub_shift (!xp at StartLoop) (p2i sz - k)
+                     * (power 2 (l2i cnt))
+               + (power 2 (l2i cnt)) * l2i (pelts x)[(!xp).offset]
+             = (power 2 (l2i cnt)) *
+                      (l2i (pelts x)[(!xp).offset]
+                      + radix * value_sub_shift (!xp at StartLoop) (p2i sz - k))
+             = (power 2 (l2i cnt)) * value_sub_shift !xp (p2i sz - p2i !i)
+   };
+   done;
+   assert { l2i !high + radix * value_sub (pelts r) (r.offset + 1) (r.offset + p2i sz)
+                  + (power radix (p2i sz)) * l2i retval
+                = value_sub_shift !xp (p2i sz)
+                  * (power 2 (l2i cnt)) };
+   value_sub_head (pelts r) r.offset (r.offset + p2i sz);
+   value_sub_update_no_change (pelts r) r.offset (r.offset+1)
+                              (r.offset + p2i sz) !high;
+   C.set r !high;
+   retval
+
+  (** [rshift r x sz cnt] shifts [(x,sz)] [cnt] bits to the right and
+      writes the result in [(r, sz)]. Returns the [cnt] least significant
+      bits of [(x, sz)]. Corresponds to [mpn_rshift]. *)
+  (*TODO overlapping allowed if r <= x*)
+  let rshift (r x:t) (sz:int32) (cnt:limb) : limb
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { valid_ptr_itv r (p2i sz) }
+    requires { 0 < l2i cnt < Limb.length }
+    requires { 0 < p2i sz }
+    ensures { l2i result + radix * value_sub_shift r (p2i sz)
+              = value_sub_shift x (p2i sz) * (power 2 (Limb.length - l2i cnt)) }
+  =
+    let tnc = Limb.(-) (Limb.of_int Limb.length) cnt in
+    let limb_zero = Limb.of_int 0 in
+    let zero = Int32.of_int 0 in
+    let one = Int32.of_int 1 in
+    let msb = Int32.(-) sz one in
+    let xp = ref x in
+    let rp = ref r in
+    let high = ref (C.get !xp) in
+    let retval, h = lsld_ext !high tnc in
+    let low = ref h in
+    let i = ref zero in
+    while (Int32.(<) !i msb) do
+      variant { p2i sz - p2i !i }
+      invariant { 0 <= p2i !i <= p2i msb }
+      invariant { l2i retval + radix * (value_sub_shift r (p2i !i)
+                  + (power radix (p2i !i)) * l2i !low)
+                  = value_sub_shift x (1 + p2i !i) * (power 2 (l2i tnc)) }
+      invariant { (!rp).offset = r.offset + p2i !i }
+      invariant { (!xp).offset = x.offset + p2i !i }
+      invariant { plength !rp = plength r }
+      invariant { plength !xp = plength x }
+      invariant { pelts !rp = pelts r }
+      invariant { pelts !xp = pelts x }
+      invariant { l2i !low < power 2 (l2i tnc) }
+      label StartLoop in
+      let ghost k = p2i !i in
+      xp := C.incr !xp one;
+      high := C.get !xp;
+      let l,h = lsld_ext !high tnc in
+      assert { l2i !low + l2i l < radix };
+      let ghost v = Limb.(+) !low l in
+      value_sub_shift_no_change (pelts r) r.offset (p2i !i) (p2i !i) v;
+      C.set !rp (Limb.(+) !low l);
+      assert { value_sub_shift r k = value_sub_shift (r at StartLoop) k };
+      rp := C.incr !rp one;
+      low := h;
+      i := Int32.(+) !i one;
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts r) x.offset (x.offset + p2i !i);
+      assert { l2i retval + radix * (value_sub_shift r (p2i !i)
+                 + (power radix (p2i !i)) * l2i !low)
+                 = value_sub_shift x (1 + p2i !i) * (power 2 (l2i tnc))
+               by
+                 l2i (pelts r)[r.offset + k]
+               = l2i (pelts r)[(!rp.offset at StartLoop)]
+               = l2i (!low at StartLoop) + l2i l
+               so
+                 l2i !high = l2i (pelts x)[(!xp).offset]
+               so
+                 l2i retval + radix * (value_sub_shift r (p2i !i)
+                                      + (power radix (p2i !i)) * l2i !low)
+               = l2i retval + radix * (value_sub_shift r k
+                              + power radix k * l2i (pelts r)[r.offset+k]
+                              + power radix (p2i !i) * l2i !low)
+               = l2i retval + radix * (value_sub_shift r k
+                              + power radix k * (l2i (!low at StartLoop) + l2i l)
+                              + power radix (p2i !i) * l2i !low)
+               = l2i retval + radix * (value_sub_shift r k
+                              + power radix k * l2i (!low at StartLoop)
+                              + power radix k * l2i l
+                              + power radix (p2i !i) * l2i !low)
+               = l2i retval + radix * (value_sub_shift r k
+                              + power radix k * l2i (!low at StartLoop))
+                 + radix * (power radix k * l2i l
+                            + power radix (p2i !i) * l2i !low)
+               = value_sub_shift x (k+1) * power 2 (l2i tnc)
+                 + radix * (power radix k * l2i l
+                            + power radix (p2i !i) * l2i !low)
+               = value_sub_shift x (p2i !i) * power 2 (l2i tnc)
+                 + radix * (power radix k * l2i l
+                            + power radix (p2i !i) * l2i !low)
+               = value_sub_shift x (p2i !i) * power 2 (l2i tnc)
+                 + radix * (power radix k * l2i l
+                            + power radix k * radix * l2i !low)
+               = value_sub_shift x (p2i !i) * power 2 (l2i tnc)
+                 + radix * (power radix k * (l2i l + radix * l2i !low))
+               = value_sub_shift x (p2i !i) * power 2 (l2i tnc)
+                 + radix * (power radix k * l2i !high * power 2 (l2i tnc))
+               = value_sub_shift x (p2i !i) * power 2 (l2i tnc)
+                 + power radix (p2i !i) * l2i !high * power 2 (l2i tnc)
+               = (value_sub_shift x (p2i !i) + power radix (p2i !i) * l2i !high)
+                 * power 2 (l2i tnc)
+               = (value_sub_shift x (p2i !i)
+                  + power radix (p2i !i) * l2i (pelts x)[x.offset + p2i !i])
+                 * power 2 (l2i tnc)
+               = value_sub_shift x (1 + p2i !i) * power 2 (l2i tnc)
+      };
+    done;
+    label EndLoop in
+    assert { l2i retval + radix * (value_sub_shift r (p2i msb)
+                  + (power radix (p2i msb)) * l2i !low)
+             = value_sub_shift x (p2i sz) * (power 2 (l2i tnc)) };
+    value_sub_tail (pelts r) r.offset (r.offset + p2i msb);
+    assert { (!rp).offset = r.offset + p2i msb };
+    value_sub_shift_no_change (pelts r) r.offset (p2i sz) (p2i sz) !low;
+    C.set !rp !low;
+    assert { value_sub_shift r (p2i sz)
+           = value_sub_shift r (p2i msb) + power radix (p2i msb) * l2i !low };
+    assert { value_sub_shift r (p2i sz)
+           = value_sub_shift (r at EndLoop) (p2i msb)
+             + power radix (p2i msb) * l2i !low
+           by
+           value_sub_shift r (p2i msb) = value_sub_shift (r at EndLoop) (p2i msb)
+           };
+    retval
+
+  (** {2 Division} *)
+
+  (** Based on Niels Möller and Torbjörn Granlund, “Improved
+      division by invariant integers” 2010 *)
+
+  use import int.MinMax
+
+  predicate reciprocal (v d:limb) =
+    l2i v = (div (radix*radix - 1) (l2i d)) - radix
+
+  let lemma fact_div (x y z:int)
+    requires { y > 0 }
+    ensures { div (x + y * z) y = (div x y) + z }
+  =
+    assert { x + y * z = y * (div (x + y * z) y) + mod (x + y * z) y
+             so mod (x + y * z) y = mod (y * z + x) y = mod x y
+             so x + y * z = y * (div (x + y * z) y) + mod x y
+             so
+             x = y * div x y + mod x y
+             so x + y * z = y * div x y + mod x y + y * z
+             so y * (div (x + y * z) y) + mod x y
+                = y * div x y + mod x y + y * z
+             so y * (div (x + y * z) y) = y * div x y + y * z
+                                        = y * ((div x y) + z)
+             so y <> 0
+             so div (x + y * z) y = div x y + z
+           }
+
+  let invert_limb (d:limb) : limb
+    requires { l2i d >= div radix 2 }
+    ensures { reciprocal result d }
+  =
+    let v = div2by1 (Limb.of_int max_uint64)
+                    (Limb.(-) (Limb.of_int max_uint64) d)
+                    d in
+    fact_div (radix * radix - 1) (l2i d) (- radix);
+    assert { l2i v = (div (radix*radix - 1) (l2i d)) - radix
+             by
+             radix - 1 + radix * (radix - 1 - l2i d)
+             = radix - 1 + radix * (radix - 1) - radix * l2i d
+             = radix - 1 + radix * radix - radix - radix * l2i d
+             = radix * radix - 1 - radix * l2i d
+             so
+             radix - 1 + radix * (radix - 1 - l2i d)
+             = radix * radix - 1 - radix * l2i d
+             so
+             l2i v
+             = div ((radix - 1) + radix * (radix - 1 - l2i d)) (l2i d)
+             = div (radix * radix - 1 - radix * l2i d) (l2i d)
+             = div (radix * radix - 1) (l2i d) - radix
+           };
+   v
+
+  (** Divide a two-word integer by a one-word integer given the
+  reciprocal of the divisor. *)
+  let div2by1_inv (uh ul d v:limb) : (limb,limb)
+    requires { l2i d >= div radix 2 }
+    requires { l2i uh < l2i d }
+    requires { reciprocal v d }
+    returns { q, r -> l2i q * l2i d + l2i r = l2i ul + radix * l2i uh }
+    returns { _q, r -> 0 <= l2i r < l2i d }
+  =
+    let zero = Limb.of_int 0 in
+    let one = Limb.of_int 1 in
+    let ghost k = radix * radix - (radix + l2i v) * l2i d in
+    let ghost u = l2i ul + radix * l2i uh in
+    assert { 1 <= k <= l2i d };
+    let l,h = mul_double v uh in
+    let sl,c = add_with_carry l ul zero in
+    let sh,c' = add_with_carry uh h c in  (* <c',sh,sl> = <uh, ul> + <h,l> *)
+    assert { l2i sl + radix * l2i sh + radix * radix * l2i c'
+             = l2i l + radix * l2i h + l2i ul + radix * l2i uh };
+    assert { l2i c' = 0
+             by
+             l2i uh < l2i d
+             so l2i v * l2i uh <= l2i v * l2i d
+             so k = radix * radix - (radix + l2i v) * l2i d
+                  = radix * radix - radix * l2i d - l2i v * l2i d
+             so l2i v * l2i d = radix * radix - radix * l2i d - k
+                              = radix * (radix - l2i d) - k
+             so k > 0
+             so l2i v * l2i d < radix * (radix - l2i d)
+             so l2i v * l2i uh < radix * (radix - l2i d)
+             so l2i l + radix * l2i h = l2i v * l2i uh
+             so l2i l + radix * l2i h < radix * (radix - l2i d)
+             so l2i uh <= l2i d - 1
+             so radix * l2i uh <= radix * (l2i d - 1) = radix * l2i d - radix
+             so l2i l + radix * l2i h + radix * l2i uh
+                < radix * (radix - l2i d) + radix * l2i uh
+                <= radix * (radix - l2i d) + radix * l2i d - radix
+                <= radix * (radix - l2i d + l2i d) - radix = radix * radix - radix
+             so l2i ul < radix
+             so l2i l + radix * l2i h + l2i ul + radix * l2i uh
+                = l2i l + radix * l2i h + radix * l2i uh + l2i ul
+                < radix * radix - radix + l2i ul
+                < radix * radix - radix + radix = radix * radix
+             so l2i sl + radix * l2i sh + radix * radix * l2i c'
+                = l2i l + radix * l2i h + l2i ul + radix * l2i uh
+                < radix * radix
+             so radix * radix * l2i c' <= l2i sl + radix * l2i sh + radix * radix * l2i c'
+             so radix * radix * l2i c' < radix * radix
+     };
+    assert { l2i sl + radix * l2i sh = l2i l + radix * l2i h + l2i ul + radix * l2i uh
+             = l2i v * l2i uh + l2i ul + radix * l2i uh
+             = l2i ul + (radix + l2i v) * l2i uh };
+    let qh = ref sh in
+    let ql = ref sl in
+    let ghost q0 = l2i !ql in
+    let ghost cq = l2i sh + 1 in (*candidate quotient*)
+    let ghost cr = l2i ul - cq * l2i d + radix * l2i uh in (*candidate remainder*)
+    assert { cq * l2i d + cr = u};
+    qh := add_mod !qh one;
+    assert { l2i !qh = mod cq radix };
+    let p = mul_mod !qh d in
+    let r = ref (sub_mod ul p) in
+    let ghost r' = l2i !r in
+    assert { r' = mod cr radix
+             by
+             let a = (- div (l2i !qh * l2i d) radix) in
+             r' = l2i !r
+             = mod (l2i ul - l2i p) radix
+             = mod (l2i ul - mod (l2i !qh * l2i d) radix) radix
+             = mod (radix * a
+                   + l2i ul - mod (l2i !qh * l2i d) radix) radix
+             = mod (l2i ul - mod (l2i !qh * l2i d) radix
+                           - radix * div (l2i !qh * l2i d) radix) radix
+             = mod (l2i ul - l2i !qh * l2i d) radix
+             = mod (l2i ul - mod cq radix * l2i d) radix
+             = mod (radix * (- (div cq radix)) * l2i d + l2i ul - mod cq radix * l2i d) radix
+             = mod (l2i ul - (mod cq radix + radix * div cq radix) * l2i d) radix
+             = mod (l2i ul - cq * l2i d) radix
+             = mod (radix * l2i uh + l2i ul - cq * l2i d) radix
+             = mod (l2i ul - cq * l2i d + radix * l2i uh) radix
+             = mod cr radix };
+    assert { radix * cr = l2i uh * k + l2i ul * (radix - l2i d) + q0 * l2i d - radix * l2i d };
+    prod_compat_strict_r (l2i ul) radix (radix - l2i d);
+    assert { (* Theorem 2 of Möller&Granlund 2010 *)
+             (max (radix - l2i d) (q0 + 1)) - radix <= cr < max (radix - l2i d) q0
+             by radix * cr = l2i uh * k + l2i ul * (radix - l2i d) + q0 * l2i d - radix * l2i d
+             so (l2i uh * k + l2i ul * (radix - l2i d) >= 0
+                by l2i uh >= 0 /\ k >= 0 /\ l2i ul >= 0 /\ radix - l2i d >= 0)
+             so radix * cr >= q0 * l2i d - radix * l2i d
+             so radix * cr >= - radix * l2i d
+             so cr >= - l2i d
+             so radix * cr >= q0 * l2i d - radix * l2i d = (q0 - radix) * l2i d
+             so radix > l2i d
+             so radix - q0 > 0
+             so (radix-q0) * l2i d < (radix - q0) * radix
+             so (q0 - radix) * l2i d > (q0 - radix) * radix
+             so radix * cr > (q0 - radix) * radix
+             so cr > q0 - radix
+             so (let m = max (radix - l2i d) (q0 +1) in
+                cr >= m - radix
+                by (cr + radix >= - l2i d + radix
+                   /\ (cr + radix > q0 so cr + radix >= q0 + 1))
+                   so cr + radix >= m)
+             so 0 < k <= l2i d so 0 <= l2i uh < l2i d
+             so k * l2i uh < k * l2i d <= l2i d * l2i d
+             so radix * cr < l2i d * l2i d + l2i ul * (radix - l2i d) + q0 * l2i d - radix * l2i d
+             so l2i ul * (radix - l2i d) < radix * (radix - l2i d)
+             so radix * cr < l2i d * l2i d + radix * (radix - l2i d) + q0 * l2i d - radix * l2i d
+             so (radix * cr < (radix - l2i d) * (radix - l2i d) + q0 * l2i d
+                by
+                l2i d * l2i d + radix * (radix - l2i d) + q0 * l2i d - radix * l2i d
+                        = radix * (radix - l2i d) + l2i d * l2i d - radix * l2i d + q0 * l2i d
+                        = radix * (radix - l2i d) + (l2i d - radix) * l2i d +  q0 * l2i d
+                        = radix * (radix - l2i d) - l2i d * (radix - l2i d) + q0 * l2i d
+                        = (radix - l2i d) * (radix - l2i d) + q0 * l2i d)
+             so let m = max (radix - l2i d) q0 in
+                radix - l2i d <= m
+             so (radix - l2i d) * (radix - l2i d) <= m* (radix - l2i d)
+             so (q0 * l2i d <= m * l2i d by 0 <= q0 <= m /\ 0 < l2i d)
+             so radix * cr < (radix - l2i d) * (radix - l2i d) + q0 * l2i d
+                           <= m* (radix - l2i d) + q0 * l2i d
+                           <= m* (radix - l2i d) + m * l2i d
+                           = m * radix
+             so cr < m
+                           };
+    assert { cr >= 0 -> r' = cr };
+    assert { cr < 0 ->
+           ( r' = cr + radix
+             by cr >= max (radix - l2i d) (q0 + 1) - radix
+             so cr >= - l2i d
+             so cr + radix >= radix - l2i d >= 0
+             so 0 <= cr + radix < radix
+             so mod (cr + radix) radix = mod cr radix
+             so r' = mod (cr + radix) radix ) };
+    assert { cr < 0 ->
+                ( l2i !r > l2i !ql
+                by max (radix - l2i d) (q0 + 1) >= q0 + 1 > q0
+                so cr >= (max (radix - l2i d) (q0 +1)) - radix > q0 - radix
+                so r' = cr + radix > q0 - radix + radix = q0 ) };
+    assert { 1 <= cq <= radix };
+    assert { (l2i !qh = cq \/ (l2i !qh = 0 /\ cq = radix)
+              by (1 <= cq < radix -> l2i !qh = mod cq radix = cq)
+              so (cq = radix -> l2i !qh = 0) ) };
+    assert { cq = radix ->
+             (cr < 0
+                by cq * l2i d + cr = u
+                so l2i uh <= l2i d - 1
+                so 1 + l2i uh <= l2i d
+                so l2i ul < radix
+                so u = l2i ul + radix * l2i uh
+                     < radix + radix * l2i uh
+                     = radix * (1 + l2i uh)
+                     <= radix * l2i d
+                so u < radix * l2i d
+                so radix * l2i d + cr = u
+                so radix * l2i d + cr < radix * l2i d
+                so cr < 0) };
+    assert { 1 <= cq < radix -> l2i !qh = cq /\ l2i !qh * l2i d + cr = u };
+    if Limb.(>) !r !ql
+    then
+    begin
+      qh := sub_mod !qh one;
+      r := add_mod !r d;
+      assert { cr >= 0 ->
+                  (l2i !r = cr + l2i d
+                  by r' = cr
+                  so r' < max (radix - l2i d) q0
+                  so r' > q0
+                  so 0 <= r' < radix - l2i d
+                  so l2i d <= r' + l2i d < radix
+                  so l2i !r = mod (r' + l2i d) radix = r' + l2i d) };
+      assert { cr >= 0 ->
+                  ( l2i !r >= l2i d
+                  by r' = cr >= 0
+                  so l2i !r = r' + l2i d >= l2i d ) };
+      assert { cr < 0 ->
+                  ( l2i !r = r' + l2i d - radix
+                  by r' = cr + radix < radix
+                  so cr >= max (radix - l2i d) (q0 + 1) - radix
+                        >= radix - l2i d - radix = - l2i d
+                  so r' = cr + radix >= radix - l2i d
+                  so l2i !r = mod (r' + l2i d) radix
+                  so radix + radix >= r' + l2i d >= radix
+                  so l2i !r = mod (r' + l2i d) radix = r' + l2i d - radix ) };
+      assert { cr < 0 ->
+                  ( 0 <= l2i !r < l2i d
+                  by r' = cr + radix < radix
+                  so l2i !r = mod (r' + l2i d) radix = r' + l2i d - radix
+                  so l2i !r >= 0
+                  so l2i !r = r' + l2i d - radix < l2i d ) };
+      assert { cq = radix ->
+                ( l2i !qh * l2i d + l2i !r = u
+                by cq * l2i d + cr = u
+                so cr < 0
+                so r' = cr + radix
+                so u = radix * l2i d + cr
+                     = (radix - 1) * l2i d + l2i d + cr
+                     = (radix - 1) * l2i d + l2i d + r' - radix
+                so r' = cr + radix >= max (radix - l2i d) (q0 + 1)
+                   >= radix - l2i d
+                so radix + radix >= l2i d + r' >= radix
+                so l2i !r = mod (l2i d + r') radix = l2i d + r' - radix
+                so (radix - 1) * l2i d + l2i !r = u
+                so l2i !qh = mod ((mod cq radix) - 1) radix
+                           = mod (-1) radix
+                           = radix - 1
+                so l2i !qh * l2i d + l2i !r = u
+               ) };
+      assert { l2i !r = cr + l2i d by "case_split" cr >= 0 \/ cr < 0 };
+      assert { 1 <= cq <= radix ->
+               ( l2i !qh * l2i d + l2i !r = u
+               by cq * l2i d + cr = u
+               so l2i !qh = cq - 1
+               so l2i !qh * l2i d + cr + l2i d = u
+               so l2i !r = cr + l2i d ) };
+    end
+    else
+    begin
+       assert { cr >= 0 };
+       assert { 1 <= cq < radix };
+    end;
+    assert { l2i !qh * l2i d + l2i !r = l2i ul + radix * l2i uh
+            by "case_split" cq = radix \/ 1 <= cq < radix };
+    if Limb.(>=) !r d
+    then begin
+      assert { cr >= 0 };
+      assert { l2i !qh < radix - 1
+               by
+               l2i !qh * l2i d = l2i ul + radix * l2i uh  - l2i !r
+               so l2i uh <= l2i d - 1
+               so l2i ul + radix * l2i uh - l2i !r
+                  <= l2i ul + radix * (l2i d - 1) - l2i !r
+                  = l2i ul + radix * l2i d - radix - l2i !r
+                  = (l2i ul - radix)  + radix * l2i d - l2i !r
+                  <  radix * l2i d - l2i !r
+                  <= radix * l2i d - l2i d
+                  = (radix - 1) * l2i d
+               so l2i !qh * l2i d < (radix - 1) * l2i d
+               so l2i d > 0
+               so l2i !qh < radix - 1 };
+      qh := Limb.(+) !qh one;
+      r := Limb.(-) !r d;
+      assert { 0 <= l2i !r < l2i d };
+      assert { l2i !qh * l2i d + l2i !r = l2i ul + radix * l2i uh };
+    end;
+    assert { 0 <= l2i !r < l2i d };
+    assert { l2i !qh * l2i d + l2i !r = l2i ul + radix * l2i uh };
+    (!qh,!r)
+
+(** [divmod_1 q x y sz] divides [(x,sz)] by [y], writes the quotient
+    in [(q, sz)] and returns the remainder. Corresponds to
+    [mpn_divmod_1]. *)
+(* TODO develop further decimal points (qxn) *)
+let divmod_1 (q x:t) (y:limb) (sz:int32) : limb
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { valid_ptr_itv q (p2i sz) }
+    requires { 0 < p2i sz }
+    requires { 0 < l2i y }
+    ensures { value_sub_shift x (p2i sz)
+              = value_sub_shift q (p2i sz) * l2i y + l2i result }
+  =
+    let limb_zero = Limb.of_int 0 in
+    let zero = Int32.of_int 0 in
+    let one = Int32.of_int 1 in
+    let msb = Int32.(-) sz one in
+    let minus_one = Int32.(-_) (Int32.of_int 1) in
+    let lx = ref limb_zero in
+    let xp = ref (C.incr x msb) in
+    let qp = ref (C.incr q msb) in
+    let i = ref msb in
+    let r = ref limb_zero in
+    let uone = Limb.of_int 1 in
+    (*normalize divisor*)
+    let clz = count_leading_zeros y in
+    let ghost mult = power 2 (p2i clz) in
+    let ry = lsl y (Limb.of_int32 clz) in
+    assert { l2i ry = mult * l2i y };
+    let ghost tlum = power 2 (Limb.length - p2i clz) in
+    assert { tlum * mult = radix };
+    let v = invert_limb ry in
+    while (Int32.(>=) !i zero) do
+      variant { p2i !i }
+      invariant { -1 <= p2i !i <= p2i msb }
+      invariant { (!qp).offset = q.offset + p2i !i }
+      invariant { (!xp).offset = x.offset + p2i !i }
+      invariant { plength !qp = plength q }
+      invariant { plength !xp = plength x }
+      invariant { pelts !qp = pelts q }
+      invariant { pelts !xp = pelts x }
+      invariant { l2i !r < l2i ry }
+      invariant { mult * value_sub (pelts x) (x.offset + p2i !i + 1) (x.offset + p2i sz)
+                  = value_sub (pelts q) (q.offset + p2i !i + 1)
+                                        (q.offset + p2i sz)
+                    * l2i ry
+                    + l2i !r }
+      invariant { l2i !r <= radix - mult }
+      invariant { mod (l2i !r) mult = 0 }
+      assert { p2i !i >= 0 };
+      label StartLoop in
+      let ghost k = p2i !i in
+      lx := C.get !xp;
+      (*TODO lshift in place would simplify things*)
+      let l,h = lsld_ext !lx (Limb.of_int32 clz) in
+      mod_mult mult (l2i y) 0;
+      assert { l2i !r + l2i h < l2i ry
+               by
+               let drm = div (l2i !r) mult in
+               let dym = div (l2i ry) mult in
+               mod (l2i !r) mult = 0
+               so l2i !r = mult * drm
+               so mod (l2i ry) mult
+                  = mod (mult * (l2i y) + 0) mult
+                  = mod 0 mult
+                  = 0
+               so l2i ry = mult * dym
+               so l2i !r < l2i ry
+               so 0 < l2i ry - l2i !r
+                    = mult * dym - mult * drm
+                    = mult * (dym - drm)
+               so mult > 0
+               so dym - drm > 0
+               so dym >= drm + 1
+               so l2i h < mult
+               so l2i !r + l2i h = mult * drm + l2i h
+                  < mult * drm + mult
+                  = mult * (drm + 1)
+                  <= mult * dym = l2i ry };
+      assert { l2i !r + l2i h < radix by
+               l2i !r + l2i h < l2i ry < radix };
+      let (qu,rem) = div2by1_inv (Limb.(+) !r h) l ry v in
+      mod_mult mult (l2i y * l2i qu) (l2i rem);
+      mod_mult mult (tlum * (l2i !r + l2i h)) (l2i l);
+      assert { mod (l2i rem) mult = 0
+               by
+               l2i ry * l2i qu + l2i rem
+               = (radix * (l2i !r + l2i h) + l2i l)
+               so
+               mult * l2i y * l2i qu + l2i rem
+               = (mult * tlum * (l2i !r + l2i h) + l2i l)
+               so mod (mult * l2i y * l2i qu + l2i rem) mult
+                  = mod (mult * tlum * (l2i !r + l2i h) + l2i l) mult
+               so mult > 0
+               so mod (mult * (l2i y * l2i qu) + l2i rem) mult
+                  = mod (l2i rem) mult
+               so mod (mult * tlum * (l2i !r + l2i h) + l2i l) mult
+                  = mod (l2i l) mult
+                  = 0
+               };
+      let ghost mer = div (l2i rem) mult in
+      assert { l2i rem <= radix - mult
+               by
+               mod (l2i rem) mult = 0
+               so mult * mer = l2i rem < radix = mult * tlum
+               so mult > 0
+               so 0 < mult * tlum - mult * mer = mult * (tlum - mer)
+               so tlum - mer > 0
+               so mer < tlum
+               so l2i rem = mult * mer <= mult * (tlum - 1) = radix - mult
+               };
+      r:=rem;
+      value_sub_update_no_change (pelts q) (!qp).offset (q.offset + 1 + p2i !i)
+                                 (q.offset + p2i sz) qu;
+      C.set !qp qu;
+      xp := C.incr !xp minus_one;
+      qp := C.incr !qp minus_one;
+      i := Int32.(-) !i one;
+      value_sub_head (pelts x) (x.offset + k) (x.offset + p2i sz);
+      value_sub_head (pelts q) (q.offset + k) (q.offset + p2i sz);
+      assert { mult * value_sub (pelts x) (x.offset + p2i !i + 1)
+                                          (x.offset + p2i sz)
+              = value_sub (pelts q) (q.offset + p2i !i + 1) (q.offset + p2i sz)
+                    * l2i ry
+                    + l2i !r
+              by
+              l2i (pelts q)[q.offset + k] = l2i qu
+              so
+              l2i (pelts x)[x.offset + k] = l2i !lx
+              so
+              l2i l + radix * l2i h = l2i !lx * mult
+              so
+              mult * value_sub (pelts x) (x.offset + p2i !i + 1)
+                                         (x.offset + p2i sz)
+              = mult * value_sub (pelts x) (x.offset + k) (x.offset + p2i sz)
+              = mult * (l2i (pelts x)[x.offset + k]
+                + radix * value_sub (pelts x) (x.offset + k + 1)
+                                              (x.offset + p2i sz))
+              = mult * l2i !lx
+                + mult * radix * value_sub (pelts x) (x.offset + k + 1)
+                                                     (x.offset + p2i sz)
+              = l2i l + radix * l2i h
+                + mult * radix * value_sub (pelts x) (x.offset + k + 1)
+                                                     (x.offset + p2i sz)
+              = l2i l + radix * l2i h
+                + radix * (value_sub (pelts q) (q.offset + k + 1)
+                                         (q.offset + p2i sz)
+                        * l2i ry
+                        + l2i (!r at StartLoop))
+              = l2i l + radix * l2i h + radix * l2i (!r at StartLoop)
+                + radix * (value_sub (pelts q) (q.offset + k + 1)
+                                         (q.offset + p2i sz)
+                           * l2i ry)
+              = l2i l + radix * (l2i h + l2i (!r at StartLoop))
+                + radix * (value_sub (pelts q) (q.offset + k + 1)
+                                         (q.offset + p2i sz)
+                           * l2i ry)
+              = l2i qu * l2i ry + l2i !r
+                + radix * value_sub (pelts q) (q.offset + k + 1)
+                                         (q.offset + p2i sz)
+                        * l2i ry
+              = l2i (pelts q)[q.offset + k] * l2i ry + l2i !r
+                + radix * value_sub (pelts q) (q.offset + k + 1)
+                                         (q.offset + p2i sz)
+                        * l2i ry
+              = l2i ry * (l2i (pelts q)[q.offset + k]
+                         + radix * value_sub (pelts q) (q.offset + k + 1)
+                                                       (q.offset + p2i sz))
+                + l2i !r
+              = l2i ry * value_sub (pelts q) (q.offset + p2i !i + 1)
+                                            (q.offset + p2i sz)
+                + l2i !r
+            }
+    done;
+    let ghost res = lsr !r (Limb.of_int32 clz) in
+    assert { l2i !r = l2i res * mult
+             so
+             mult * value_sub_shift x (p2i sz)
+              = value_sub_shift q (p2i sz) * l2i ry + l2i !r
+              = value_sub_shift q (p2i sz) * l2i y * mult + l2i !r
+              = value_sub_shift q (p2i sz) * l2i y * mult + l2i res * mult
+              = (value_sub_shift q (p2i sz) * l2i y + l2i res) * mult
+            so
+            value_sub_shift x (p2i sz)
+              = value_sub_shift q (p2i sz) * l2i y + l2i res };
+    lsr !r (Limb.of_int32 clz)
+
+  predicate reciprocal_3by2 (v dh dl:limb) =
+    l2i v = div (radix*radix*radix -1) (l2i dl + radix * l2i dh) - radix
+
+  let div3by2_inv (uh um ul dh dl v: limb) : (limb,limb,limb)
+    requires { l2i dh >= div radix 2 }
+    requires { reciprocal_3by2 v dh dl }
+    requires { l2i um + radix * l2i uh < l2i dl + radix * l2i dh }
+    returns { q, rl, rh -> l2i q * (l2i dl + radix * l2i dh) + l2i rl + radix * l2i rh
+                  = l2i ul + radix * (l2i um + radix * l2i uh) }
+    returns { _q, rl, rh -> 0 <= l2i rl + radix * l2i rh < l2i dl + radix * l2i dh }
+  =
+    let ghost d = l2i dl + radix * l2i dh in
+    let ghost u = l2i ul + radix * (l2i um + radix * l2i uh) in
+    let zero = Limb.of_int 0 in
+    let one = Limb.of_int 1 in
+    let q1 = ref zero in
+    let r0 = ref zero in
+    let r1 = ref zero in
+    let l,h = mul_double v uh in
+    let sl, c = add_with_carry um l zero in
+    let sh, c' = add_with_carry uh h c in
+    assert { l2i sl + radix * l2i sh + radix * radix * l2i c'
+             = l2i um + radix * l2i uh + l2i v * l2i uh };
+    assert { l2i c' = 0
+             by
+             l2i um + radix * l2i uh < d
+             so radix * l2i uh < d
+             so radix * (l2i um + radix * l2i uh + l2i v * l2i uh)
+                < radix * (d + l2i v * l2i uh)
+                = radix * d + l2i v * radix * l2i uh
+                <= radix * d + l2i v * d
+                = (div (radix * radix * radix - 1) d) * d
+                <= radix * radix * radix - 1
+                < radix * radix * radix
+             so l2i um + radix * l2i uh + l2i v * l2i uh < radix * radix
+             so l2i sl + radix * l2i sh + radix * radix * l2i c' < radix * radix
+             so radix * radix * l2i c' < radix * radix
+     };
+    q1 := sh;
+    let ghost q0 = l2i sl in
+    let ghost cq = l2i !q1 + 1 in (*candidate quotient*)
+    q1 := add_mod !q1 one;
+    assert { l2i !q1 = mod cq radix };
+    let p = mul_mod dh sh in
+    r1 := sub_mod um p;
+    label CQuot in
+    let ghost a = div (l2i um - l2i dh * l2i sh) radix in
+    (*assert { l2i um - l2i dh * l2i sh = a * radix + l2i !r1
+             by l2i !r1 = mod (l2i um - l2i dh * l2i sh) radix  };*)
+    let tl, th = mul_double sh dl in
+    let il, b = sub_with_borrow ul tl zero in
+    let ih, b' = sub_with_borrow !r1 th b in
+    assert { l2i il + radix * l2i ih - radix * radix * l2i b'
+             = l2i ul + radix * l2i !r1 - l2i sh * l2i dl };
+    let bl,b2 = sub_with_borrow il dl zero in
+    let bh, b2' = sub_with_borrow ih dh b2 in
+    assert { l2i bl + radix * l2i bh - radix * radix * l2i b2'
+             = l2i il + radix * l2i ih - l2i dl - radix * l2i dh };
+    mod_mult (radix * radix) (l2i b')
+             (l2i ul + radix * l2i !r1 - l2i sh * l2i dl - l2i dl
+                - radix * l2i dh);
+    assert { l2i bl + radix * l2i bh
+             = mod (l2i ul + radix * l2i !r1
+                - l2i sh * l2i dl- l2i dl
+                - radix * l2i dh) (radix * radix)
+             by
+             l2i bl + radix * l2i bh
+             = mod (l2i il + radix * l2i ih
+                - l2i dl - radix * l2i dh) (radix * radix)
+             so l2i il + radix * l2i ih
+                = radix * radix * l2i b' + l2i ul + radix * l2i !r1
+                  - l2i sh * l2i dl
+             so mod (l2i il + radix * l2i ih
+                - l2i dl - radix * l2i dh) (radix * radix)
+                = mod (radix * radix * l2i b' + l2i ul + radix * l2i !r1
+                      - l2i sh * l2i dl - l2i dl - radix * l2i dh)
+                  (radix * radix)
+                = mod (l2i ul + radix * l2i !r1
+                - l2i sh * l2i dl - l2i dl
+                - radix * l2i dh) (radix * radix) };
+    r1 := bh;
+    r0 := bl;
+    let ghost r' = l2i !r0 + radix * l2i !r1 in
+    let ghost cr = u - d * cq in
+    assert {  r' = mod cr(radix * radix)
+              by
+              (l2i !r1 at CQuot = mod (l2i um - l2i dh * l2i sh) radix
+                by let a' = div (l2i dh * l2i sh) radix in
+                   l2i dh * l2i sh = l2i p + radix * a'
+                so l2i !r1 at CQuot = mod (l2i um - l2i p) radix
+                   = mod (radix * a' + l2i um - l2i dh * l2i sh) radix
+                   = mod (l2i um - l2i dh * l2i sh) radix )
+              so l2i um - l2i dh * l2i sh = a * radix + l2i !r1 at CQuot
+              so l2i !r0 + radix * l2i !r1
+                 = mod (l2i ul + radix * l2i (!r1 at CQuot)
+                  - l2i sh * l2i dl - l2i dl
+                  - radix * l2i dh) (radix * radix)
+              so l2i ul + radix * l2i (!r1 at CQuot)
+                   - l2i sh * l2i dl - l2i dl - radix * l2i dh
+                 = l2i ul + radix * (l2i um - l2i dh * l2i sh - a * radix)
+                   - l2i sh * l2i dl - l2i dl - radix * l2i dh
+                 = l2i ul + radix * l2i um - radix * l2i dh * l2i sh
+                   - radix * radix * a - l2i sh * l2i dl - l2i dl
+                   - radix * l2i dh
+                 = l2i ul + radix * l2i um - radix * l2i dh * (l2i sh + 1)
+                   - radix * radix * a - l2i sh * l2i dl - l2i dl
+                 = l2i ul + radix * l2i um - radix * l2i dh * (l2i sh + 1)
+                   - radix * radix * a - l2i dl * (l2i sh + 1)
+                 = l2i ul + radix * l2i um
+                   - (l2i dl + radix * l2i dh) * (l2i sh + 1)
+                   - radix * radix * a
+                 = l2i ul + radix * l2i um - d * cq - radix * radix * a
+                 = u - radix * radix * l2i uh - d * cq - radix * radix * a
+                 = cr + radix * radix * (- a - l2i uh)
+              so (*let y = - a - l2i uh in*)
+                 mod (l2i ul + radix * l2i (!r1 at CQuot)
+                  - l2i sh * l2i dl - l2i dl
+                  - radix * l2i dh) (radix * radix)
+                 = mod (radix * radix * (-a - l2i uh) + cr)
+                       (radix * radix)
+                 = mod cr (radix*radix)
+               };
+    let ghost m = max (radix * radix - d) (q0 * radix) in
+    assert { (* Theorem 3 of Moller&Granlund 2010 *)
+             m - radix * radix <= cr < m
+            by
+            let k = radix * radix * radix - (radix + l2i v) * d in
+            reciprocal_3by2 v dh dl
+            so let m3 = radix * radix * radix - 1 in
+               (radix + l2i v) * d = d * div m3 d = m3 - mod m3 d
+            so (k = 1 + mod m3 d
+                by k = radix * radix * radix - (radix + l2i v) * d
+                     = m3 + 1 - (radix + l2i v) * d
+                     = m3 + 1 - m3 + mod m3 d
+                     = 1 + mod m3 d)
+            so 1 <=  k <= d
+            so q0 + radix * l2i sh = (radix + l2i v) * l2i uh + l2i um
+            so cq = l2i sh + 1
+            so radix * cq = radix * l2i sh + radix
+               = (radix + l2i v) * l2i uh + l2i um - q0 + radix
+            so (radix * cr = k * l2i uh + (radix * radix - d) * l2i um
+                 + radix * l2i ul + d * q0 - d * radix
+               by radix * cr = radix * (u - cq * d)
+               = radix * u
+                 - ((radix + l2i v) * l2i uh + l2i um - q0 + radix) * d
+               = radix * u - d * (radix + l2i v) * l2i uh
+                 - d * l2i um + d * q0 - d * radix
+               = radix * u - (radix * radix * radix - k) * l2i uh
+                 - d * l2i um + d * q0 - d * radix
+               = (radix * radix * radix * l2i uh + radix * radix * l2i um
+                 + radix * l2i ul) - (radix * radix * radix - k) * l2i uh
+                 - d * l2i um + d * q0 - d * radix
+               = k * l2i uh + radix * radix * l2i um + radix * l2i ul
+                 - d * l2i um + d * q0 - d * radix
+               = k * l2i uh + (radix * radix - d) * l2i um + radix * l2i ul
+                 + d * q0 - d * radix )
+            so (cr >= m - radix * radix
+               by (
+                  k >= 0 so radix * radix - d >= 0
+               so l2i uh >= 0 so l2i um >= 0 so l2i ul >= 0
+               so  k * l2i uh + (radix * radix - d) * l2i um + radix * l2i ul
+                   >= 0
+               so radix * cr >= d * q0 - d * radix
+               so q0 >= 0 so d >= 0
+               so d * q0 >= 0
+               so radix * cr >= - d * radix
+               so cr >= -d = radix * radix - d - radix * radix
+               so radix * cr >= d * (q0 - radix)
+               so (
+                    (radix - q0) * d < (radix - q0) * radix * radix
+                    by let rq = radix - q0 in let r2 = radix * radix in
+                    rq > 0 /\ d < r2
+                    so rq * d < rq * r2
+                  )
+               so d * (q0 - radix) > radix * radix * (q0 - radix)
+               so radix * cr > radix * radix * (q0 - radix)
+               so cr > radix * (q0 - radix) = radix * q0 - radix * radix
+                  ))
+            so cr < m
+            by (
+                let bbd = radix * radix - d in
+                bbd > 0 so
+                if l2i uh <= l2i dh - 1
+                then
+                  let dm = l2i dh - 1 in
+                  l2i uh <= dm
+                  so
+                  k * l2i uh <= k * dm
+                  so (k * dm <= d * dm by k <= d /\ 0 <= dm)
+                  so k * l2i uh <= d * dm
+                  so
+                  bbd * l2i um <= bbd * (radix - 1)
+                  so
+                  radix * cr
+                  = k * l2i uh + (radix * radix - d) * l2i um
+                    + radix * l2i ul + d * q0 - radix * d
+                  <= d * dm + bbd * l2i um
+                    + radix * l2i ul + d * q0 - radix * d
+                  <= d * dm + bbd * (radix - 1)
+                    + radix * l2i ul + d * q0 - radix * d
+                  < d * dm + bbd * (radix - 1)
+                    + radix * radix + d * q0 - radix * d
+                  so radix * radix * cr
+                  < radix * (d * dm + bbd * (radix - 1)
+                    + radix * radix + d * q0 - radix * d)
+                  = d * radix * (l2i dh - 1) + bbd * radix * (radix - 1)
+                    + radix * radix * radix + radix * d * q0 - radix * radix * d
+                  = d * radix * l2i dh - d * radix + bbd * radix * (radix - 1)
+                    + radix * radix * radix + radix * d * q0 - radix * radix * d
+                  = d * (d - l2i dl) - d * radix + bbd * radix * (radix - 1)
+                    + radix * radix * radix + radix * d * q0 - radix * radix * d
+                  = d * d - d * radix + bbd * radix * (radix - 1)
+                    + radix * radix * radix + radix * d * q0 - radix * radix * d - d * l2i dl
+                  so (d * l2i dl >= 0 by d >= 0 /\ l2i dl >= 0)
+                  so radix * radix * cr
+                  < d * d - d * radix + bbd * radix * (radix - 1)
+                    + radix * radix * radix + radix * d * q0 - radix * radix * d - d * l2i dl
+                  <= d * d - d * radix + bbd * radix * (radix - 1)
+                    + radix * radix * radix + radix * d * q0 - radix * radix * d
+                  = d * d - d * radix + bbd * (radix * radix - radix)
+                    + radix * radix * radix + radix * d * q0 - radix * radix * d
+                  = d * d - d * radix + bbd * radix * radix - (radix * radix - d) * radix
+                    + radix * radix * radix + radix * d * q0 - radix * radix * d
+                  = d * d - d * radix + bbd * radix * radix
+                    + radix * d - radix * radix * radix
+                    + radix * radix * radix + radix * d * q0 - radix * radix * d
+                  = d * d + bbd * radix * radix - radix * radix * d + radix * d * q0
+                  = bbd * radix * radix - d * (radix * radix - d) + radix * d * q0
+                  = bbd * radix * radix - d * bbd + radix * d * q0
+                  = bbd * bbd + d * (radix * q0)
+                  <= bbd * m + d * (radix * q0)
+                  <= bbd * m + d * m
+                  = radix * radix * m
+                  so cr < m
+                 else
+                  l2i uh = l2i dh
+                  so
+                  (l2i um <= l2i dl - 1
+                  by l2i um + radix * l2i uh < l2i dl + radix * l2i dh)
+                  so
+                  ( radix * radix * cr
+                    < radix * radix * m
+                    - (radix - l2i dl) * (radix * radix * radix - d * (1+ radix))
+                 by radix * cr
+                  = k * l2i dh + (radix * radix - d) * l2i um
+                    + radix * l2i ul + d * q0 - radix * d
+                  <= d * l2i dh + (radix * radix - d) * l2i um
+                    + radix * l2i ul + d * q0 - radix * d
+                  <= d * l2i dh + (radix * radix - d) * (l2i dl - 1)
+                    + radix * l2i ul + d * q0 - radix * d
+                  < d * l2i dh + (radix * radix - d) * (l2i dl - 1)
+                    + radix * radix + d * q0 - radix * d
+                  so radix * radix * cr
+                  < radix * (d * l2i dh + (radix * radix - d) * (l2i dl - 1)
+                    + radix * radix + d * q0 - radix * d)
+                  = d * radix * l2i dh
+                    + (radix * radix - d) * (l2i dl - 1) * radix
+                    + radix * radix * radix + d * q0 * radix - radix * radix * d
+                  = d * (d - l2i dl)
+                    + (radix * radix - d) * (radix * l2i dl - radix)
+                    + radix * radix * radix + d * q0 * radix - radix * radix * d
+                  = d * d - d * l2i dl + radix * radix * radix * l2i dl
+                    - d * radix * l2i dl + d * radix - radix * radix * radix
+                    + radix * radix * radix + d * q0 * radix - radix * radix * d
+                  = d * d - d * l2i dl + radix * radix * radix * l2i dl
+                    - d * radix * l2i dl + d * radix + d * q0 * radix
+                    - radix * radix * d
+                  = d * d - radix * radix * d + d * radix + d * q0 * radix
+                    + l2i dl * (radix * radix * radix - d - d * radix)
+                  = d * (d - radix * radix) + d * radix + d * q0 * radix
+                    + l2i dl * (radix * radix * radix - d - d * radix)
+                  = bbd * (-d) + d * radix + d * q0 * radix
+                    + l2i dl * (radix * radix * radix - d - d * radix)
+                  = bbd * (bbd - radix * radix) + d * radix + d * q0 * radix
+                    + l2i dl * (radix * radix * radix - d - d * radix)
+                  = bbd * bbd + d * q0 * radix
+                    - bbd * radix * radix + d * radix
+                    + l2i dl * (radix * radix * radix - d * (1 + radix))
+                  = bbd * bbd + d * q0 * radix
+                    - (radix * radix - d) * radix * radix + d * radix
+                    + l2i dl * (radix * radix * radix - d * (1 + radix))
+                  = bbd * bbd + d * q0 * radix
+                    - radix * ((radix * radix - d) * radix - d)
+                    + l2i dl * (radix * radix * radix - d * (1 + radix))
+                  = bbd * bbd + d * q0 * radix
+                    - radix *  (radix * radix * radix - d * radix - d)
+                    + l2i dl * (radix * radix * radix - d * (1 + radix))
+                  = bbd * bbd + d * q0 * radix
+                    - radix * (radix * radix * radix - d * (1+ radix))
+                    + l2i dl * (radix * radix * radix - d * (1 + radix))
+                  = bbd * bbd + d * q0 * radix
+                    - (radix - l2i dl) * (radix * radix * radix - d * (1+ radix))
+                  <= bbd * m + d * q0 * radix
+                    - (radix - l2i dl) * (radix * radix * radix - d * (1+ radix))
+                  <= bbd * m + d * m
+                    - (radix - l2i dl) * (radix * radix * radix - d * (1+ radix))
+                  = (bbd + d) * m
+                    - (radix - l2i dl) * (radix * radix * radix - d * (1+ radix))
+                  = radix * radix * m
+                    - (radix - l2i dl) * (radix * radix * radix - d * (1+ radix))
+                  )
+                  so
+                    (cr < m by
+                    if d <= radix * (radix - 1)
+                    then (radix + 1) * d <= radix * (radix - 1) * (radix + 1)
+                         = radix * (radix * radix - 1)
+                         = radix * radix * radix - radix
+                         < radix * radix * radix
+                         so (radix * radix * radix - d * (1+ radix)) > 0
+                         so radix - l2i dl > 0
+                         so (radix - l2i dl) * (radix * radix * radix
+                                               - d * (1+ radix))
+                            > 0
+                         so
+                         radix * radix * cr
+                         < radix * radix * m
+                           - (radix - l2i dl) * (radix * radix * radix
+                           - d * (1+ radix))
+                         < radix * radix * m
+                         so radix * radix * cr < radix * radix * m
+                    else
+                        l2i dl + radix * l2i dh = d > radix * (radix - 1)
+                        so l2i dl < radix
+                        so l2i dl + radix * l2i dh < radix * (1 + l2i dh)
+                        so radix - 1 < 1 + l2i dh
+                        so l2i dh > radix - 2
+                        so l2i dh = radix - 1
+                        so l2i uh = l2i dh
+                        so d >= radix * (radix - 1) +1
+                        so d * (radix + 1)
+                           >= (radix * (radix - 1) + 1) * (radix +1)
+                            = radix * (radix * radix - 1) + radix + 1
+                            = radix * radix * radix - radix + radix + 1
+                            = radix * radix * radix + 1
+                        so
+                        (d * div (radix * radix * radix - 1) d
+                             <= d * (radix + 1)
+                          by d * div (radix * radix * radix - 1) d
+                             <= radix * radix * radix - 1
+                             < radix * radix * radix + 1
+                             <= d * (radix + 1))
+                        so (let a = div (radix * radix * radix - 1) d in
+                           a < radix + 1 by  a * d < (radix + 1) * d)
+                        so l2i v = div (radix * radix * radix - 1) d - radix
+                                 < radix + 1 - radix = 1
+                        so l2i v = 0
+                        so l2i sh = l2i uh = radix - 1
+                        so cq = l2i sh + 1 = radix
+                        so cr = u - cq * d
+                              = u - radix * d
+                              = l2i ul + radix * (l2i um + radix * l2i dh)
+                                       - radix * (l2i dl + radix * l2i dh)
+                              = l2i ul + radix * (l2i um - l2i dl)
+                        so l2i um <= l2i dl - 1
+                        so 1 + l2i um - l2i dl <= 0
+                        so l2i ul < radix
+                        so cr = l2i ul + radix * (l2i um - l2i dl)
+                              < radix + radix * (l2i um - l2i dl)
+                              = radix * (1 + l2i um - l2i dl) <= 0
+                        so cr < 0 <= m
+                   )
+                )
+            };
+    assert { cr >= 0 -> r' = cr };
+    assert { cr < 0 -> r' = radix * radix + cr
+             by
+             m >= radix * radix - d
+             so cr >= m - radix * radix >= -d
+             so cr + radix * radix >= radix * radix - d >= 0
+             so 0 <= cr + radix * radix < radix * radix
+             so mod (radix * radix + cr) (radix*radix) = mod cr (radix*radix)
+             so r' = mod (radix * radix + cr) (radix*radix) };
+    assert { cr < 0 -> l2i !r1 >= l2i sl
+             by m >= radix * q0
+             so cr >= m - radix * radix >= radix * q0 - radix * radix
+             so r' = radix * radix + cr >= radix * q0
+             so r' = radix * l2i !r1 + l2i !r0 >= radix * q0
+             so l2i !r0 < radix
+             so r' < radix * l2i !r1 + radix = radix * (l2i !r1 + 1)
+             so radix * q0 < radix * (l2i !r1 + 1)
+             so l2i sl = q0 < l2i !r1 + 1 };
+    assert { 1 <= cq <= radix };
+    assert { 1 <= cq < radix -> l2i !q1 = cq so l2i !q1 * d + cr = u };
+    assert { cq = radix ->
+             (cr < 0
+                by cq * d + cr = u
+                so l2i um + radix * l2i uh <= d - 1
+                so radix * d + cr = l2i ul
+                                    + radix * (l2i um + radix * l2i uh)
+                                  <= l2i ul + radix * (d - 1)
+                                  = l2i ul - radix + radix * d
+                                  < radix * d
+             )
+           };
+    label PreCorrections in
+    if Limb.(>=) !r1 sl
+    then begin
+      q1 := sub_mod !q1 one;
+      assert { l2i !q1 = cq - 1
+               by
+               if cq = radix
+               then
+                 l2i (!q1 at PreCorrections)
+                 = mod cq radix = mod radix radix= 0
+                 so l2i !q1 = mod (0 - 1) radix = radix - 1 = cq - 1
+               else
+                 0 <= cq - 1 < radix - 1
+                 so l2i (!q1 at PreCorrections) = cq
+                 so l2i !q1 = mod (cq - 1) radix = cq - 1
+                 };
+      let rl, c = add_with_carry !r0 dl zero in
+      let rh, c' = add_with_carry !r1 dh c in
+      assert { l2i rl + radix * l2i rh = mod (r' + d) (radix * radix)
+               by radix * radix * l2i c' + l2i rl + radix * l2i rh
+                  = r' + d
+               so mod (r' + d) (radix * radix)
+                  = mod (radix * radix * l2i c' + l2i rl + radix * l2i rh)
+                      (radix * radix)
+                  = mod (l2i rl + radix * l2i rh) (radix * radix)  };
+      assert { l2i rl + radix * l2i rh = cr + d
+               by
+               if cr >= 0
+               then r' = cr
+                    so l2i rl + radix * l2i rh = mod (cr + d) (radix * radix)
+                    so cr < max (radix * radix - d) (q0*radix)
+                    so (cr >= q0 * radix
+                       by
+                          r' = radix * l2i !r1 + l2i !r0
+                             >= radix * l2i !r1
+                             >= radix * q0)
+                    so cr < radix * radix - d
+                    so cr + d < radix * radix
+                    so (cr + d >= 0  by cr + d >= cr)
+                    so mod (cr + d) (radix * radix) = cr + d
+               else
+                    r' = cr + radix * radix
+                    so cr >= m - radix * radix
+                    so r' >= m >= radix * radix - d
+                    so r' + d >= radix * radix
+                    so r' < radix * radix
+                    so d < radix * radix
+                    so r' + d < radix * radix + radix * radix
+                    so mod (r' + d) (radix * radix)
+                       = r' + d - radix * radix
+                       = cr + d
+             };
+      r1 := rh;
+      r0 := rl;
+      assert { l2i !q1 * d + l2i !r0 + radix * l2i !r1 = u
+               by
+               cq * d + cr = u
+               so l2i !q1 = cq - 1
+               so l2i !r0 + radix * l2i !r1 = cr + d
+               so l2i !q1 * d + l2i !r0 + radix * l2i !r1
+                  = (cq - 1) * d + cr + d
+                  = cq * d - d + cr + d
+                  = cq * d + cr };
+    end
+    else assert { l2i !q1 * d + r' = u
+                  by cr >= 0
+                  so r' = cr
+                  so 1 <= cq < radix
+                  so l2i !q1 * d + cr = u };
+    assert { l2i !q1 * d + l2i !r0 + radix * l2i !r1 = u };
+    label PreRemAdjust in
+    if (Limb.(>) !r1 dh) || (Limb.(=) !r1 dh && Limb.(>=) !r0 dl)
+    then begin (*unlikely*)
+      let bl, b = sub_with_borrow !r0 dl zero in
+      let bh, b'= sub_with_borrow !r1 dh b in
+      assert { l2i b' = 0 };
+      assert { l2i bl + radix * l2i bh = l2i !r0 + radix * l2i !r1 - d };
+      assert { l2i !q1 < radix - 1
+               by l2i !q1 * d + l2i !r0 + radix * l2i !r1 = u
+               so l2i !r0 + radix * l2i !r1 >= d
+               so l2i um + radix * l2i uh <= d - 1
+               so u = l2i ul + radix * (l2i um + radix * l2i uh)
+                    <= l2i ul + radix * (d - 1)
+                    < radix + radix * (d-1)
+                    = radix * d
+               so (l2i !q1 * d < (radix - 1) * d
+                  by
+                  l2i !q1 * d = u - (l2i !r0 + radix * l2i !r1)
+                              <= u - d
+                              < radix * d - d
+                              = (radix - 1) * d )
+               };
+      q1 := add_mod !q1 one;
+      assert { l2i !q1 = l2i (!q1 at PreRemAdjust) + 1 };
+      r1 := bh;
+      r0 := bl;
+      assert { l2i !q1 * d + l2i !r0 + radix * l2i !r1 = u
+               by
+               l2i !q1 * d + l2i !r0 + radix * l2i !r1
+               = (l2i (!q1 at PreRemAdjust) + 1) * d
+                 + (l2i !r0 + radix * l2i !r1 at PreRemAdjust) - d
+               = (l2i !q1 * d + l2i !r0 + radix * l2i !r1 at PreRemAdjust)
+                };
+    end;
+    assert { 0 <= l2i !r0 + radix * l2i !r1 < d };
+    (!q1,!r0,!r1)
+
+  let lemma bounds_imply_rec3by2 (v dh dl:limb)
+    requires { radix * radix * radix - (l2i dl + radix * l2i dh)
+               <= (radix + l2i v) * (l2i dl + radix * l2i dh)
+               < radix * radix * radix }
+    ensures { reciprocal_3by2 v dh dl }
+  = ()
+    (*let ghost d = l2i dl + radix * l2i dh in
+    let ghost w = Limb.of_int (div (radix*radix*radix -1) d - radix) in
+    assert { reciprocal_3by2 w dh dl };
+    let ghost e = l2i v - l2i w in
+    assert { radix * radix * radix - d
+             <= (radix + l2i w) * d
+             < radix * radix * radix };
+    assert { e = 0 }*)
+
+
+  let reciprocal_word_3by2 (dh dl:limb) : limb
+    requires { l2i dh >= div radix 2 }
+    ensures { reciprocal_3by2 result dh dl }
+  =
+    let ghost d = l2i dl + radix * l2i dh in
+    let one = Limb.of_int 1 in
+    let v = ref (invert_limb dh) in
+    assert { radix * radix - l2i dh
+             <= (radix + l2i !v) * l2i dh
+             < radix * radix
+             by
+             radix + l2i !v = div (radix * radix - 1) (l2i dh) };
+    let p = ref (mul_mod dh !v) in
+    assert { (radix + l2i !v) * l2i dh
+             = radix * (radix-1)
+               + l2i !p
+             by
+             mod ((radix + l2i !v) * l2i dh) radix
+             = mod (radix * l2i dh + l2i dh * l2i !v) radix
+             = mod (l2i dh * l2i !v) radix = l2i !p
+             so
+             div ((radix + l2i !v) * l2i dh) radix = radix - 1
+             so
+             (radix + l2i !v) * l2i dh
+             = radix * div ((radix + l2i !v) * l2i dh) radix
+               + mod (l2i dh * l2i !v) radix
+             = radix * (radix - 1) + l2i !p
+             };
+    label Estimate in
+    p := add_mod !p dl;
+    if Limb.(<) !p dl (* carry out *)
+    then begin
+      assert { l2i (!p at Estimate) + l2i dl >= radix };
+      assert { l2i (!p at Estimate) + l2i dl = radix + l2i !p };
+      assert { l2i !v >= 1
+               by
+               l2i (!p at Estimate) + l2i dl >= radix
+               so l2i (!p at Estimate) > 0
+             };
+      assert { (radix + l2i !v) * l2i dh + l2i dl
+               = radix * (radix - 1) + radix + l2i !p };
+      label Carry in
+      if Limb.(>=) !p dh
+      then begin
+        v := Limb.(-) !v one;
+        p := Limb.(-) !p dh;
+        assert { (radix + l2i !v) * l2i dh + l2i dl
+                 = radix * (radix - 1) + radix + l2i !p
+               };
+      end;
+      label Borrow in
+      v := Limb.(-) !v one;
+      assert { l2i !p < l2i dh };
+      p := sub_mod !p dh;
+      assert { l2i !p = radix + l2i !p at Borrow - l2i dh };
+    end;
+    assert { (radix + l2i !v) * l2i dh * radix + radix * l2i dl
+               = radix * radix * (radix - 1) + radix * l2i !p
+             by (radix + l2i !v) * l2i dh + l2i dl
+                 = radix * (radix - 1) + l2i !p };
+    assert { radix * radix - l2i dh
+             <= (radix + l2i !v) * l2i dh + l2i dl
+             < radix * radix };
+    let tl, th = mul_double !v dl in
+    label Adjust in
+    p := add_mod !p th;
+    if Limb.(<) !p th (* carry out *)
+    then begin
+      assert { l2i (!p at Adjust) + l2i th >= radix };
+      assert { l2i (!p at Adjust) + l2i th = radix + l2i !p
+               by l2i (!p at Adjust) + l2i th < radix + radix
+               so div (l2i (!p at Adjust) + l2i th) radix = 1
+               so l2i !p = mod (l2i (!p at Adjust) + l2i th) radix
+               so l2i (!p at Adjust) + l2i th
+                  = radix * div (l2i (!p at Adjust) + l2i th) radix
+                    + mod (l2i (!p at Adjust) + l2i th) radix
+                  = radix + l2i !p
+             };
+      assert { l2i !v >= 1
+               by
+               l2i th <> 0
+               so l2i !v <> 0
+             };
+      if Limb.(>) !p dh || (Limb.(=) !p dh && Limb.(>=) tl dl)
+      then begin
+        assert { l2i tl + radix * l2i !p >= d };
+        v := Limb.(-) !v one;
+        assert { (radix + l2i !v) * l2i dh * radix + radix * l2i dl
+                   + l2i !v * l2i dl
+                 = radix * radix * radix
+                   + radix * l2i !p + l2i tl - d
+                 by
+                 (radix + l2i !v) * l2i dh * radix + radix * l2i dl
+                   + l2i !v * l2i dl
+                 = (radix + l2i !v at Adjust - 1) * l2i dh * radix
+                   + radix * l2i dl
+                   + (l2i !v at Adjust - 1) * l2i dl
+                 = (radix + l2i !v at Adjust) * l2i dh * radix
+                   + radix *  l2i dl
+                   + (l2i !v at Adjust) * l2i dl - radix * l2i dh
+                   - l2i dl
+                 = radix * radix * (radix - 1) + radix * l2i (!p at Adjust)
+                   + (l2i !v at Adjust) * l2i dl - radix * l2i dh
+                   - l2i dl
+                 = radix * radix * (radix - 1) + radix * l2i (!p at Adjust)
+                   + radix * l2i th + l2i tl - d
+                 = radix * radix * (radix - 1) + radix * (radix + l2i !p)
+                   + l2i tl - d
+                 = radix * radix * (radix - 1) + radix * radix + radix * l2i !p
+                   + l2i tl - d
+                 = radix * radix * radix + radix * l2i !p + l2i tl - d
+            };
+      end;
+      assert { radix * radix * radix
+               <= (radix + l2i !v) * l2i dh * radix + radix * l2i dl
+                   + l2i !v * l2i dl
+               < radix * radix * radix + d };
+      v := Limb.(-) !v one;
+    end;
+    bounds_imply_rec3by2 !v dh dl;
+    !v
+
+  let sub3 (x y z:limb) : (limb,limb)
+    returns { (r,d) -> l2i x - l2i y - l2i z = l2i r - radix * l2i d
+    	      	     /\ 0 <= l2i d <= 2 }
+  =
+    let limb_zero = Limb.of_int 0 in
+    let u1, b1 = sub_with_borrow x y limb_zero in
+    let u2, b2 = sub_with_borrow u1 z limb_zero in
+    (u2, (Limb.(+) b1 b2))
+
+  (** [submul_limb r x y sz] multiplies [(x, sz)] by [y], substracts the [sz]
+      least significant limbs from [(r, sz)] and writes the result in [(r,sz)].
+      Returns the most significant limb of the product plus the borrow
+      of the substraction. Corresponds to [mpn_submul_1].*)
+  let submul_limb (r x:t) (y:limb) (sz:int32):limb
+    requires { valid_ptr_itv x (p2i sz) }
+    requires { valid_ptr_itv r (p2i sz) }
+    ensures { value_sub_shift r (p2i sz) - (power radix (p2i sz)) * l2i result
+            = value_sub_shift (old r) (p2i sz)
+              - value_sub_shift x (p2i sz) * l2i y }
+    writes { r.data.contents.elts }
+    ensures { forall j. j < r.offset \/ r.offset + p2i sz <= j ->
+              (pelts r)[j] = (pelts (old r))[j] }
+=
+    let limb_zero = Limb.of_int 0 in
+    let lx = ref limb_zero in
+    let lr = ref limb_zero in
+    let b = ref limb_zero in
+    let i = ref (Int32.of_int 0) in
+    while Int32.(<) !i sz do
+      variant { p2i sz - p2i !i }
+      invariant { 0 <= p2i !i <= p2i sz }
+      invariant { value_sub_shift r (p2i !i) - (power radix (p2i !i)) * l2i !b
+                 = value_sub_shift (old r) (p2i !i)
+                   - value_sub_shift x (p2i !i) * l2i y }
+      invariant { forall j. p2i !i <= j < p2i sz ->
+                 (pelts (old r)) [r.offset+j] = (pelts r)[r.offset + j]  }
+      invariant { forall j. j < r.offset \/ r.offset + p2i sz <= j ->
+                 (pelts r)[j] = (pelts (old r))[j] }
+      label StartLoop in
+      let ghost k = p2i !i in
+      lx := get_ofs x !i;
+      lr := get_ofs r !i;
+      assert { l2i !lr = l2i (pelts (old r))[r.offset + p2i !i] };
+      let rl, rh = Limb.mul_double !lx y in
+      let res, borrow = sub3 !lr rl !b in
+      value_sub_tail (pelts r) r.offset (r.offset + k);
+      value_sub_tail (pelts x) x.offset (x.offset + k);
+      value_sub_update (pelts r) (r.offset + p2i !i) r.offset (r.offset + p2i !i +1) res;
+      set_ofs r !i res;
+      assert { forall j. (p2i !i + 1) <= j < p2i sz ->
+               (pelts (old r))[r.offset+j] = (pelts r)[r.offset+j]
+               by
+               (pelts r)[r.offset+j] = ((pelts r) at StartLoop)[r.offset+j]
+                                  = (pelts (old r))[r.offset+j] };
+      assert { value_sub_shift r (p2i !i + 1)
+              = value_sub_shift (r at StartLoop) (p2i !i + 1)
+                + (power radix (p2i !i)) * (l2i res - l2i !lr)
+               };
+      assert { l2i rl + radix * l2i rh <= (radix-1)*(radix-1)
+               by
+               (l2i !lx * l2i y <= l2i !lx * (radix-1) <= (radix-1)*(radix-1)
+                 by
+                0 <= l2i !lx <= radix - 1 /\ 0 <= l2i y <= radix -1)
+                /\
+                l2i rl + radix * l2i rh = l2i !lx * l2i y
+                };
+      assert { l2i rh < radix - 1
+               by
+               l2i rl + radix * l2i rh  <= (radix -1) * (radix -1)
+               so
+               radix * l2i rh <= (radix -1) * (radix -1)
+               };
+      assert { l2i rh = radix - 2 -> l2i rl <= 1
+               by
+               l2i rl + radix * l2i rh <= (radix-1)*(radix-1) };
+      assert { l2i rh = radix - 2 -> l2i borrow <= 1
+               by l2i rl <= 1 };
+      b := Limb.(+) rh borrow;
+      i := Int32.(+) !i (Int32.of_int 1);
+      assert { value_sub_shift r (p2i !i) - (power radix (p2i !i)) * l2i !b
+                 = value_sub_shift (old r) (p2i !i)
+                   - value_sub_shift x (p2i !i) * l2i y
+               by
+                (value_sub_shift r (p2i !i) - (power radix (p2i !i)) * l2i !b
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i res - l2i !lr)
+                   - (power radix (p2i !i)) * l2i !b
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i res - l2i !lr)
+                   - (power radix (p2i !i)) * (l2i rh + l2i borrow)
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i res - l2i !lr)
+                   - (power radix k) * radix * (l2i rh + l2i borrow)
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i res - l2i !lr
+                                   - radix * (l2i rh + l2i borrow))
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i res - radix * l2i borrow
+                          - l2i !lr - radix * l2i rh)
+                = value_sub_shift (r at StartLoop) (p2i !i) +
+                   (power radix k) * (l2i !lr - l2i rl - l2i (!b at StartLoop)
+                          - l2i !lr - radix * l2i rh)
+                = value_sub_shift (r at StartLoop) (p2i !i) -
+                   (power radix k) * (l2i rl + radix * l2i rh + l2i (!b at StartLoop))
+                = value_sub_shift (r at StartLoop) (p2i !i) -
+                   (power radix k) * (l2i !lx * l2i y + l2i (!b at StartLoop))
+                = value_sub_shift (r at StartLoop) k
+                    + (power radix k) * l2i !lr
+                    - (power radix k) * (l2i !lx * l2i y + l2i (!b at StartLoop))
+                = value_sub_shift (r at StartLoop) k
+                    - (power radix k) * l2i (!b at StartLoop)
+                    + (power radix k) * (l2i !lr - l2i !lx * l2i y)
+                = value_sub_shift (old r) k
+                    - value_sub_shift x k * l2i y
+                    + (power radix k) * (l2i !lr - l2i !lx * l2i y)
+                = value_sub_shift (old r) k
+                    + (power radix k) * l2i !lr
+                    - (value_sub_shift x k + (power radix k)*l2i !lx) * l2i y
+                = value_sub_shift (old r) (p2i !i)
+                    - (value_sub_shift x k + (power radix k)*l2i !lx) * l2i y
+                = value_sub_shift (old r) (p2i !i)
+                    - value_sub_shift x (p2i !i) * l2i y
+                    by
+                  value_sub_shift (old r) (p2i !i) = value_sub_shift (old r) k
+                     + (power radix k) * l2i !lr
+                     )
+                    };
+    done;
+    !b
+
+  (* [(x,sz)] is normalized if its most significant bit is set. *)
+  predicate normalized (x:t) (sz:int32) =
+    valid_ptr_itv x (p2i sz) /\ l2i (pelts x)[p2i sz - 1] >= div radix 2
+
+  let div_sb_qr (q x y:t) (sx sy:int32) : unit
+    requires { 2 <= p2i sy <= p2i sx }
+    requires { valid_ptr_itv x (p2i sx) }
+    requires { valid_ptr_itv y (p2i sy) }
+    requires { valid_ptr_itv q (p2i sx - p2i sy) }
+    requires { normalized y sy }
+  =
+    let one = Int32.of_int 1 in
+    let two = Int32.of_int 2 in
+    let limb_zero = Limb.of_int 0 in
+    let zero = Int32.of_int 0 in
+    let minus_one = Int32.(-_) (Int32.of_int 1) in
+    let uone = Limb.of_int 1 in
+    let x1 = ref limb_zero in
+    let x0 = ref limb_zero in
+    let xp = ref (C.incr x (Int32.(-) sx two)) in
+    let qp = ref (C.incr q (Int32.(-) sx sy)) in
+    let dh = C.get_ofs y (Int32.(-) sy one) in
+    let dl = C.get_ofs y (Int32.(-) sy two) in
+    let v = reciprocal_word_3by2 dh dl in
+    let x1 = ref (C.get_ofs !xp one) in
+    let i = ref (Int32.(-) sx sy) in
+    let mdn = Int32.(-) two sy in
+    let q = ref limb_zero in
+    while (Int32.(>) !i zero) do
+      variant { p2i !i }
+      xp := C.incr !xp minus_one;
+      if (Limb.(=) !x1 dh && Limb.(=) (C.get_ofs !xp one) dl) (* unlikely *)
+      then begin
+        q := Limb.of_int Limb.max_uint64;
+        let _ = submul_limb (C.incr !xp mdn) y !q sy in
+        x1 := C.get_ofs !xp one
+      end
+      else begin
+        let qu, rh, rl =
+            div3by2_inv !x1 (C.get_ofs !xp one) (C.get !xp) dh dl v in
+        q := qu;
+        x1 := rh;
+        x0 := rl;
+        (* TODO use sy-2 and use the existing x0 and x1 for the last two steps*)
+        let cy = submul_limb (C.incr !xp mdn) y !q sy in
+       (* let cy1 = if (Limb.(<) !x0 cy) then uone else uzero in
+        x0 := sub_mod !x0 cy;
+        let cy2 = if (Limb.(<) !x1 cy1) then uone else uzero in
+        x1 := sub_mod !x1 cy2;
+        C.set !xp !x0;*)
+        if Limb.ne cy limb_zero (*unlikely*)
+        then begin
+          (* TODO should be a simple add in place *)
+          let c = addmul_limb (C.incr !xp mdn) y uone sy in
+          x1 := Limb.(+) !x1 (Limb.(+) dh c);
+          q := Limb.(-) !q uone;
+	end;
+      end;
+      qp := C.incr !qp minus_one;
+      C.set !qp !q
+    done;
+    C.set_ofs !xp one !x1
+
+  (** [div_qr q r x y sx sy] divides [(x,sx)] by [(y,sy)], writes the quotient
+    in [(q, (sx-sy))] and the remainder in [(r, sy)]. Corresponds to
+    [mpn_tdiv_qr]. *)
+  let div_qr (q r x y:t) (sx sy:int32) : unit
+    requires { 1 <= p2i sy <= p2i sx}
+    requires { valid_ptr_itv x (p2i sx) }
+    requires { valid_ptr_itv y (p2i sy) }
+    requires { valid_ptr_itv q (p2i sx - p2i sy + 1) } (* TODO check if this is needed*)
+    requires { valid_ptr_itv r (p2i sy) }
+    requires { l2i (pelts y)[p2i sy - 1] > 0 }
+  =
+    let one = Int32.of_int 1 in
+    let two = Int32.of_int 2 in
+    let limb_zero = Limb.of_int 0 in
+    let zero = Int32.of_int 0 in
+    let minus_one = Int32.(-_) (Int32.of_int 1) in
+    let uone = Limb.of_int 1 in
+    if (Int32.(=) sy one)
+    then
+      let lr = divmod_1 q x (C.get y) sx in
+      C.set r lr
+    else
+      let clz = count_leading_zeros (C.get_ofs y (Int32.(-) sy one)) in
+      if Int32.(=) clz zero
+      then begin
+        let nx = malloc (UInt32.of_int32 sx) in
+        let _ = add_limb nx x limb_zero sx in (*TODO actual copy*)
+	div_sb_qr q nx y sx sy;
+	let _ = add_limb r nx limb_zero sy in
+	free nx;
+      end
+      else begin
+        let nx = malloc (UInt32.of_int32 (Int32.(+) sx one)) in
+        let ny = malloc (UInt32.of_int32 sy) in
+	let _ = lshift ny y sy (Limb.of_int32 clz) in
+	let h = lshift nx x sx (Limb.of_int32 clz) in
+	C.set_ofs nx sx h;
+	(* TODO don't add 1 when not needed, cf "adjust" in GMP algo *)
+	div_sb_qr q nx ny (Int32.(+) sx (Int32.of_int 1)) sy;
+	let _ = rshift r nx sy (Limb.of_int32 clz) in
+	free nx;
+	free ny;
+      end
+
+  (** Tests *)
+ (*
+ let print (p:t) (m n:int32) : unit
+    requires { 0 <= p.offset + p2i m
+               <= p.offset + p2i n
+               <= plength p }
+  =
+    let i = ref m in
+    let q = ref (C.incr p m) in
+    let one = Int32.of_int 1 in
+    while (Int32.(<) !i n) do
+      invariant { p2i m <= p2i !i <= p2i n }
+      invariant { (!q).offset = p.offset + p2i !i }
+      invariant { plength !q = plength p }
+      variant { p2i n - p2i !i }
+      print_uint32 (C.get !q);
+      print_space ();
+      q := C.incr !q one;
+      i := Int32.(+) !i one;
+    done;
+    print_newline ()
+
+  let from_limb (l:limb) : t
+    ensures { is_null result \/ plength result = 1 }
+    ensures { is_null result \/ value_sub_shift result 1 = l2i l }
+    ensures { result.offset = 0 }
+  =
+    let p = malloc (UInt32.of_int 1) in
+    if not (is_null p)
+    then C.set p l;
+    p
+
+  let two_limbs (l1 l2: limb) : t
+    ensures { is_null result \/ plength result = 2 }
+    ensures { is_null result \/ value_sub_shift result 2 = l2i l1 + radix * l2i l2 }
+    ensures { result.offset = 0 }
+  =
+    let p = malloc (UInt32.of_int 2) in
+    if not (is_null p)
+    then begin
+      C.set p l1;
+      C.set (C.incr p (Int32.of_int 1)) l2
+      end;
+    p
+*)
+(*
+  let main () =
+    let p = from_limb (Limb.of_int 42) in
+    if not (is_null p)
+    then begin
+      print_uint32 (C.get p);
+      print_newline ();
+      free p;
+    end;
+    let q = two_limbs (Limb.of_int 0xffffffff) (Limb.of_int 42) in
+    if not (is_null q)
+    then begin
+      print q (Int32.of_int 0) (Int32.of_int 2);
+      free q;
+    end;
+    let one = Int32.of_int 1 in
+    let two = Int32.of_int 2 in
+    let three = Int32.of_int 3 in
+    let four = Int32.of_int 4 in
+    let r = malloc (Limb.of_int 4) in
+    let s = malloc (Limb.of_int 4) in
+    if (is_null r || is_null s) then ()
+    else begin
+      zero r four;
+      zero s four;
+      let zero = Int32.of_int 0 in
+      let x = two_limbs (Limb.of_int 42) (Limb.of_int 13) in
+      let y = two_limbs (Limb.of_int 0xffffffff) (Limb.of_int 24) in
+      if (is_null x || is_null y)
+      then ()
+      else begin
+        print x zero two;
+        print y zero two;
+        let c = add r x y two two in
+        print r zero four;
+        print_uint32 c;
+        print_newline ();
+        let c = sub s r x two two in
+        print s zero four;
+        print_uint32 c;
+        print_newline ();
+        let c = sub s x r two two in
+        print s zero four;
+        print_uint32 c;
+        print_newline ();
+        let c = add r y s two two in
+        print r zero four;
+        print_uint32 c;
+        print_newline ();
+        mul r x y two two;
+        print r zero four;
+        let c = rshift s r four (Limb.of_int 3) in
+        print s zero four;
+        print_uint32 c;
+        print_newline ();
+        let c = rshift s r four (Limb.of_int 12) in
+        print s zero four;
+        print_uint32 c;
+        print_newline ();
+        let c = lshift s r three (Limb.of_int 28) in
+        print s zero four;
+        print_uint32 c;
+        print_newline ();
+      end;
+      free x;
+      free y;
+      free r;
+      free s;
+    end;
+    let l = Limb.of_int 0xf0000001 in
+    let v = invert_limb l in
+    print_uint32 l;
+    print_newline ();
+    print_uint32 v;
+    print_newline ();
+    let x = from_limb l in
+    let y = from_limb (Limb.of_int 45) in
+    let r = malloc (Limb.of_int 2) in
+    let s = malloc (Limb.of_int 2) in
+    if (is_null x || is_null y || is_null r || is_null s)
+    then ()
+    else begin
+      mul r x y one one;
+      let _ = add_limb s r (Limb.of_int 15) two in
+      print s (Int32.of_int 0) two;
+      let (q,rem) = div2by1_inv (C.get_ofs s one) (C.get s) l v in
+      print_uint32 q;
+      print_space ();
+      print_uint32 rem;
+      print_newline ();
+    end;
+    free r;
+    free s;
+    free x;
+    free y;
+*)
+end
+
+(*
+module Heap
+
+  type elt
+
+
+  type base
+
+  type ptr model { base: base; mutable offset:int }
+
+  (** heap of memory blocks storing values of type elt *)
+  type heap = {
+
+    ghost mutable length : map base int;  (* returns -1 for non-allocated block *)
+    ghost mutable contents : map base (map int elt);
+  }
+
+  val ghost h : heap
+
+  (** operation [*p] *)
+  val get (p : ptr) :elt
+    requires { 0 <= p.offset < h.length[p.base] }
+    reads { h }
+    ensures { result = h.contents[p.base][p.offset] }
+
+  (** operations [p+i], [p[i]] *)
+
+  val malloc(n:int32):ptr
+    requires { n >= 0 }
+    writes  { h.length }
+    ensures { result.offset = 0 }
+    ensures { h.length[result.base] = n  }
+    ensures { (old h).length[result.base] = -1  }
+    ensures { forall b:base. b <> result.base -> (old h).length[b] = h,length[b]  }
+
+
+  val free ...
+
+end
+*)
