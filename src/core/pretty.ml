@@ -407,7 +407,6 @@ let print_list_next sep print fmt = function
 
 let print_decl fmt d = match d.d_node with
   | Dtype ts  -> print_ty_decl fmt ts
-  | Drange ri -> print_range_decl fmt ri
   | Dfloat fi -> print_float_decl fmt fi
   | Ddata tl  -> print_list_next newline print_data_decl fmt tl
   | Dparam ls -> print_param_decl fmt ls
@@ -560,6 +559,10 @@ let () = Exn_printer.register
       fprintf fmt "Not a term: %a" print_term t
   | Term.FmlaExpected t ->
       fprintf fmt "Not a formula: %a" print_term t
+  | Theory.NonFoundedTypeDecl ts ->
+      fprintf fmt "Cannot construct a value of type %a" print_ts ts
+  | Theory.UnknownLiteralType ty ->
+      fprintf fmt "Unknown literal type %a" print_ty ty
   | Pattern.ConstructorExpected (ls,ty) ->
       fprintf fmt "%s %a is not a constructor of type %a"
         (if ls.ls_value = None then "Predicate" else "Function") print_ls ls
@@ -579,8 +582,6 @@ let () = Exn_printer.register
       fprintf fmt
         "Type symbol %a is a type alias and cannot be declared as algebraic"
         print_ts ts
-  | Decl.NonFoundedTypeDecl ts ->
-      fprintf fmt "Cannot construct a value of type %a" print_ts ts
   | Decl.NonPositiveTypeDecl (_ts, ls, ty) ->
       fprintf fmt "Constructor %a \
           contains a non strictly positive occurrence of type %a"
@@ -614,7 +615,5 @@ let () = Exn_printer.register
         id.id_string
   | Decl.NoTerminationProof ls ->
       fprintf fmt "Cannot prove the termination of %a" print_ls ls
-  | Decl.UnknownLiteralType ty ->
-      fprintf fmt "Unknown literal type %a" print_ty ty
   | _ -> raise exn
   end

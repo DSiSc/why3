@@ -907,7 +907,7 @@ and eval_app env s ls tl =
     try
       let d = Ident.Mid.find ls.ls_name env.tknown in
       match d.Decl.d_node with
-      | Decl.Dtype _ | Decl.Drange _ | Decl.Dfloat _ | Decl.Dprop _ -> assert false
+      | Decl.Dtype _ | Decl.Dfloat _ | Decl.Dprop _ -> assert false
       | Decl.Dlogic dl ->
         (* regular definition *)
         let d = List.assq ls dl in

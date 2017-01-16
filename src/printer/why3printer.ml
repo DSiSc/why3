@@ -355,7 +355,7 @@ let print_list_next sep print fmt = function
 
 let print_decl fmt d = match d.d_node with
   | Dtype ts  -> print_type_decl fmt ts
-  | Drange ri -> print_range_decl fmt ri
+  (* | Drange ri -> print_range_decl fmt ri *)
   | Dfloat fi -> print_float_decl fmt fi
   | Ddata tl  -> print_list_next nothing print_data_decl fmt tl
   | Dparam ls -> print_param_decl fmt ls

@@ -65,7 +65,6 @@ let compute_diff t1 t2 =
       Hdecl.replace hdone decl ();
       match decl.d_node with
       | Dtype ts
-      | Drange { range_ts = ts }
       | Dfloat { float_ts = ts } -> remove_ts acc ts
       | Ddata l -> List.fold_left (fun acc (ts,_) -> remove_ts acc ts) acc l
       | Dparam ls -> remove_ls acc ls
@@ -228,7 +227,6 @@ let add_rem rem decl =
   let remove_pr rem pr = { rem with rem_pr = Spr.add pr rem.rem_pr} in
   match decl.d_node with
   | Dtype ts
-  | Drange { range_ts = ts }
   | Dfloat { float_ts = ts } -> remove_ts rem ts
   | Ddata l -> List.fold_left (fun rem (ts,_) -> remove_ts rem ts) rem l
   | Dparam ls -> remove_ls rem ls

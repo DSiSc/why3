@@ -90,7 +90,7 @@ let rec rewrite tenv t = match t.t_node with
   | _ -> t_map (rewrite tenv) t
 
 let decl tenv d = match d.d_node with
-  | Dtype _ | Drange _ | Dfloat _ | Dparam _ -> [d]
+  | Dtype _ | Dfloat _ | Dparam _ -> [d]
   | Ddata _ -> Printer.unsupportedDecl d
       "Algebraic and recursively-defined types are \
             not supported, run eliminate_algebraic"

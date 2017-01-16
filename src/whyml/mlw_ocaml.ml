@@ -395,8 +395,6 @@ module Translate = struct
   let logic_decl info d = match d.d_node with
     | Dtype ts ->
       type_decl info ts
-    | Drange ri ->
-      type_decl info ri.range_ts
     | Dfloat fi ->
       type_decl info fi.float_ts
     | Ddata tl ->

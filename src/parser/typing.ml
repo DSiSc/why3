@@ -42,13 +42,19 @@ let add_decl_with_tuples uc d =
   add_decl_with_tuples uc d
 
 let add_ty_decl uc ts      = add_decl_with_tuples uc (create_ty_decl ts)
-let add_range_decl uc rd   = add_decl_with_tuples uc (create_range_decl rd)
 let add_float_decl uc fd   = add_decl_with_tuples uc (create_float_decl fd)
 let add_data_decl uc dl    = add_decl_with_tuples uc (create_data_decl dl)
 let add_param_decl uc ls   = add_decl_with_tuples uc (create_param_decl ls)
 let add_logic_decl uc dl   = add_decl_with_tuples uc (create_logic_decl dl)
 let add_ind_decl uc s dl   = add_decl_with_tuples uc (create_ind_decl s dl)
 let add_prop_decl uc k p f = add_decl_with_tuples uc (create_prop_decl k p f)
+let add_range_decl uc rd   =
+  let uc = add_decl_with_tuples uc (create_range_decl rd) in
+  let a = BigInt.to_string rd.range_lo_val in
+  let b = BigInt.to_string rd.range_hi_val in
+  let uc = add_param_decl uc rd.range_to_int in
+  add_meta uc meta_range
+      (MAts rd.range_ts :: MAls rd.range_to_int :: MAstr a :: MAstr b :: [])
 
 (** symbol lookup *)
 
@@ -364,15 +370,15 @@ let rec dterm uc gvars denv {term_desc = desc; term_loc = loc} =
   | Ptree.Tnamed (Lstr lab, e1) ->
       DTlabel (dterm uc gvars denv e1, Slab.singleton lab)
   | Ptree.Tcast (e1, ty) ->
-      (* FIXME: accepts and silently ignores double casts: ((0:ty1):ty2) *)
+    (* FIXME: accepts and silently ignores double casts: ((0:ty1):ty2) *)
       let e1 = dterm uc gvars denv e1 in
       let ty = ty_of_pty uc ty in
       match e1.dt_node, ty.ty_node with
       | DTconst (Number.ConstInt _ as c, _), Tyapp (ts, []) ->
-          begin match find_range_decl (get_known uc) ts with
-          | Some _ -> DTconst (c, dty_of_ty ty)
-          | None -> DTcast (e1, ty)
-          end
+        if is_range_type (get_meta uc) ts then
+          DTconst (c, dty_of_ty ty)
+        else
+          DTcast (e1, ty)
       | DTconst (Number.ConstReal _ as c, _), Tyapp (ts, []) ->
           begin match find_float_decl (get_known uc) ts with
           | Some _ -> DTconst (c, dty_of_ty ty)

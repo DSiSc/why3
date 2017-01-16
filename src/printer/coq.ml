@@ -924,9 +924,6 @@ let print_decl ~old info fmt d =
     match d.d_node with
     | Dtype ts
     | Ddata ((ts, _)::_) -> id_unique iprinter ts.ts_name
-    | Drange _ ->
-      Printer.unsupportedDecl d
-        "coq: range types are not supported"
     | Dfloat _ ->
       Printer.unsupportedDecl d
         "coq: mapping to float not yet implemented"
@@ -942,9 +939,6 @@ let print_decl ~old info fmt d =
   | Dtype ts ->
       print_type_decl ~prev info fmt ts
   | Ddata tl -> print_data_decls info fmt tl
-  | Drange _ ->
-    Printer.unsupportedDecl d
-      "coq: range types are not supported"
   | Dfloat _ ->
     Printer.unsupportedDecl d
       "coq: mapping to float not yet implemented"

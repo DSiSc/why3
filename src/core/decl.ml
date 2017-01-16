@@ -324,7 +324,6 @@ type decl = {
 
 and decl_node =
   | Dtype  of tysymbol          (* abstract types and aliases *)
-  | Drange of range_decl        (* bounded integers *)
   | Dfloat of float_decl        (* floating-point numbers *)
   | Ddata  of data_decl list    (* recursive algebraic types *)
   | Dparam of lsymbol           (* abstract functions and predicates *)
@@ -355,11 +354,6 @@ module Hsdecl = Hashcons.Make (struct
 
   let equal d1 d2 = match d1.d_node, d2.d_node with
     | Dtype  s1, Dtype  s2 -> ts_equal s1 s2
-    | Drange ri1, Drange ri2 ->
-        ts_equal ri1.range_ts ri2.range_ts &&
-        ls_equal ri1.range_to_int ri2.range_to_int &&
-        BigInt.eq ri1.range_lo_val ri2.range_lo_val &&
-        BigInt.eq ri1.range_hi_val ri2.range_hi_val
     | Dfloat fi1, Dfloat fi2 ->
         ts_equal fi1.float_ts fi2.float_ts &&
         ls_equal fi1.float_to_real fi2.float_to_real &&
@@ -390,8 +384,6 @@ module Hsdecl = Hashcons.Make (struct
 
   let hash d = match d.d_node with
     | Dtype  s -> ts_hash s
-    | Drange ri ->
-        Hashcons.combine (ts_hash ri.range_ts) (ls_hash ri.range_to_int)
     | Dfloat fi ->
         Hashcons.combine (ts_hash fi.float_ts) (ls_hash fi.float_to_real)
     | Dparam s -> ls_hash s
@@ -463,9 +455,10 @@ let create_ty_decl ts =
 
 let create_range_decl ri =
   let syms = Sid.empty in
-  let news = Sid.add ri.range_to_int.ls_name
-    (Sid.singleton ri.range_ts.ts_name) in
-  mk_decl (Drange ri) syms news
+(*  let news = Sid.add ri.range_to_int.ls_name
+      (Sid.singleton ri.range_ts.ts_name) in *)
+  let news = Sid.singleton ri.range_ts.ts_name in
+  mk_decl (Dtype ri.range_ts) syms news
 
 let create_float_decl fi =
   let syms = Sid.empty in
@@ -604,7 +597,7 @@ let create_prop_decl k p f =
 (** Utilities *)
 
 let decl_map fn d = match d.d_node with
-  | Dtype _ | Drange _ | Dfloat _ | Ddata _ | Dparam _ -> d
+  | Dtype _ | Dfloat _ | Ddata _ | Dparam _ -> d
   | Dlogic l ->
       let fn (ls,ld) =
         let vl,e,close = open_ls_defn_cb ld in
@@ -619,7 +612,7 @@ let decl_map fn d = match d.d_node with
       create_prop_decl k pr (fn f)
 
 let decl_fold fn acc d = match d.d_node with
-  | Dtype _ | Drange _ | Dfloat _ | Ddata _ | Dparam _ -> acc
+  | Dtype _ | Dfloat _ | Ddata _ | Dparam _ -> acc
   | Dlogic l ->
       let fn acc (_,ld) =
         let _,e = open_ls_defn ld in
@@ -639,7 +632,7 @@ let list_rpair_map_fold fn =
   Lists.map_fold_left fn
 
 let decl_map_fold fn acc d = match d.d_node with
-  | Dtype _ | Drange _ | Dfloat _ | Ddata _ | Dparam _ -> acc, d
+  | Dtype _ | Dfloat _ | Ddata _ | Dparam _ -> acc, d
   | Dlogic l ->
       let fn acc (ls,ld) =
         let vl,e,close = open_ls_defn_cb ld in
@@ -679,47 +672,30 @@ let merge_known kn1 kn2 =
   in
   Mid.union check_known kn1 kn2
 
-let known_add_decl kn0 decl =
-  let kn = Mid.map (Util.const decl) decl.d_news in
-  let check id decl0 _ =
-    if d_equal decl0 decl
-    then raise (KnownIdent id)
-    else raise (RedeclaredIdent id)
-  in
-  let kn = Mid.union check kn0 kn in
-  let unk = Mid.set_diff decl.d_syms kn in
-  if Sid.is_empty unk then kn
-  else raise (UnknownIdent (Sid.choose unk))
 
 let find_constructors kn ts =
   match (Mid.find ts.ts_name kn).d_node with
-  | Dtype _ | Drange _ | Dfloat _ -> []
+  | Dtype _ | Dfloat _ -> []
   | Ddata dl -> List.assq ts dl
-  | Dparam _ | Dlogic _ | Dind _ | Dprop _ -> assert false
-
-let find_range_decl kn ts =
-  match (Mid.find ts.ts_name kn).d_node with
-  | Drange ri -> Some ri
-  | Dtype _ | Ddata _ | Dfloat _ -> None
   | Dparam _ | Dlogic _ | Dind _ | Dprop _ -> assert false
 
 let find_float_decl kn ts =
   match (Mid.find ts.ts_name kn).d_node with
   | Dfloat fi -> Some fi
-  | Dtype _ | Ddata _ | Drange _ -> None
+  | Dtype _ | Ddata _ -> None
   | Dparam _ | Dlogic _ | Dind _ | Dprop _ -> assert false
 
 let find_inductive_cases kn ps =
   match (Mid.find ps.ls_name kn).d_node with
   | Dind (_, dl) -> List.assq ps dl
   | Dlogic _ | Dparam _ | Ddata _ -> []
-  | Dtype _ | Drange _ | Dfloat _ | Dprop _ -> assert false
+  | Dtype _ | Dfloat _ | Dprop _ -> assert false
 
 let find_logic_definition kn ls =
   match (Mid.find ls.ls_name kn).d_node with
   | Dlogic dl -> Some (List.assq ls dl)
   | Dparam _ | Dind _ | Ddata _ -> None
-  | Dtype _ | Drange _ | Dfloat _ | Dprop _ -> assert false
+  | Dtype _ | Dfloat _ | Dprop _ -> assert false
 
 let find_prop kn pr =
   match (Mid.find pr.pr_name kn).d_node with
@@ -727,7 +703,7 @@ let find_prop kn pr =
       let test (_,l) = List.mem_assq pr l in
       List.assq pr (snd (List.find test dl))
   | Dprop (_,_,f) -> f
-  | Dtype _ | Drange _ | Dfloat _
+  | Dtype _ | Dfloat _
   | Ddata _ | Dparam _ | Dlogic _ -> assert false
 
 let find_prop_decl kn pr =
@@ -736,124 +712,8 @@ let find_prop_decl kn pr =
       let test (_,l) = List.mem_assq pr l in
       Paxiom, List.assq pr (snd (List.find test dl))
   | Dprop (k,_,f) -> k,f
-  | Dtype _ | Drange _ | Dfloat _
+  | Dtype _ | Dfloat _
   | Ddata _ | Dparam _ | Dlogic _ -> assert false
-
-let check_match kn d =
-  let rec check () t = match t.t_node with
-    | Tcase (t1,bl) ->
-        let get_constructors ts = List.map fst (find_constructors kn ts) in
-        let pl = List.map (fun b -> let p,_ = t_open_branch b in [p]) bl in
-        Loc.try2 ?loc:t.t_loc (Pattern.check_compile ~get_constructors) [t1] pl;
-        t_fold check () t
-    | _ -> t_fold check () t
-  in
-  decl_fold check () d
-
-exception UnknownLiteralType of ty
-
-let check_literals kn d =
-  let get_ts ty = match ty.ty_node with
-    | Tyapp (ts,[]) -> ts
-    | _ -> raise (UnknownLiteralType ty) in
-  let rec check () t = match t.t_node, t.t_ty with
-    | Tconst (Number.ConstInt c), Some ty when not (ty_equal ty ty_int) ->
-        let ri = match find_range_decl kn (get_ts ty) with
-          | Some ri -> ri | _ -> raise (UnknownLiteralType ty) in
-        Number.check_range c ri.range_lo_val ri.range_hi_val
-    | Tconst (Number.ConstReal c), Some ty when not (ty_equal ty ty_real) ->
-        let fi = match find_float_decl kn (get_ts ty) with
-          | Some fi -> fi | _ -> raise (UnknownLiteralType ty) in
-        Number.check_float c fi.float_eb_val fi.float_sb_val
-    | _ -> t_fold check () t
-  in
-  decl_fold check () d
-
-exception NonFoundedTypeDecl of tysymbol
-
-let check_foundness kn d =
-  let rec check_ts tss tvs ts =
-    (* recursive data type, abandon *)
-    if Sts.mem ts tss then false else
-    let cl = find_constructors kn ts in
-    (* an abstract type is inhabited iff
-       all its type arguments are inhabited *)
-    if cl == [] then Stv.is_empty tvs else
-    (* an algebraic type is inhabited iff
-       we can build a value of this type *)
-    let tss = Sts.add ts tss in
-    List.exists (check_constr tss tvs) cl
-  and check_constr tss tvs (ls,_) =
-    (* we can construct a value iff every
-       argument is of an inhabited type *)
-    List.for_all (check_type tss tvs) ls.ls_args
-  and check_type tss tvs ty = match ty.ty_node with
-    | Tyvar tv ->
-        not (Stv.mem tv tvs)
-    | Tyapp (ts,tl) ->
-        let check acc tv ty =
-          if check_type tss tvs ty then acc else Stv.add tv acc in
-        let tvs = List.fold_left2 check Stv.empty ts.ts_args tl in
-        check_ts tss tvs ts
-  in
-  match d.d_node with
-  | Ddata tdl ->
-      let check () (ts,_) =
-        if check_ts Sts.empty Stv.empty ts
-        then () else raise (NonFoundedTypeDecl ts)
-      in
-      List.fold_left check () tdl
-  | _ -> ()
-
-let rec ts_extract_pos kn sts ts =
-  assert (ts.ts_def = None);
-  if ts_equal ts ts_func then [false;true] else
-  if ts_equal ts ts_pred then [false] else
-  if Sts.mem ts sts then List.map Util.ttrue ts.ts_args else
-  match find_constructors kn ts with
-    | [] ->
-        List.map Util.ffalse ts.ts_args
-    | csl ->
-        let sts = Sts.add ts sts in
-        let rec get_ty stv ty = match ty.ty_node with
-          | Tyvar _ -> stv
-          | Tyapp (ts,tl) ->
-              let get acc pos =
-                if pos then get_ty acc else ty_freevars acc in
-              List.fold_left2 get stv (ts_extract_pos kn sts ts) tl
-        in
-        let get_cs acc (ls,_) = List.fold_left get_ty acc ls.ls_args in
-        let negs = List.fold_left get_cs Stv.empty csl in
-        List.map (fun v -> not (Stv.mem v negs)) ts.ts_args
-
-let check_positivity kn d = match d.d_node with
-  | Ddata tdl ->
-      let add s (ts,_) = Sts.add ts s in
-      let tss = List.fold_left add Sts.empty tdl in
-      let check_constr tys (cs,_) =
-        let rec check_ty ty = match ty.ty_node with
-          | Tyvar _ -> ()
-          | Tyapp (ts,tl) ->
-              let check pos ty =
-                if pos then check_ty ty else
-                if ty_s_any (fun ts -> Sts.mem ts tss) ty
-                then raise (NonPositiveTypeDecl (tys,cs,ty))
-              in
-              List.iter2 check (ts_extract_pos kn Sts.empty ts) tl
-        in
-        List.iter check_ty cs.ls_args
-      in
-      let check_decl (ts,cl) = List.iter (check_constr ts) cl in
-      List.iter check_decl tdl
-  | _ -> ()
-
-let known_add_decl kn d =
-  let kn = known_add_decl kn d in
-  check_positivity kn d;
-  check_foundness kn d;
-  check_match kn d;
-  check_literals kn d;
-  kn
 
 (** Records *)
 

@@ -630,10 +630,10 @@ let rec dexpr ({uc = uc} as lenv) denv {expr_desc = desc; expr_loc = loc} =
       let ity = ity_of_pty uc pty in
       match e1.de_node, ity.ity_node with
       | DEconst (Number.ConstInt _ as c, _), Itypur (ts, []) ->
-          begin match find_range_decl (Theory.get_known (get_theory uc)) ts with
-          | Some _ -> DEconst (c, dity_of_ity ity)
-          | None -> DEcast (e1, ity)
-          end
+          if is_range_type (Theory.get_meta (get_theory uc)) ts then
+            DEconst (c, dity_of_ity ity)
+          else
+            DEcast (e1, ity)
       | DEconst (Number.ConstReal _ as c, _), Itypur (ts, []) ->
           begin match find_float_decl (Theory.get_known (get_theory uc)) ts with
           | Some _ -> DEconst (c, dity_of_ity ity)

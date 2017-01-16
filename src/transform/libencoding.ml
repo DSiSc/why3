@@ -164,11 +164,10 @@ let d_monomorph ty_base kept lsmap d =
   let dl = match d.d_node with
     | Dtype { ts_def = Some _ } -> []
     | Dtype ts
-    | Drange { range_ts = ts }
     | Dfloat { float_ts = ts }
       when not (Sty.exists (ty_s_any (ts_equal ts)) kept) ->
       []
-    | Dtype _ | Drange _ | Dfloat _ -> [d]
+    | Dtype _ | Dfloat _ -> [d]
     | Ddata _ ->
         Printer.unsupportedDecl d "no algebraic types at this point"
     | Dparam ls ->

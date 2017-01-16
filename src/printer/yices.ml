@@ -246,9 +246,6 @@ let print_param_decl info fmt ls =
 let print_decl info fmt d = match d.d_node with
   | Dtype ts ->
       print_type_decl info fmt ts
-  | Drange ri ->
-      if not (Mid.mem ri.range_ts.ts_name info.info_syn) then
-        unsupportedDecl d "yices: does not support range types"
   | Dfloat fi ->
       if not (Mid.mem fi.float_ts.ts_name info.info_syn) then
         unsupportedDecl d "yices: does not support floats"

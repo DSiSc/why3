@@ -642,9 +642,6 @@ let print_decl vc_loc cntexample args info fmt d =
   match d.d_node with
   | Dtype ts ->
       print_type_decl info fmt ts
-  | Drange ri when query_syntax info.info_syn ri.range_ts.ts_name <> None -> ()
-  | Drange _ -> unsupportedDecl d
-      "smtv2: range types are not supported" (* FIXME: misleading message *)
   | Dfloat fi when query_syntax info.info_syn fi.float_ts.ts_name <> None -> ()
   | Dfloat _ -> unsupportedDecl d
       "smtv2: floats are not supported" (* FIXME: misleading message *)

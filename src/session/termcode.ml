@@ -538,12 +538,12 @@ module Checksum = struct
   let decl b d = match d.Decl.d_node with
     | Decl.Dtype ts ->
         char b 'T'; tysymbol b ts
-    | Decl.Drange ri ->
+(*    | Decl.Drange ri ->
         char b 'G';
         tysymbol b ri.Decl.range_ts;
         lsymbol b ri.Decl.range_to_int;
         integer_constant b ri.Decl.range_lo_cst;
-        integer_constant b ri.Decl.range_hi_cst
+        integer_constant b ri.Decl.range_hi_cst *)
     | Decl.Dfloat fi ->
         char b 'F';
         tysymbol b fi.Decl.float_ts;

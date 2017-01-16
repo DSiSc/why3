@@ -239,9 +239,6 @@ let print_decl info fmt d = match d.d_node with
       print_type_decl info fmt ts
   | Ddata _ -> unsupportedDecl d
       "cvc3: algebraic types are not supported"
-  | Drange ri ->
-      if not (Mid.mem ri.range_ts.ts_name info.info_syn) then
-        unsupportedDecl d "cvc3 does not support range types"
   | Dfloat fi ->
       if not (Mid.mem fi.float_ts.ts_name info.info_syn) then
         unsupportedDecl d "cvc3 does not support floats"

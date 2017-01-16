@@ -118,7 +118,6 @@ type decl = private {
 
 and decl_node = private
   | Dtype  of tysymbol          (** abstract types and aliases *)
-  | Drange of range_decl        (** bounded integers *)
   | Dfloat of float_decl        (** floating-point numbers *)
   | Ddata  of data_decl list    (** recursive algebraic types *)
   | Dparam of lsymbol           (** abstract functions and predicates *)
@@ -167,8 +166,6 @@ exception BadRecordField of lsymbol
 exception RecordFieldMissing of lsymbol * lsymbol
 exception DuplicateRecordField of lsymbol * lsymbol
 
-exception UnknownLiteralType of ty
-
 (** {2 Utilities} *)
 
 val decl_map : (term -> term) -> decl -> decl
@@ -192,15 +189,12 @@ end
 type known_map = decl Mid.t
 
 val known_id : known_map -> ident -> unit
-val known_add_decl : known_map -> decl -> known_map
 val merge_known : known_map -> known_map -> known_map
 
 exception KnownIdent of ident
 exception UnknownIdent of ident
 exception RedeclaredIdent of ident
-exception NonFoundedTypeDecl of tysymbol
 
-val find_range_decl : known_map -> tysymbol -> range_decl option
 val find_float_decl : known_map -> tysymbol -> float_decl option
 val find_constructors : known_map -> tysymbol -> constructor list
 val find_inductive_cases : known_map -> lsymbol -> (prsymbol * term) list

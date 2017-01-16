@@ -279,9 +279,6 @@ let add_decl uc d =
   let add_logic uc (ls,_) = add_ls uc ls in
   let uc = match d.Decl.d_node with
     | Decl.Dtype ts -> add_ts uc ts
-    | Decl.Drange ri ->
-        let uc = add_ts uc ri.Decl.range_ts in
-        add_ls uc ri.Decl.range_to_int
     | Decl.Dfloat fi ->
         let uc = add_ts uc fi.Decl.float_ts in
         let uc = add_ls uc fi.Decl.float_to_real in

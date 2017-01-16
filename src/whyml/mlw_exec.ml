@@ -99,8 +99,6 @@ and is_exec_decl ctx d =
   match d.d_node with
   | Dtype ts ->
     allow_ts ts; true
-  | Drange ri ->
-    allow_ts ri.range_ts; allow_ls ri.range_to_int; true
   | Dfloat fi ->
     allow_ts fi.float_ts; allow_ls fi.float_to_real;
     allow_ls fi.float_is_finite; true
