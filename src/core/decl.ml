@@ -19,20 +19,16 @@ open Term
 type range_decl = {
   range_ts        : tysymbol;
   range_to_int    : lsymbol;
-  range_lo_val    : BigInt.t;
-  range_lo_cst    : Number.integer_constant;
-  range_hi_val    : BigInt.t;
-  range_hi_cst    : Number.integer_constant;
+  range_lo        : BigInt.t;
+  range_hi        : BigInt.t;
 }
 
 type float_decl = {
   float_ts        : tysymbol;
   float_to_real   : lsymbol;
   float_is_finite : lsymbol;
-  float_eb_val    : BigInt.t;
-  float_eb_cst    : Number.integer_constant;
-  float_sb_val    : BigInt.t;
-  float_sb_cst    : Number.integer_constant;
+  float_eb        : BigInt.t;
+  float_sb        : BigInt.t;
 }
 
 (** Type declaration *)
@@ -324,7 +320,6 @@ type decl = {
 
 and decl_node =
   | Dtype  of tysymbol          (* abstract types and aliases *)
-  | Dfloat of float_decl        (* floating-point numbers *)
   | Ddata  of data_decl list    (* recursive algebraic types *)
   | Dparam of lsymbol           (* abstract functions and predicates *)
   | Dlogic of logic_decl list   (* defined functions and predicates *)
@@ -354,12 +349,6 @@ module Hsdecl = Hashcons.Make (struct
 
   let equal d1 d2 = match d1.d_node, d2.d_node with
     | Dtype  s1, Dtype  s2 -> ts_equal s1 s2
-    | Dfloat fi1, Dfloat fi2 ->
-        ts_equal fi1.float_ts fi2.float_ts &&
-        ls_equal fi1.float_to_real fi2.float_to_real &&
-        ls_equal fi1.float_is_finite fi2.float_is_finite &&
-        BigInt.eq fi1.float_eb_val fi2.float_eb_val &&
-        BigInt.eq fi1.float_sb_val fi2.float_sb_val
     | Ddata  l1, Ddata  l2 -> Lists.equal eq_td l1 l2
     | Dparam s1, Dparam s2 -> ls_equal s1 s2
     | Dlogic l1, Dlogic l2 -> Lists.equal eq_ld l1 l2
@@ -384,10 +373,8 @@ module Hsdecl = Hashcons.Make (struct
 
   let hash d = match d.d_node with
     | Dtype  s -> ts_hash s
-    | Dfloat fi ->
-        Hashcons.combine (ts_hash fi.float_ts) (ls_hash fi.float_to_real)
-    | Dparam s -> ls_hash s
     | Ddata  l -> Hashcons.combine_list hs_td 3 l
+    | Dparam s -> ls_hash s
     | Dlogic l -> Hashcons.combine_list hs_ld 5 l
     | Dind (_,l) -> Hashcons.combine_list hs_ind 7 l
     | Dprop (k,pr,f) -> Hashcons.combine (hs_kind k) (hs_prop (pr,f))
@@ -446,26 +433,6 @@ let create_ty_decl ts =
   let syms = Opt.fold syms_ty Sid.empty ts.ts_def in
   let news = Sid.singleton ts.ts_name in
   mk_decl (Dtype ts) syms news
-
-(* TODO: sanity checks for create_[range|float]_decl:
-  - _val have sensible values and correspond to _cst
-  - projection lsymbols have appropriate type signature
-  - type symbols have no arguments (?) and are not aliases
-  - ??? *)
-
-let create_range_decl ri =
-  let syms = Sid.empty in
-(*  let news = Sid.add ri.range_to_int.ls_name
-      (Sid.singleton ri.range_ts.ts_name) in *)
-  let news = Sid.singleton ri.range_ts.ts_name in
-  mk_decl (Dtype ri.range_ts) syms news
-
-let create_float_decl fi =
-  let syms = Sid.empty in
-  let news = Sid.add fi.float_to_real.ls_name
-    (Sid.singleton fi.float_ts.ts_name) in
-  let news = Sid.add fi.float_is_finite.ls_name news in
-  mk_decl (Dfloat fi) syms news
 
 let create_data_decl tdl =
   if tdl = [] then raise EmptyDecl;
@@ -597,7 +564,7 @@ let create_prop_decl k p f =
 (** Utilities *)
 
 let decl_map fn d = match d.d_node with
-  | Dtype _ | Dfloat _ | Ddata _ | Dparam _ -> d
+  | Dtype _ | Ddata _ | Dparam _ -> d
   | Dlogic l ->
       let fn (ls,ld) =
         let vl,e,close = open_ls_defn_cb ld in
@@ -612,7 +579,7 @@ let decl_map fn d = match d.d_node with
       create_prop_decl k pr (fn f)
 
 let decl_fold fn acc d = match d.d_node with
-  | Dtype _ | Dfloat _ | Ddata _ | Dparam _ -> acc
+  | Dtype _ | Ddata _ | Dparam _ -> acc
   | Dlogic l ->
       let fn acc (_,ld) =
         let _,e = open_ls_defn ld in
@@ -632,7 +599,7 @@ let list_rpair_map_fold fn =
   Lists.map_fold_left fn
 
 let decl_map_fold fn acc d = match d.d_node with
-  | Dtype _ | Dfloat _ | Ddata _ | Dparam _ -> acc, d
+  | Dtype _ | Ddata _ | Dparam _ -> acc, d
   | Dlogic l ->
       let fn acc (ls,ld) =
         let vl,e,close = open_ls_defn_cb ld in
@@ -672,30 +639,35 @@ let merge_known kn1 kn2 =
   in
   Mid.union check_known kn1 kn2
 
+let known_add_decl kn0 decl =
+  let kn = Mid.map (Util.const decl) decl.d_news in
+  let check id decl0 _ =
+    if d_equal decl0 decl
+    then raise (KnownIdent id)
+    else raise (RedeclaredIdent id)
+  in
+  let kn = Mid.union check kn0 kn in
+  let unk = Mid.set_diff decl.d_syms kn in
+  if Sid.is_empty unk then kn
+  else raise (UnknownIdent (Sid.choose unk))
 
 let find_constructors kn ts =
   match (Mid.find ts.ts_name kn).d_node with
-  | Dtype _ | Dfloat _ -> []
+  | Dtype _ -> []
   | Ddata dl -> List.assq ts dl
-  | Dparam _ | Dlogic _ | Dind _ | Dprop _ -> assert false
-
-let find_float_decl kn ts =
-  match (Mid.find ts.ts_name kn).d_node with
-  | Dfloat fi -> Some fi
-  | Dtype _ | Ddata _ -> None
   | Dparam _ | Dlogic _ | Dind _ | Dprop _ -> assert false
 
 let find_inductive_cases kn ps =
   match (Mid.find ps.ls_name kn).d_node with
   | Dind (_, dl) -> List.assq ps dl
   | Dlogic _ | Dparam _ | Ddata _ -> []
-  | Dtype _ | Dfloat _ | Dprop _ -> assert false
+  | Dtype _ | Dprop _ -> assert false
 
 let find_logic_definition kn ls =
   match (Mid.find ls.ls_name kn).d_node with
   | Dlogic dl -> Some (List.assq ls dl)
   | Dparam _ | Dind _ | Ddata _ -> None
-  | Dtype _ | Dfloat _ | Dprop _ -> assert false
+  | Dtype _ | Dprop _ -> assert false
 
 let find_prop kn pr =
   match (Mid.find pr.pr_name kn).d_node with
@@ -703,8 +675,7 @@ let find_prop kn pr =
       let test (_,l) = List.mem_assq pr l in
       List.assq pr (snd (List.find test dl))
   | Dprop (_,_,f) -> f
-  | Dtype _ | Dfloat _
-  | Ddata _ | Dparam _ | Dlogic _ -> assert false
+  | Dtype _ | Ddata _ | Dparam _ | Dlogic _ -> assert false
 
 let find_prop_decl kn pr =
   match (Mid.find pr.pr_name kn).d_node with
@@ -712,8 +683,96 @@ let find_prop_decl kn pr =
       let test (_,l) = List.mem_assq pr l in
       Paxiom, List.assq pr (snd (List.find test dl))
   | Dprop (k,_,f) -> k,f
-  | Dtype _ | Dfloat _
-  | Ddata _ | Dparam _ | Dlogic _ -> assert false
+  | Dtype _ | Ddata _ | Dparam _ | Dlogic _ -> assert false
+
+let check_match kn d =
+  let rec check () t = match t.t_node with
+    | Tcase (t1,bl) ->
+        let get_constructors ts = List.map fst (find_constructors kn ts) in
+        let pl = List.map (fun b -> let p,_ = t_open_branch b in [p]) bl in
+        Loc.try2 ?loc:t.t_loc (Pattern.check_compile ~get_constructors) [t1] pl;
+        t_fold check () t
+    | _ -> t_fold check () t
+  in
+  decl_fold check () d
+
+exception NonFoundedTypeDecl of tysymbol
+
+let check_foundness kn d =
+  let rec check_ts tss tvs ts =
+    (* recursive data type, abandon *)
+    if Sts.mem ts tss then false else
+    let cl = find_constructors kn ts in
+    (* an abstract type is inhabited iff
+       all its type arguments are inhabited *)
+    if cl == [] then Stv.is_empty tvs else
+    (* an algebraic type is inhabited iff
+       we can build a value of this type *)
+    let tss = Sts.add ts tss in
+    List.exists (check_constr tss tvs) cl
+  and check_constr tss tvs (ls,_) =
+    (* we can construct a value iff every
+       argument is of an inhabited type *)
+    List.for_all (check_type tss tvs) ls.ls_args
+  and check_type tss tvs ty = match ty.ty_node with
+    | Tyvar tv ->
+        not (Stv.mem tv tvs)
+    | Tyapp (ts,tl) ->
+        let check acc tv ty =
+          if check_type tss tvs ty then acc else Stv.add tv acc in
+        let tvs = List.fold_left2 check Stv.empty ts.ts_args tl in
+        check_ts tss tvs ts
+  in
+  match d.d_node with
+  | Ddata tdl ->
+      let check () (ts,_) =
+        if check_ts Sts.empty Stv.empty ts
+        then () else raise (NonFoundedTypeDecl ts)
+      in
+      List.fold_left check () tdl
+  | _ -> ()
+
+let rec ts_extract_pos kn sts ts =
+  assert (ts.ts_def = None);
+  if ts_equal ts ts_func then [false;true] else
+  if ts_equal ts ts_pred then [false] else
+  if Sts.mem ts sts then List.map Util.ttrue ts.ts_args else
+  match find_constructors kn ts with
+    | [] ->
+        List.map Util.ffalse ts.ts_args
+    | csl ->
+        let sts = Sts.add ts sts in
+        let rec get_ty stv ty = match ty.ty_node with
+          | Tyvar _ -> stv
+          | Tyapp (ts,tl) ->
+              let get acc pos =
+                if pos then get_ty acc else ty_freevars acc in
+              List.fold_left2 get stv (ts_extract_pos kn sts ts) tl
+        in
+        let get_cs acc (ls,_) = List.fold_left get_ty acc ls.ls_args in
+        let negs = List.fold_left get_cs Stv.empty csl in
+        List.map (fun v -> not (Stv.mem v negs)) ts.ts_args
+
+let check_positivity kn d = match d.d_node with
+  | Ddata tdl ->
+      let add s (ts,_) = Sts.add ts s in
+      let tss = List.fold_left add Sts.empty tdl in
+      let check_constr tys (cs,_) =
+        let rec check_ty ty = match ty.ty_node with
+          | Tyvar _ -> ()
+          | Tyapp (ts,tl) ->
+              let check pos ty =
+                if pos then check_ty ty else
+                if ty_s_any (fun ts -> Sts.mem ts tss) ty
+                then raise (NonPositiveTypeDecl (tys,cs,ty))
+              in
+              List.iter2 check (ts_extract_pos kn Sts.empty ts) tl
+        in
+        List.iter check_ty cs.ls_args
+      in
+      let check_decl (ts,cl) = List.iter (check_constr ts) cl in
+      List.iter check_decl tdl
+  | _ -> ()
 
 (** Records *)
 

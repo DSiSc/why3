@@ -400,9 +400,6 @@ let print_decl info fmt d =
   match d.d_node with
   | Dtype ts ->
       print_type_decl info fmt ts
-  | Dfloat fi ->
-      if not (Mid.mem fi.float_ts.ts_name info.info_syn) then
-        unsupportedDecl d "Isabelle does not support floats"
   | Ddata tl -> print_data_decls info fmt tl
   | Dparam ls ->
       print_param_decl info fmt ls

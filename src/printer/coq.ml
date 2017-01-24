@@ -924,9 +924,6 @@ let print_decl ~old info fmt d =
     match d.d_node with
     | Dtype ts
     | Ddata ((ts, _)::_) -> id_unique iprinter ts.ts_name
-    | Dfloat _ ->
-      Printer.unsupportedDecl d
-        "coq: mapping to float not yet implemented"
     | Dparam ls
     | Dlogic ((ls,_)::_)
     | Dind (_, (ls,_)::_) -> id_unique iprinter ls.ls_name
@@ -939,9 +936,6 @@ let print_decl ~old info fmt d =
   | Dtype ts ->
       print_type_decl ~prev info fmt ts
   | Ddata tl -> print_data_decls info fmt tl
-  | Dfloat _ ->
-    Printer.unsupportedDecl d
-      "coq: mapping to float not yet implemented"
   | Dparam ls ->
       print_param_decl ~prev info fmt ls
   | Dlogic [s,_ as ld] when not (Sid.mem s.ls_name d.d_syms) ->

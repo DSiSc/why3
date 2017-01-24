@@ -635,10 +635,10 @@ let rec dexpr ({uc = uc} as lenv) denv {expr_desc = desc; expr_loc = loc} =
           else
             DEcast (e1, ity)
       | DEconst (Number.ConstReal _ as c, _), Itypur (ts, []) ->
-          begin match find_float_decl (Theory.get_known (get_theory uc)) ts with
-          | Some _ -> DEconst (c, dity_of_ity ity)
-          | None -> DEcast (e1, ity)
-          end
+          if is_float_type (Theory.get_meta (get_theory uc)) ts then
+            DEconst (c, dity_of_ity ity)
+          else
+            DEcast (e1, ity)
       | _ -> DEcast (e1, ity))
 
 and drec_defn ~top lenv denv fdl =
@@ -989,7 +989,7 @@ let add_types ~wp uc tdl =
       | TDalias _ ->
           abstr, algeb, ts :: alias, range, float
       | TDrange (a,b,proj) ->
-          (* FIXME: all sanity checks must be done in Decl *)
+          (* FIXME: all sanity checks must be done in Decl (still valid ?) *)
           let ts = match ts with
             | TS ts -> ts
             | PT _ -> assert false in
@@ -1001,14 +1001,12 @@ let add_types ~wp uc tdl =
           let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
           let ri = {
             range_ts     = ts;
-            range_lo_cst = a;
-            range_lo_val = a_val;
-            range_hi_cst = b;
-            range_hi_val = b_val;
+            range_lo     = a_val;
+            range_hi     = b_val;
             range_to_int = ls } in
           abstr, algeb, alias, ri :: range, float
       | TDfloat (eb,sb,proj,isF) ->
-          (* FIXME: all sanity checks must be done in Decl *)
+          (* FIXME: all sanity checks must be done in Decl (still valid ?) *)
           let ts = match ts with
             | TS ts -> ts
             | PT _ -> assert false in
@@ -1023,13 +1021,11 @@ let add_types ~wp uc tdl =
           let proj = create_lsymbol proj_id [ty] (Some ty_real) in
           let isF = create_lsymbol isF_id [ty] None in
           let fi = {
-            float_ts = ts;
-            float_eb_cst = eb;
-            float_eb_val = eb_val;
-            float_sb_cst = sb;
-            float_sb_val = sb_val;
-            float_to_real = proj;
-            float_is_finite = isF; } in
+            float_ts         = ts;
+            float_eb         = eb_val;
+            float_sb         = sb_val;
+            float_to_real    = proj;
+            float_is_finite  = isF; } in
           abstr, algeb, alias, range, fi :: float
       | (TDalgebraic _ | TDrecord _) when Hstr.find mutables x ->
           abstr, (ts, Hstr.find predefs x) :: algeb, alias, range, float
@@ -1101,10 +1097,10 @@ let add_types ~wp uc tdl =
     | TS ts -> add_decl_with_tuples uc (Decl.create_ty_decl ts)
   in
   let add_range_decl uc rd =
-    add_decl_with_tuples uc (Decl.create_range_decl rd)
+    add_decl_with_tuples uc (Decl.create_ty_decl rd.range_ts)
   in
   let add_float_decl uc fd =
-    add_decl_with_tuples uc (Decl.create_float_decl fd)
+    add_decl_with_tuples uc (Decl.create_ty_decl fd.float_ts)
   in
   let add_invariant uc d = if d.td_inv = [] then uc else
     add_type_invariant d.td_loc uc d.td_ident d.td_params d.td_inv in

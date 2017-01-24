@@ -1054,7 +1054,7 @@ let add_wp_decl km name f uc =
   let f = if Debug.test_flag no_eval then f else
     (* do preliminary checks on f to spare eval_match any surprises *)
     let _lkm =
-      Theory.known_add_decl (Theory.get_meta uc) lkm (create_prop_decl Pgoal pr f)
+      Theory.known_add_decl lkm (Theory.get_meta uc) (create_prop_decl Pgoal pr f)
     in
     Eval_match.eval_match ~inline:Eval_match.inline_nonrec_linear lkm f in
   (* printf "wp: f=%a@." print_term f; *)

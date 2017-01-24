@@ -42,19 +42,26 @@ let add_decl_with_tuples uc d =
   add_decl_with_tuples uc d
 
 let add_ty_decl uc ts      = add_decl_with_tuples uc (create_ty_decl ts)
-let add_float_decl uc fd   = add_decl_with_tuples uc (create_float_decl fd)
 let add_data_decl uc dl    = add_decl_with_tuples uc (create_data_decl dl)
 let add_param_decl uc ls   = add_decl_with_tuples uc (create_param_decl ls)
 let add_logic_decl uc dl   = add_decl_with_tuples uc (create_logic_decl dl)
 let add_ind_decl uc s dl   = add_decl_with_tuples uc (create_ind_decl s dl)
 let add_prop_decl uc k p f = add_decl_with_tuples uc (create_prop_decl k p f)
 let add_range_decl uc rd   =
-  let uc = add_decl_with_tuples uc (create_range_decl rd) in
-  let a = BigInt.to_string rd.range_lo_val in
-  let b = BigInt.to_string rd.range_hi_val in
+  let uc = add_ty_decl uc rd.range_ts in
+  let a = BigInt.to_string rd.range_lo in
+  let b = BigInt.to_string rd.range_hi in
   let uc = add_param_decl uc rd.range_to_int in
   add_meta uc meta_range
-      (MAts rd.range_ts :: MAls rd.range_to_int :: MAstr a :: MAstr b :: [])
+    (MAts rd.range_ts :: MAls rd.range_to_int :: MAstr a :: MAstr b :: [])
+let add_float_decl uc fd =
+  let uc = add_ty_decl uc fd.float_ts in
+  let eb = BigInt.to_string fd.float_eb in
+  let sb = BigInt.to_string fd.float_sb in
+  let uc = add_param_decl uc fd.float_to_real in
+  let uc = add_param_decl uc fd.float_is_finite in
+  add_meta uc meta_float
+    (MAts fd.float_ts :: MAls fd.float_to_real :: MAls fd.float_is_finite :: MAstr eb :: MAstr sb :: [] )
 
 (** symbol lookup *)
 
@@ -380,10 +387,10 @@ let rec dterm uc gvars denv {term_desc = desc; term_loc = loc} =
         else
           DTcast (e1, ty)
       | DTconst (Number.ConstReal _ as c, _), Tyapp (ts, []) ->
-          begin match find_float_decl (get_known uc) ts with
-          | Some _ -> DTconst (c, dty_of_ty ty)
-          | None -> DTcast (e1, ty)
-          end
+        if is_float_type (get_meta uc) ts then
+          DTconst (c, dty_of_ty ty)
+        else
+          DTcast (e1, ty)
       | _ -> DTcast (e1, ty))
 
 (** Export for program parsing *)
@@ -525,10 +532,8 @@ let add_types dl th =
             let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
             let ri = {
               range_ts     = ts;
-              range_lo_cst = a;
-              range_lo_val = a_val;
-              range_hi_cst = b;
-              range_hi_val = b_val;
+              range_lo     = a_val;
+              range_hi     = b_val;
               range_to_int = ls } in
             abstr, algeb, alias, ri::range, float
       | TDfloat (eb,sb,proj,isF) ->
@@ -546,10 +551,8 @@ let add_types dl th =
             let isF = create_psymbol isF_id [ty] in
             let fi = {
               float_ts        = ts;
-              float_eb_cst    = eb;
-              float_eb_val    = eb_val;
-              float_sb_cst    = sb;
-              float_sb_val    = sb_val;
+              float_eb        = eb_val;
+              float_sb        = sb_val;
               float_to_real   = proj;
               float_is_finite = isF } in
             abstr, algeb, alias, range, fi::float

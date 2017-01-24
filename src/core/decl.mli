@@ -20,20 +20,16 @@ open Term
 type range_decl = {
   range_ts        : tysymbol;
   range_to_int    : lsymbol;
-  range_lo_val    : BigInt.t;
-  range_lo_cst    : Number.integer_constant;
-  range_hi_val    : BigInt.t;
-  range_hi_cst    : Number.integer_constant;
+  range_lo        : BigInt.t;
+  range_hi        : BigInt.t;
 }
 
 type float_decl = {
   float_ts        : tysymbol;
   float_to_real   : lsymbol;
   float_is_finite : lsymbol;
-  float_eb_val    : BigInt.t;
-  float_eb_cst    : Number.integer_constant;
-  float_sb_val    : BigInt.t;
-  float_sb_cst    : Number.integer_constant;
+  float_eb        : BigInt.t;
+  float_sb        : BigInt.t;
 }
 
 (** {2 Algebraic type declaration} *)
@@ -118,7 +114,6 @@ type decl = private {
 
 and decl_node = private
   | Dtype  of tysymbol          (** abstract types and aliases *)
-  | Dfloat of float_decl        (** floating-point numbers *)
   | Ddata  of data_decl list    (** recursive algebraic types *)
   | Dparam of lsymbol           (** abstract functions and predicates *)
   | Dlogic of logic_decl list   (** defined functions and predicates *)
@@ -136,8 +131,6 @@ val d_hash : decl -> int
 (** {2 Declaration constructors} *)
 
 val create_ty_decl : tysymbol -> decl
-val create_range_decl : range_decl -> decl
-val create_float_decl : float_decl -> decl
 val create_data_decl : data_decl list -> decl
 val create_param_decl : lsymbol -> decl
 val create_logic_decl : logic_decl list -> decl
@@ -191,16 +184,23 @@ type known_map = decl Mid.t
 val known_id : known_map -> ident -> unit
 val merge_known : known_map -> known_map -> known_map
 
+val known_add_decl : known_map -> decl -> known_map
+
 exception KnownIdent of ident
 exception UnknownIdent of ident
 exception RedeclaredIdent of ident
 
-val find_float_decl : known_map -> tysymbol -> float_decl option
 val find_constructors : known_map -> tysymbol -> constructor list
 val find_inductive_cases : known_map -> lsymbol -> (prsymbol * term) list
 val find_logic_definition : known_map -> lsymbol -> ls_defn option
 val find_prop : known_map -> prsymbol -> term
 val find_prop_decl : known_map -> prsymbol -> prop_kind * term
+
+exception NonFoundedTypeDecl of tysymbol
+
+val check_positivity : known_map -> decl -> unit
+val check_foundness  : known_map -> decl -> unit
+val check_match      : known_map -> decl -> unit
 
 (** {2 Records} *)
 

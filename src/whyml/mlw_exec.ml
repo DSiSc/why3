@@ -98,10 +98,7 @@ and is_exec_decl ctx d =
   let forbid_ls ls = declare_id ctx ls.ls_name false in
   match d.d_node with
   | Dtype ts ->
-    allow_ts ts; true
-  | Dfloat fi ->
-    allow_ts fi.float_ts; allow_ls fi.float_to_real;
-    allow_ls fi.float_is_finite; true
+      allow_ts ts; true
   | Ddata ddl ->
       let constructor (ls, prl) =
         allow_ls ls; List.iter (Opt.iter allow_ls) prl in

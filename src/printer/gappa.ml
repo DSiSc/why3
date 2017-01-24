@@ -382,7 +382,6 @@ let prepare info defs ((eqs,hyps,goal) as acc) d =
   match d.d_node with
     | Dtype _ | Ddata _ -> acc
     | Dparam _ | Dlogic _ -> acc
-    | Dfloat _ -> acc
     | Dind _ ->
         unsupportedDecl d
           "please remove inductive definitions before calling gappa printer"

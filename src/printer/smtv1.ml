@@ -194,8 +194,6 @@ let print_param_decl info fmt ls =
 let print_decl info fmt d = match d.d_node with
   | Dtype ts ->
       print_type_decl info fmt ts
-  | Dfloat _ -> unsupportedDecl d
-      "smtv1: floats are not supported"
   | Ddata _ -> unsupportedDecl d
       "smtv1: algebraic types are not supported"
   | Dparam ls ->

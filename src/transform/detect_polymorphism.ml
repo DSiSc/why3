@@ -62,7 +62,6 @@ let detect_polymorphism_in_decl ign_ts ign_ls ign_pr d =
                 Pretty.print_decl d;
   match d.d_node with
   | Dtype ts -> check_ts ign_ts ts
-  | Dfloat _ -> false
   | Ddata dl ->
      List.fold_left (fun acc (ts,_) -> acc || check_ts ign_ts ts) false dl
   | Dparam ls ->

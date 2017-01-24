@@ -270,8 +270,7 @@ end
 
 let decl kept d = match d.d_node with
   | Dtype { ts_def = Some _ } -> []
-  | Dtype ts | Dfloat { float_ts = ts } ->
-      d :: Lib.lsdecl_of_ts_select ts
+  | Dtype ts -> d :: Lib.lsdecl_of_ts_select ts
   | Ddata _ -> Printer.unsupportedDecl d
       "Algebraic types are not supported, run eliminate_algebraic"
   | Dparam ls -> Transform.param_transform kept ls

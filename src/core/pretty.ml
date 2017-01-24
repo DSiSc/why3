@@ -324,20 +324,6 @@ let print_ty_decl fmt ts =
     print_def ts.ts_def;
   forget_tvs ()
 
-let print_range_decl fmt ri =
-  fprintf fmt "@[<hov 2>type %a%a is range %a : %a .. %a@]"
-    print_ts ri.range_ts print_id_labels ri.range_ts.ts_name
-    print_ls ri.range_to_int
-    Number.print_integer_constant ri.range_lo_cst
-    Number.print_integer_constant ri.range_hi_cst
-
-let print_float_decl fmt fi =
-  fprintf fmt "@[<hov 2>type %a%a is float %a, %a : %a, %a@]"
-    print_ts fi.float_ts print_id_labels fi.float_ts.ts_name
-    print_ls fi.float_to_real print_ls fi.float_is_finite
-    Number.print_integer_constant fi.float_eb_cst
-    Number.print_integer_constant fi.float_sb_cst
-
 let print_data_decl fst fmt (ts,csl) =
   fprintf fmt "@[<hov 2>%s %a%a%a =@\n@[<hov>%a@]@]"
     (if fst then "type" else "with") print_ts ts
@@ -407,7 +393,6 @@ let print_list_next sep print fmt = function
 
 let print_decl fmt d = match d.d_node with
   | Dtype ts  -> print_ty_decl fmt ts
-  | Dfloat fi -> print_float_decl fmt fi
   | Ddata tl  -> print_list_next newline print_data_decl fmt tl
   | Dparam ls -> print_param_decl fmt ls
   | Dlogic ll -> print_list_next newline print_logic_decl fmt ll
@@ -559,10 +544,8 @@ let () = Exn_printer.register
       fprintf fmt "Not a term: %a" print_term t
   | Term.FmlaExpected t ->
       fprintf fmt "Not a formula: %a" print_term t
-  | Theory.NonFoundedTypeDecl ts ->
-      fprintf fmt "Cannot construct a value of type %a" print_ts ts
-  | Theory.UnknownLiteralType ty ->
-      fprintf fmt "Unknown literal type %a" print_ty ty
+  | Theory.UnknownLiteralType ts ->
+      fprintf fmt "Unknown literal type symbol %a" print_ts ts
   | Pattern.ConstructorExpected (ls,ty) ->
       fprintf fmt "%s %a is not a constructor of type %a"
         (if ls.ls_value = None then "Predicate" else "Function") print_ls ls
@@ -589,6 +572,8 @@ let () = Exn_printer.register
   | Decl.InvalidIndDecl (_ls, pr) ->
       fprintf fmt "Ill-formed inductive clause %a"
         print_pr pr
+  | Decl.NonFoundedTypeDecl ts ->
+      fprintf fmt "Cannot construct a value of type %a" print_ts ts
   | Decl.NonPositiveIndDecl (_ls, pr, ls1) ->
       fprintf fmt "Inductive clause %a contains \
           a non strictly positive occurrence of symbol %a"

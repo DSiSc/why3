@@ -75,7 +75,7 @@ let locate kn label t =
                     (*here a label has been found*)
                     make_context Hole t, (ls, argl, cl), rhs
                 | Dind _ | Dlogic _ | Dparam _ | Ddata _ -> locate_rhs find_any
-                | Dtype _ | Dfloat _ | Dprop _ -> assert false
+                | Dtype _ | Dprop _ -> assert false
               end
             | _  -> locate_rhs find_any
         else locate_rhs find_any

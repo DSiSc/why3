@@ -751,7 +751,7 @@ and reduce_app_no_equ engine st ls ~orig ty rem_cont =
             raise Not_found
         end in
       match d.Decl.d_node with
-      | Decl.Dtype _ | Decl.Dfloat _ | Decl.Dprop _ ->
+      | Decl.Dtype _ | Decl.Dprop _ ->
         assert false
       | Decl.Dlogic dl ->
         (* regular definition *)

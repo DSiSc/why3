@@ -110,7 +110,7 @@ let check_decl = function
   | d -> d
 
 let new_decl task d td =
-  let kn = known_add_decl (task_meta task) (task_known task) (check_decl d) in
+  let kn = known_add_decl (task_known task) (task_meta task) (check_decl d) in
   mk_task td (check_task task) kn (task_clone task) (task_meta task)
 
 let new_decl task d td = try new_decl task d td with KnownIdent _ -> task

@@ -127,7 +127,7 @@ type info = {
   mutable info_in_goal : bool;
   info_vc_term : vc_term_info;
   info_printer : ident_printer;
-  info_km      : known_map;
+  info_mm      : Theory.meta_map;
 }
 
 let debug_print_term message t =
@@ -322,8 +322,9 @@ let rec print_term info fmt t =
         | Some st, Number.ConstInt c ->
             syntax_range_literal st fmt c
         | Some st, Number.ConstReal c ->
-            let fi = Opt.get (find_float_decl info.info_km ts) in
-            syntax_float_literal st fmt c fi.float_eb_val fi.float_sb_val
+            let (_,_,eb,sb) = Theory.find_float info.info_mm ts in
+            let eb,sb = BigInt.of_string eb, BigInt.of_string sb in
+            syntax_float_literal st fmt c eb sb
         | None, _ -> Number.print number_format fmt c
           (* TODO/FIXME: we must assert here that the type is either
               ty_int or ty_real, otherwise it makes no sense to print
@@ -642,9 +643,6 @@ let print_decl vc_loc cntexample args info fmt d =
   match d.d_node with
   | Dtype ts ->
       print_type_decl info fmt ts
-  | Dfloat fi when query_syntax info.info_syn fi.float_ts.ts_name <> None -> ()
-  | Dfloat _ -> unsupportedDecl d
-      "smtv2: floats are not supported" (* FIXME: misleading message *)
   | Ddata [(ts,_)] when query_syntax info.info_syn ts.ts_name <> None -> ()
   | Ddata dl ->
       fprintf fmt "@[(declare-datatypes ()@ (%a))@]@\n"
@@ -676,7 +674,7 @@ let print_task args ?old:_ fmt task =
     info_in_goal = false;
     info_vc_term = vc_info;
     info_printer = ident_printer ();
-    info_km = Task.task_known task } in
+    info_mm = Task.task_meta task } in
   print_prelude fmt args.prelude;
   set_produce_models fmt cntexample;
   print_th_prelude task fmt args.th_prelude;

@@ -355,35 +355,17 @@ let close_namespace uc import =
 
 (* known add decl *)
 
-let known_add_decl kn0 decl =
-  let kn = Mid.map (Util.const decl) decl.d_news in
-  let check id decl0 _ =
-    if d_equal decl0 decl
-    then raise (KnownIdent id)
-    else raise (RedeclaredIdent id)
-  in
-  let kn = Mid.union check kn0 kn in
-  let unk = Mid.set_diff decl.d_syms kn in
-  if Sid.is_empty unk then kn
-  else raise (UnknownIdent (Sid.choose unk))
 
-let check_match kn d =
-  let rec check () t = match t.t_node with
-    | Tcase (t1,bl) ->
-        let get_constructors ts = List.map fst (find_constructors kn ts) in
-        let pl = List.map (fun b -> let p,_ = t_open_branch b in [p]) bl in
-        Loc.try2 ?loc:t.t_loc (Pattern.check_compile ~get_constructors) [t1] pl;
-        t_fold check () t
-    | _ -> t_fold check () t
-  in
-  decl_fold check () d
 
 let meta_range = register_meta "range_type"
     [MTtysymbol; MTlsymbol; MTstring; MTstring]
     ~desc:"Store@ a@ range@ type@ range@ and@ projection."
 
-exception UnknownLiteralTypesym of tysymbol
-exception UnknownLiteralType of ty
+let meta_float = register_meta "float_type"
+    [MTtysymbol; MTlsymbol; MTlsymbol; MTstring; MTstring]
+    ~desc:"Store@ a@ float@ type@ information."
+
+exception UnknownLiteralType of tysymbol
 
 let find_range mm ts =
   let tds = mm_find mm meta_range in
@@ -396,116 +378,59 @@ let find_range mm ts =
     | _ -> assert false
   in
   match Stdecl.fold f tds.tds_set None with
-  | None -> raise (UnknownLiteralTypesym ts)
+  | None -> raise (UnknownLiteralType ts)
+  | Some ri -> ri
+
+let find_float mm ts =
+  let tds = mm_find mm meta_float in
+  let f td acc = match td.td_node with
+    | Meta (_, (MAts ts' :: MAls to_real :: MAls is_finite :: MAstr eb :: MAstr sb :: [])) ->
+      if ts_equal ts ts' then
+        Some (to_real, is_finite, eb, sb)
+      else
+        acc
+    | _ -> assert false
+  in
+  match Stdecl.fold f tds.tds_set None with
+  | None -> raise (UnknownLiteralType ts)
   | Some ri -> ri
 
 let is_range_type mm ts =
   let tds = mm_find mm meta_range in
   Stdecl.exists
-    (fun td -> match td.td_node with | Meta (_, (MAts ts' ::_)) ->
-        ts_equal ts ts' | _ -> false) tds.tds_set
+    (fun td -> match td.td_node with
+       | Meta (_, (MAts ts'::_)) -> ts_equal ts ts'
+       | _ -> false) tds.tds_set
 
-let check_literals mm kn d =
-  let get_ts ty = match ty.ty_node with
-    | Tyapp (ts,[]) -> ts
-    | _ -> raise (UnknownLiteralType ty) in
+let is_float_type mm ts =
+  let tds = mm_find mm meta_float in
+  Stdecl.exists
+    (fun td -> match td.td_node with
+       | Meta (_, (MAts ts'::_)) -> ts_equal ts ts'
+       | _ -> false) tds.tds_set
+
+let check_literals mm d =
   let rec check () t = match t.t_node, t.t_ty with
-    | Tconst (Number.ConstInt c), Some ty when not (ty_equal ty ty_int) ->
-      let (_,lo,hi) = find_range mm (get_ts ty) in
-      let lo,hi = BigInt.of_string lo, BigInt.of_string hi in
+    | Tconst (Number.ConstInt c), Some {ty_node = Tyapp (ts,[])}
+      when not (ts_equal ts ts_int) ->
+        let (_,lo,hi) = find_range mm ts in
+        let lo,hi = BigInt.of_string lo, BigInt.of_string hi in
         Number.check_range c lo hi
-    | Tconst (Number.ConstReal c), Some ty when not (ty_equal ty ty_real) ->
-      let fi = match find_float_decl kn (get_ts ty) with
-        | Some fi -> fi | _ -> raise (UnknownLiteralType ty) in
-        Number.check_float c fi.float_eb_val fi.float_sb_val
+    | Tconst (Number.ConstReal c), Some {ty_node = Tyapp (ts,[])}
+      when not (ts_equal ts ts_real) ->
+        let (_,_,eb,sb) = find_float mm ts in
+        let eb,sb = BigInt.of_string eb, BigInt.of_string sb in
+        Number.check_float c eb sb
     | _ -> t_fold check () t
   in
   decl_fold check () d
 
-exception NonFoundedTypeDecl of tysymbol
-
-let check_foundness kn d =
-  let rec check_ts tss tvs ts =
-    (* recursive data type, abandon *)
-    if Sts.mem ts tss then false else
-    let cl = find_constructors kn ts in
-    (* an abstract type is inhabited iff
-       all its type arguments are inhabited *)
-    if cl == [] then Stv.is_empty tvs else
-    (* an algebraic type is inhabited iff
-       we can build a value of this type *)
-    let tss = Sts.add ts tss in
-    List.exists (check_constr tss tvs) cl
-  and check_constr tss tvs (ls,_) =
-    (* we can construct a value iff every
-       argument is of an inhabited type *)
-    List.for_all (check_type tss tvs) ls.ls_args
-  and check_type tss tvs ty = match ty.ty_node with
-    | Tyvar tv ->
-        not (Stv.mem tv tvs)
-    | Tyapp (ts,tl) ->
-        let check acc tv ty =
-          if check_type tss tvs ty then acc else Stv.add tv acc in
-        let tvs = List.fold_left2 check Stv.empty ts.ts_args tl in
-        check_ts tss tvs ts
-  in
-  match d.d_node with
-  | Ddata tdl ->
-      let check () (ts,_) =
-        if check_ts Sts.empty Stv.empty ts
-        then () else raise (NonFoundedTypeDecl ts)
-      in
-      List.fold_left check () tdl
-  | _ -> ()
-
-let rec ts_extract_pos kn sts ts =
-  assert (ts.ts_def = None);
-  if ts_equal ts ts_func then [false;true] else
-  if ts_equal ts ts_pred then [false] else
-  if Sts.mem ts sts then List.map Util.ttrue ts.ts_args else
-  match find_constructors kn ts with
-    | [] ->
-        List.map Util.ffalse ts.ts_args
-    | csl ->
-        let sts = Sts.add ts sts in
-        let rec get_ty stv ty = match ty.ty_node with
-          | Tyvar _ -> stv
-          | Tyapp (ts,tl) ->
-              let get acc pos =
-                if pos then get_ty acc else ty_freevars acc in
-              List.fold_left2 get stv (ts_extract_pos kn sts ts) tl
-        in
-        let get_cs acc (ls,_) = List.fold_left get_ty acc ls.ls_args in
-        let negs = List.fold_left get_cs Stv.empty csl in
-        List.map (fun v -> not (Stv.mem v negs)) ts.ts_args
-
-let check_positivity kn d = match d.d_node with
-  | Ddata tdl ->
-      let add s (ts,_) = Sts.add ts s in
-      let tss = List.fold_left add Sts.empty tdl in
-      let check_constr tys (cs,_) =
-        let rec check_ty ty = match ty.ty_node with
-          | Tyvar _ -> ()
-          | Tyapp (ts,tl) ->
-              let check pos ty =
-                if pos then check_ty ty else
-                if ty_s_any (fun ts -> Sts.mem ts tss) ty
-                then raise (NonPositiveTypeDecl (tys,cs,ty))
-              in
-              List.iter2 check (ts_extract_pos kn Sts.empty ts) tl
-        in
-        List.iter check_ty cs.ls_args
-      in
-      let check_decl (ts,cl) = List.iter (check_constr ts) cl in
-      List.iter check_decl tdl
-  | _ -> ()
-
-let known_add_decl mm kn d =
+let known_add_decl kn mm d =
   let kn = known_add_decl kn d in
   check_positivity kn d;
   check_foundness kn d;
   check_match kn d;
-  check_literals mm kn d;
+  check_literals mm d;
   kn
 
 (* Base constructors *)
@@ -532,25 +457,28 @@ let known_meta kn al =
 let add_tdecl uc td = match td.td_node with
   | Decl d -> { uc with
       uc_decls = td :: uc.uc_decls;
-      uc_known = known_add_decl uc.uc_meta uc.uc_known d;
+      uc_known = known_add_decl uc.uc_known uc.uc_meta d;
       uc_local = Sid.union uc.uc_local d.d_news }
   | Use th when Sid.mem th.th_name uc.uc_used -> uc
   | Use th ->
-    let f mm td = match td.td_node with
-      | Meta(t,_) -> mm_add mm t td
-      | _ -> mm
-    in
-    { uc with
-      uc_decls = td :: uc.uc_decls;
-      uc_known = merge_known uc.uc_known th.th_known;
-      uc_meta = List.fold_left f uc.uc_meta th.th_decls;
-      uc_used  = Sid.union uc.uc_used (Sid.add th.th_name th.th_used) }
+      let rec add_meta mm td = match td.td_node with
+        | Meta(t,_) -> mm_add mm t td
+        | Use th when Sid.mem th.th_name uc.uc_used -> mm
+        | Use th -> List.fold_left add_meta mm th.th_decls;
+        | _ -> mm
+      in
+      { uc with
+        uc_decls = td :: uc.uc_decls;
+        uc_known = merge_known uc.uc_known th.th_known;
+        uc_meta  = List.fold_left add_meta uc.uc_meta th.th_decls;
+        uc_used  =
+          Sid.union uc.uc_used (Sid.add th.th_name th.th_used) }
   | Clone (_,sm) -> known_clone uc.uc_known sm;
       { uc with uc_decls = td :: uc.uc_decls }
   | Meta (t,al) -> known_meta uc.uc_known al;
-    { uc with
-      uc_decls = td :: uc.uc_decls;
-      uc_meta = mm_add uc.uc_meta t td }
+      { uc with
+        uc_decls = td :: uc.uc_decls;
+        uc_meta = mm_add uc.uc_meta t td }
 
 (** Declarations *)
 
@@ -601,7 +529,7 @@ let check_decl_opacity d = match d.d_node with
   (* All lsymbols declared in Ddata are safe, nothing to check.
      We allow arbitrary ls_opaque in Dparam, but we check that
      cloning in theories preserves opacity, see cl_init below. *)
-  | Dtype _ | Dfloat _ | Ddata _ | Dparam _ | Dprop _ -> ()
+  | Dtype _ | Ddata _ | Dparam _ | Dprop _ -> ()
   | Dlogic dl ->
       let check (ols,ld) =
         let check () ls args value =
@@ -648,10 +576,6 @@ let add_decl ?(warn=true) uc d =
   match d.d_node with
   | Dtype ts  ->
       add_symbol_ts uc ts
-  | Dfloat fi ->
-      let uc = add_symbol_ts uc fi.float_ts in
-      let uc = add_symbol_ls uc fi.float_to_real in
-      add_symbol_ls uc fi.float_is_finite
   | Ddata dl  ->
       let add_field uc = function
         | Some pj -> add_symbol_ls uc pj
@@ -835,18 +759,6 @@ let cl_type cl inst ts =
     else raise (CannotInstantiate ts.ts_name);
   create_ty_decl (cl_find_ts cl ts)
 
-let cl_float cl inst fi =
-  if Mts.mem fi.float_ts inst.inst_ts then
-    raise (CannotInstantiate fi.float_ts.ts_name);
-  if Mls.mem fi.float_to_real inst.inst_ls then
-    raise (CannotInstantiate fi.float_to_real.ls_name);
-  if Mls.mem fi.float_is_finite inst.inst_ls then
-    raise (CannotInstantiate fi.float_is_finite.ls_name);
-  create_float_decl { fi with
-    float_ts        = cl_find_ts cl fi.float_ts;
-    float_to_real   = cl_find_ls cl fi.float_to_real;
-    float_is_finite = cl_find_ls cl fi.float_is_finite; }
-
 let cl_data cl inst tdl =
   let add_ls ls =
     if Mls.mem ls inst.inst_ls then
@@ -914,7 +826,6 @@ let cl_prop cl inst (k,pr,f) =
 
 let cl_decl cl inst d = match d.d_node with
   | Dtype ts -> cl_type cl inst ts
-  | Dfloat fi -> cl_float cl inst fi
   | Ddata tdl -> cl_data cl inst tdl
   | Dparam ls -> cl_param cl inst ls
   | Dlogic ldl -> cl_logic cl inst ldl
