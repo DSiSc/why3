@@ -120,11 +120,8 @@ An arithmetic goal: 2+2 = 4
 
 *)
 
-let two : Term.term =
-  Term.t_const (Number.ConstInt (Number.int_const_dec "2")) Ty.ty_int
-
-let four : Term.term =
-  Term.t_const (Number.ConstInt (Number.int_const_dec "4")) Ty.ty_int
+let two  : Term.term = Term.t_nat_const 2
+let four : Term.term = Term.t_nat_const 4
 
 let int_theory : Theory.theory = Env.read_theory env ["int"] "Int"
 
@@ -155,8 +152,7 @@ let () = printf "@[On task 3, alt-ergo answers %a@."
   Call_provers.print_prover_result result3
 
 (* quantifiers: let's build "forall x:int. x*x >= 0" *)
-let zero : Term.term =
-  Term.t_const (Number.ConstInt (Number.int_const_dec "0")) Ty.ty_int
+let zero : Term.term = Term.t_nat_const 0
 
 let mult_symbol : Term.lsymbol =
   Theory.ns_find_ls int_theory.Theory.th_export ["infix *"]

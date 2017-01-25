@@ -353,10 +353,6 @@ let close_namespace uc import =
   | [], [_], [_] -> raise NoOpenedNamespace
   | _ -> assert false
 
-(* known add decl *)
-
-
-
 let meta_range = register_meta "range_type"
     [MTtysymbol; MTlsymbol; MTstring; MTstring]
     ~desc:"Store@ a@ range@ type@ range@ and@ projection."

@@ -238,7 +238,7 @@ let print_decl info fmt d = match d.d_node with
   | Dtype ts ->
       print_type_decl info fmt ts
   | Ddata _ -> unsupportedDecl d
-      "cvc3: algebraic types are not supported"
+      "cvc3 : algebraic type are not supported"
   | Dparam ls ->
       print_param_decl info fmt ls
   | Dlogic dl ->

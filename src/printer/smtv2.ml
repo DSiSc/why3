@@ -165,24 +165,24 @@ let rec print_term info fmt t =
   check_enter_vc_term t info.info_in_goal info.info_vc_term;
 
   let () = match t.t_node with
-    | Tconst c ->
-        let ts = match t.t_ty with
-          | Some { ty_node = Tyapp (ts, []) } -> ts
-          | _ -> assert false (* impossible *) in
-        (* look for syntax literal ts in driver *)
-        begin match query_syntax info.info_rliteral ts.ts_name, c with
+  | Tconst c ->
+      let ts = match t.t_ty with
+        | Some { ty_node = Tyapp (ts, []) } -> ts
+        | _ -> assert false (* impossible *) in
+      (* look for syntax literal ts in driver *)
+      begin match query_syntax info.info_rliteral ts.ts_name, c with
         | Some st, Number.ConstInt c ->
-            syntax_range_literal st fmt c
+          syntax_range_literal st fmt c
         | Some st, Number.ConstReal c ->
-            let (_,_,eb,sb) = Theory.find_float info.info_mm ts in
-            let eb,sb = BigInt.of_string eb, BigInt.of_string sb in
-            syntax_float_literal st fmt c eb sb
+          let (_,_,eb,sb) = Theory.find_float info.info_mm ts in
+          let eb,sb = BigInt.of_string eb, BigInt.of_string sb in
+          syntax_float_literal st fmt c eb sb
         | None, _ -> Number.print number_format fmt c
-          (* TODO/FIXME: we must assert here that the type is either
-              ty_int or ty_real, otherwise it makes no sense to print
-              the literal. Do we ensure that preserved literal types
-              are exactly those that have a dedicated syntax? *)
-        end
+        (* TODO/FIXME: we must assert here that the type is either
+            ty_int or ty_real, otherwise it makes no sense to print
+            the literal. Do we ensure that preserved literal types
+            are exactly those that have a dedicated syntax? *)
+      end
   | Tvar v -> print_var info fmt v
   | Tapp (ls, tl) ->
     (* let's check if a converter applies *)

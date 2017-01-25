@@ -35,9 +35,9 @@ let elim_abstract undef_ls rem_pr rem_ls rem_ts d = match d.d_node with
   | Dprop (Paxiom,pr,_) when Spr.mem pr rem_pr -> []
   | Dtype ts when Sts.mem ts rem_ts -> []
   | Ddata l ->
-      let test_id (ts,_) = not (Sts.mem ts rem_ts) in
-      let l = List.filter test_id l in
-      (if l = [] then [] else [create_data_decl l])
+    let test_id (ts,_) = not (Sts.mem ts rem_ts) in
+    let l = List.filter test_id l in
+    (if l = [] then [] else [create_data_decl l])
   | _ -> [d]
 
 let eliminate_builtin =
@@ -52,13 +52,16 @@ let () = Trans.register_transform "eliminate_builtin" eliminate_builtin
     that@ are@ builtin@ in@ the@ prover@ (see@ 'syntax'@ and@ \
     'remove'@ clauses@ in@ the@ prover's@ driver)."
 
-(** compute the meta_remove_* given two tasks one included in the other *)
+(** compute the meta_remove_* given two task one included in the other *)
 let compute_diff t1 t2 =
   let km = Mid.set_diff (Task.task_known t1) (Task.task_known t2) in
   let hdone = Hdecl.create 10 in
-  let remove_ts acc ts = (Printer.meta_remove_type, [Theory.MAts ts])::acc in
-  let remove_ls acc ls = (Printer.meta_remove_logic, [Theory.MAls ls])::acc in
-  let remove_pr acc pr = (Printer.meta_remove_prop, [Theory.MApr pr])::acc in
+  let remove_ts acc ts =
+    (Printer.meta_remove_type, [Theory.MAts ts])::acc in
+  let remove_ls acc ls =
+    (Printer.meta_remove_logic, [Theory.MAls ls])::acc in
+  let remove_pr acc pr =
+    (Printer.meta_remove_prop, [Theory.MApr pr])::acc in
   Mid.fold_left (fun acc _ decl ->
     if Hdecl.mem hdone decl then acc
     else begin
@@ -221,9 +224,12 @@ let rec elim_task task rem =
 
 
 let add_rem rem decl =
-  let remove_ts rem ts = { rem with rem_ts = Sts.add ts rem.rem_ts} in
-  let remove_ls rem ls = { rem with rem_ls = Sls.add ls rem.rem_ls} in
-  let remove_pr rem pr = { rem with rem_pr = Spr.add pr rem.rem_pr} in
+  let remove_ts rem ts =
+    { rem with rem_ts = Sts.add ts rem.rem_ts} in
+  let remove_ls rem ls =
+    { rem with rem_ls = Sls.add ls rem.rem_ls} in
+  let remove_pr rem pr =
+    { rem with rem_pr = Spr.add pr rem.rem_pr} in
   match decl.d_node with
   | Dtype ts -> remove_ts rem ts
   | Ddata l -> List.fold_left (fun rem (ts,_) -> remove_ts rem ts) rem l

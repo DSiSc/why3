@@ -49,6 +49,8 @@ let big_int_of_value v =
   match v with
   | Int n -> n
   | Term { t_node = Tconst c } -> big_int_of_const c
+  | Term { t_node = Tapp (ls,[{ t_node = Tconst c }]) }
+    when ls_compare ls !ls_minus = 0 -> BigInt.minus (big_int_of_const c)
   | _ -> raise NotNum
 
 
@@ -747,8 +749,7 @@ and reduce_app_no_equ engine st ls ~orig ty rem_cont =
               cont_stack = rem_cont; }
         end in
       match d.Decl.d_node with
-      | Decl.Dtype _ | Decl.Dprop _ ->
-        assert false
+      | Decl.Dtype _ | Decl.Dprop _ -> assert false
       | Decl.Dlogic dl ->
         (* regular definition *)
         let d = List.assq ls dl in

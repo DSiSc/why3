@@ -85,7 +85,6 @@ val add_syntax_map : tdecl -> syntax_map -> syntax_map
 (* interprets a declaration as a syntax rule, if any *)
 
 val get_converter_map : task -> converter_map
-(*val add_converter_map : tdecl -> converter_map -> converter_map*)
 
 val get_rliteral_map : task -> syntax_map
 val add_rliteral_map : tdecl -> syntax_map -> syntax_map

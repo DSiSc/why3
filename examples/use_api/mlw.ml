@@ -11,7 +11,7 @@
 
 (*******************
 
-This file builds some MLW modules using the API 
+This file builds some MLW modules using the API
 
 ******************)
 
@@ -64,12 +64,9 @@ let d =
   }
   in
   let body =
-    let c6 = Term.t_const
-      (Number.ConstInt (Number.int_const_dec "6")) Ty.ty_int in
-    let c7 =
-      Term.t_const (Number.ConstInt (Number.int_const_dec "7")) Ty.ty_int in
-    let c42 =
-      Term.t_const (Number.ConstInt (Number.int_const_dec "42")) Ty.ty_int in
+    let c6  = Term.t_nat_const 6 in
+    let c7  = Term.t_nat_const 7 in
+    let c42 = Term.t_nat_const 42 in
     let p =
       Term.t_equ (Term.t_app_infer mul_int [c6;c7]) c42
     in
