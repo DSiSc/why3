@@ -402,11 +402,11 @@ theory BV64
 
   use int.Int (* needed to use range types *)
 
-  type t is range to_uint: 0x0000_0000_0000_0000 .. 0xFFFF_FFFF_FFFF_FFFF
+  type t = < range 0x0000_0000_0000_0000 0xFFFF_FFFF_FFFF_FFFF >
 
   clone export BV_Gen with
     type t = t,
-    function to_uint = to_uint,
+    function to_uint = t'int,
     constant size = size,
     constant two_power_size = two_power_size,
     constant max_int = max_int,
@@ -423,11 +423,11 @@ theory BV32
 
   use int.Int (* needed to use range types *)
 
-  type t is range to_uint: 0x0000_0000 .. 0xFFFF_FFFF
+  type t = < range 0x0000_0000 0xFFFF_FFFF >
 
   clone export BV_Gen with
     type t = t,
-    function to_uint = to_uint,
+    function to_uint = t'int,
     constant size = size,
     constant two_power_size = two_power_size,
     constant max_int = max_int,
@@ -444,11 +444,11 @@ theory BV16
 
   use int.Int (* needed to use range types *)
 
-  type t is range to_uint: 0x0000 .. 0xFFFF
+  type t = < range 0x0000 0xFFFF >
 
   clone export BV_Gen with
     type t = t,
-    function to_uint = to_uint,
+    function to_uint = t'int,
     constant size = size,
     constant two_power_size = two_power_size,
     constant max_int = max_int,
@@ -465,11 +465,11 @@ theory BV8
 
   use int.Int (* needed to use range types *)
 
-  type t is range to_uint: 0x00 .. 0xFF
+  type t = < range 0x00 0xFF >
 
   clone export BV_Gen with
     type t = t,
-    function to_uint = to_uint,
+    function to_uint = t'int,
     constant size = size,
     constant two_power_size = two_power_size,
     constant max_int = max_int,
@@ -516,8 +516,8 @@ theory BVConverter_32_64
     type bigBV = BV64.t,
     type smallBV = BV32.t,
     predicate in_small_range = in_range,
-    function to_uint_small = BV32.to_uint,
-    function to_uint_big = BV64.to_uint
+    function to_uint_small = BV32.t'int,
+    function to_uint_big = BV64.t'int
 end
 
 theory BVConverter_16_64
@@ -530,8 +530,8 @@ theory BVConverter_16_64
     type bigBV = BV64.t,
     type smallBV = BV16.t,
     predicate in_small_range = in_range,
-    function to_uint_small = BV16.to_uint,
-    function to_uint_big = BV64.to_uint
+    function to_uint_small = BV16.t'int,
+    function to_uint_big = BV64.t'int
 end
 
 theory BVConverter_8_64
@@ -544,8 +544,8 @@ theory BVConverter_8_64
     type bigBV = BV64.t,
     type smallBV = BV8.t,
     predicate in_small_range = in_range,
-    function to_uint_small = BV8.to_uint,
-    function to_uint_big = BV64.to_uint
+    function to_uint_small = BV8.t'int,
+    function to_uint_big = BV64.t'int
 end
 
 theory BVConverter_16_32
@@ -558,8 +558,8 @@ theory BVConverter_16_32
     type bigBV = BV32.t,
     type smallBV = BV16.t,
     predicate in_small_range = in_range,
-    function to_uint_small = BV16.to_uint,
-    function to_uint_big = BV32.to_uint
+    function to_uint_small = BV16.t'int,
+    function to_uint_big = BV32.t'int
 end
 
 theory BVConverter_8_32
@@ -572,8 +572,8 @@ theory BVConverter_8_32
     type bigBV = BV32.t,
     type smallBV = BV8.t,
     predicate in_small_range = in_range,
-    function to_uint_small = BV8.to_uint,
-    function to_uint_big = BV32.to_uint
+    function to_uint_small = BV8.t'int,
+    function to_uint_big = BV32.t'int
 end
 
 theory BVConverter_8_16
@@ -586,6 +586,6 @@ theory BVConverter_8_16
     type bigBV = BV16.t,
     type smallBV = BV8.t,
     predicate in_small_range = in_range,
-    function to_uint_small = BV8.to_uint,
-    function to_uint_big = BV16.to_uint
+    function to_uint_small = BV8.t'int,
+    function to_uint_big = BV16.t'int
 end

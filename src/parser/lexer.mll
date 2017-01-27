@@ -43,7 +43,6 @@
         "if", IF;
         "import", IMPORT;
         "in", IN;
-        "is", IS;
         "inductive", INDUCTIVE;
         "lemma", LEMMA;
         "let", LET;
@@ -206,6 +205,10 @@ rule token = parse
       { BAR }
   | "="
       { EQUAL }
+  | "<"
+      { LT }
+  | ">"
+      { GT }
   | "<>"
       { LTGT }
   | "["

@@ -160,7 +160,7 @@ end
 
 %token AS AXIOM BY CLONE COINDUCTIVE CONSTANT
 %token ELSE END EPSILON EXISTS EXPORT FALSE FLOAT FORALL FUNCTION
-%token GOAL IF IMPORT IN INDUCTIVE IS LEMMA
+%token GOAL IF IMPORT IN INDUCTIVE LEMMA
 %token LET MATCH META NAMESPACE NOT PROP PREDICATE RANGE
 %token SO THEN THEORY TRUE TYPE USE WITH
 
@@ -177,7 +177,7 @@ end
 %token AND ARROW
 %token BAR
 %token COLON COMMA
-%token DOT DOTDOT EQUAL LAMBDA LTGT
+%token DOT DOTDOT EQUAL LAMBDA LT GT LTGT
 %token LEFTPAR LEFTPAR_STAR_RIGHTPAR LEFTSQ
 %token LARROW LRARROW OR
 %token RIGHTPAR RIGHTSQ
@@ -205,7 +205,7 @@ end
 %right OR BARBAR
 %right AND AMPAMP
 %nonassoc NOT
-%left EQUAL LTGT OP1
+%left EQUAL LT GT LTGT OP1
 %nonassoc LARROW
 %nonassoc RIGHTSQ    (* stronger than <- for e1[e2 <- e3] *)
 %left OP2
@@ -345,10 +345,10 @@ typedefn:
 | model abstract ty invariant*
     { $1, $2, TDalias $3, $4 }
 (* FIXME: allow negative bounds *)
-| IS RANGE labels(lident) COLON INTEGER DOTDOT INTEGER
-    { false, Public, TDrange ($5, $7, $3), [] }
-| IS FLOAT labels(lident) COMMA labels(lident) COLON INTEGER COMMA INTEGER
-    { false, Public, TDfloat ($7, $9, $3, $5), [] }
+| EQUAL LT RANGE INTEGER INTEGER GT
+    { false, Public, TDrange ($4, $5), [] }
+| EQUAL LT FLOAT INTEGER INTEGER GT
+    { false, Public, TDfloat ($4, $5), [] }
 
 model:
 | EQUAL         { false }
@@ -943,7 +943,6 @@ lident_keyword:
 | MODEL           { "model" }
 | RANGE           { "range" }
 | FLOAT           { "float" }
-| IS              { "is" }
 
 quote_uident:
 | QUOTE_UIDENT  { mk_id ("'" ^ $1) $startpos $endpos }
@@ -981,6 +980,8 @@ lident_op:
 | LEFTSQ UNDERSCORE DOTDOT            RIGHTSQ { mixfix "[_..]" }
 
 op_symbol:
+| LT  { "<" }
+| GT  { ">" }
 | OP1 { $1 }
 | OP2 { $1 }
 | OP3 { $1 }
@@ -993,6 +994,8 @@ prefix_op:
 | op_symbol { mk_id (prefix $1)  $startpos $endpos }
 
 %inline infix_op:
+| o = LT    { mk_id (infix "<")  $startpos $endpos }
+| o = GT    { mk_id (infix ">")  $startpos $endpos }
 | o = OP1   { mk_id (infix o)    $startpos $endpos }
 | o = OP2   { mk_id (infix o)    $startpos $endpos }
 | o = OP3   { mk_id (infix o)    $startpos $endpos }

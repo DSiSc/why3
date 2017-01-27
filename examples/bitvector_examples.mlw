@@ -8,13 +8,13 @@ module Test_proofinuse
   (* Shift is div example -------------------  *)
 
   let shift_is_div ( x : t ) ( y : t ) : t =
-    requires{ 0 <= to_uint y < 32 }
+    requires{ 0 <= t'int y < 32 }
     let res = lsr_bv x one in
     assert{ res = ( udiv x (2:t) ) };
-    assert{ to_uint res = div (to_uint x) 2 };
+    assert{ t'int res = div (t'int x) 2 };
     let res = lsr_bv res (2:t) in
     assert{ res = ( udiv x (8:t) ) };
-    assert{ to_uint res = div (to_uint x) 8 };
+    assert{ t'int res = div (t'int x) 8 };
     res
 
  (* Mask example --------------------- *)
@@ -267,16 +267,16 @@ module Test_imperial_violet
     forall b. ule zeros b /\ ule b ones
 
   lemma to_int_ule:
-    forall b c. ule b c -> to_uint b <= to_uint c
+    forall b c. ule b c -> t'int b <= t'int c
 
   lemma to_int_ult:
-    forall b c. ult b c -> to_uint b < to_uint c
+    forall b c. ult b c -> t'int b < t'int c
 
   lemma bv32_bounds_0:
-    forall b. 0 <= to_uint b
+    forall b. 0 <= t'int b
 
   lemma bv32_bounds:
-    forall b. 0 <= to_uint b < 0x1_0000_0000
+    forall b. 0 <= t'int b < 0x1_0000_0000
 
   (* bounded add of array of t *)
 
@@ -287,11 +287,11 @@ module Test_imperial_violet
     requires{ forall i. 0 <= i < length b ->
                 ult b[i] (0x8000_0000:t) }
     ensures{ forall i. 0 <= i < length result ->
-               to_uint result[i] = to_uint a[i] + to_uint b[i] }
+               t'int result[i] = t'int a[i] + t'int b[i] }
     let sum = make (length a) zeros in
     for i = 0 to length a - 1 do
       invariant{ forall j. 0 <= j < i -> sum[j] = add a[j] b[j] }
-      invariant{ forall j. 0 <= j < i -> to_uint sum[j] = to_uint a[j] + to_uint b[j] }
+      invariant{ forall j. 0 <= j < i -> t'int sum[j] = t'int a[j] + t'int b[j] }
       sum[i] <- add a[i] b[i]
     done;
     sum
@@ -330,97 +330,97 @@ module Test_from_bitvector_example
     lsr_bv ones (30:t)
 
   let lsr29 () =
-    ensures{ to_uint result = 7 }
+    ensures{ t'int result = 7 }
     lsr_bv ones (29:t)
 
   let lsr28 () =
-    ensures{ to_uint result = 15 }
+    ensures{ t'int result = 15 }
     lsr_bv ones (28:t)
 
   let lsr27 () =
-    ensures{ to_uint result = 31 }
+    ensures{ t'int result = 31 }
     lsr_bv ones (27:t)
 
   let lsr26 () =
-    ensures{ to_uint result = 63 }
+    ensures{ t'int result = 63 }
     lsr_bv ones (26:t)
 
   let lsr20 () =
-    ensures{ to_uint result = 4095 }
+    ensures{ t'int result = 4095 }
     lsr_bv ones (20:t)
 
   let lsr13 () =
-    ensures{ to_uint result = 524287 }
+    ensures{ t'int result = 524287 }
     lsr_bv ones (13:t)
 
   let lsr8 () =
-    ensures{ to_uint result = 16777215 }
+    ensures{ t'int result = 16777215 }
     lsr_bv ones (8:t)
 
   goal to_int_0x00000001:
-    to_uint (lsr_bv ones (31:t)) = 1
+    t'int (lsr_bv ones (31:t)) = 1
 
   goal to_int_0x00000003:
-    to_uint (lsr_bv ones (30:t)) = 3
+    t'int (lsr_bv ones (30:t)) = 3
 
   goal to_int_0x00000007:
-    to_uint (lsr_bv ones (29:t)) = 7
+    t'int (lsr_bv ones (29:t)) = 7
 
   goal to_int_0x0000000F:
-    to_uint (lsr_bv ones (28:t)) = 15
+    t'int (lsr_bv ones (28:t)) = 15
 
   goal to_int_0x0000001F:
-    to_uint (lsr_bv ones (27:t)) = 31
+    t'int (lsr_bv ones (27:t)) = 31
 
   goal to_int_0x0000003F:
-    to_uint (lsr_bv ones (26:t)) = 63
+    t'int (lsr_bv ones (26:t)) = 63
 
   goal to_int_0x0000007F:
-    to_uint (lsr_bv ones (25:t)) = 127
+    t'int (lsr_bv ones (25:t)) = 127
 
   goal to_int_0x000000FF:
-    to_uint (lsr_bv ones (24:t)) = 255
+    t'int (lsr_bv ones (24:t)) = 255
 
   goal to_int_0x000001FF:
-    to_uint (lsr_bv ones (23:t)) = 511
+    t'int (lsr_bv ones (23:t)) = 511
 
   goal to_int_0x000003FF:
-    to_uint (lsr_bv ones (22:t)) = 1023
+    t'int (lsr_bv ones (22:t)) = 1023
 
   goal to_int_0x000007FF:
-    to_uint (lsr_bv ones (21:t)) = 2047
+    t'int (lsr_bv ones (21:t)) = 2047
 
   goal to_int_0x00000FFF:
-    to_uint (lsr_bv ones (20:t)) = 4095
+    t'int (lsr_bv ones (20:t)) = 4095
 
   goal to_int_0x00001FFF:
-    to_uint (lsr_bv ones (19:t)) = 8191
+    t'int (lsr_bv ones (19:t)) = 8191
 
   goal to_int_0x00003FFF:
-    to_uint (lsr_bv ones (18:t)) = 16383
+    t'int (lsr_bv ones (18:t)) = 16383
 
   goal to_int_0x00007FFF:
-    to_uint (lsr_bv ones (17:t)) = 32767
+    t'int (lsr_bv ones (17:t)) = 32767
 
   goal to_int_0x0000FFFF:
-    to_uint (lsr_bv ones (16:t)) = 65535
+    t'int (lsr_bv ones (16:t)) = 65535
 
   goal to_int_0x0001FFFF:
-    to_uint (lsr_bv ones (15:t)) = 131071
+    t'int (lsr_bv ones (15:t)) = 131071
 
   goal to_int_0x0003FFFF:
-    to_uint (lsr_bv ones (14:t)) = 262143
+    t'int (lsr_bv ones (14:t)) = 262143
 
   goal to_int_0x0007FFFF:
-    to_uint (lsr_bv ones (13:t)) = 524287
+    t'int (lsr_bv ones (13:t)) = 524287
 
   goal to_int_0x000FFFFF:
-    to_uint (lsr_bv ones (12:t)) = 1048575
+    t'int (lsr_bv ones (12:t)) = 1048575
 
   goal to_int_0x00FFFFFF:
-    to_uint (lsr_bv ones (8:t)) = 16777215
+    t'int (lsr_bv ones (8:t)) = 16777215
 
   goal to_int_0xFFFFFFFF:
-    to_uint ones = 4294967295
+    t'int ones = 4294967295
 
 end

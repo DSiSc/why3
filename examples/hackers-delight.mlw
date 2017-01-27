@@ -76,7 +76,7 @@ module Utils_Spec
 
   let rec lemma countSpec_Aux (bv : t) : unit
   variant {bv with ult}
-  ensures {to_uint (count bv) = NumOf.numof (nth bv) 0 32}
+  ensures {t'int (count bv) = NumOf.numof (nth bv) 0 32}
   =
     if bv = zeros then ()
     else
@@ -97,7 +97,7 @@ module Utils_Spec
   (** With these lemmas, we can now prove the correctness property of
   count: *)
 
-  lemma countSpec: forall b. to_uint (count b) = NumOf.numof
+  lemma countSpec: forall b. t'int (count b) = NumOf.numof
         (nth b) 0 32
 
   (** {6 hammingD correctness } *)
@@ -108,7 +108,7 @@ module Utils_Spec
 
   (** The correctness property can be express as the following: *)
   let lemma hamming_spec (a b : t) : unit
-  ensures {to_uint (hammingD a b) = NumOf.numof (nth_diff a b) 0 32}
+  ensures {t'int (hammingD a b) = NumOf.numof (nth_diff a b) 0 32}
   =
    assert { forall i. 0 <= i < 32 -> nth (bw_xor a b) i <-> (nth_diff a b i) }
 
@@ -129,7 +129,7 @@ module Utils_Spec
     numof_or p q a (b-1)
 
   let lemma triangleInequalityInt (a b c : t) : unit
-    ensures {to_uint (hammingD a b) + to_uint (hammingD b c) >= to_uint (hammingD a c)}
+    ensures {t'int (hammingD a b) + t'int (hammingD b c) >= t'int (hammingD a c)}
   =
     assert {numof (fun_or (nth_diff a b) (nth_diff b c)) 0 32 >= numof (nth_diff a c) 0 32
              by

@@ -988,7 +988,7 @@ let add_types ~wp uc tdl =
           ts :: abstr, algeb, alias, range, float
       | TDalias _ ->
           abstr, algeb, ts :: alias, range, float
-      | TDrange (a,b,proj) ->
+      | TDrange (a,b) ->
           (* FIXME: all sanity checks must be done in Decl (still valid ?) *)
           let ts = match ts with
             | TS ts -> ts
@@ -997,6 +997,8 @@ let add_types ~wp uc tdl =
           let b_val = Number.compute_int b in
           if BigInt.lt b_val a_val then
             Loc.error ~loc:d.td_loc Typing.EmptyRange;
+          let proj =
+              { d.td_ident with id_str = d.td_ident.id_str ^ "'int" } in
           let id = create_user_id proj in
           let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
           let ri = {
@@ -1005,7 +1007,7 @@ let add_types ~wp uc tdl =
             range_hi     = b_val;
             range_to_int = ls } in
           abstr, algeb, alias, ri :: range, float
-      | TDfloat (eb,sb,proj,isF) ->
+      | TDfloat (eb,sb) ->
           (* FIXME: all sanity checks must be done in Decl (still valid ?) *)
           let ts = match ts with
             | TS ts -> ts
@@ -1015,7 +1017,11 @@ let add_types ~wp uc tdl =
           if BigInt.lt eb_val (BigInt.of_int 1) ||
              BigInt.lt sb_val (BigInt.of_int 1) then
             Loc.error ~loc:d.td_loc Typing.BadFloatSpec;
+          let proj =
+            { d.td_ident with id_str = d.td_ident.id_str ^ "'real" } in
           let proj_id = create_user_id proj in
+          let isF =
+            { d.td_ident with id_str = d.td_ident.id_str ^ "'isFinite" } in
           let isF_id = create_user_id isF in
           let ty = ty_app ts [] in
           let proj = create_lsymbol proj_id [ty] (Some ty_real) in

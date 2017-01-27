@@ -131,7 +131,7 @@ module BitsSpec
   use bv.BV32
   val below (n: BV32.t) : t
     requires { BV32.ule n (32:BV32.t) }
-    ensures  { result.mdl = interval 0 (BV32.to_uint n) }
+    ensures  { result.mdl = interval 0 (BV32.t'int n) }
 end
 
 module Bits "the 1-bits of an integer, as a set of integers"
@@ -225,10 +225,10 @@ module Bits "the 1-bits of an integer, as a set of integers"
 
   let below (n: BV32.t) : t
     requires { BV32.ule n (32:BV32.t) }
-    ensures  { result.mdl = interval 0 (to_uint n) }
+    ensures  { result.mdl = interval 0 (t'int n) }
   =
     { bv = bw_not (lsl_bv ones n);
-      mdl = interval 0 (to_uint n) }
+      mdl = interval 0 (t'int n) }
 
 end
 
@@ -331,7 +331,7 @@ module NQueensBits
     end
 
   let queens (q: BV32.t)
-    requires { BV32.to_uint q = n }
+    requires { BV32.t'int q = n }
     requires { BV32.ule q BV32.size_bv }
     requires { !s = 0 }
     ensures  { result = !s }
