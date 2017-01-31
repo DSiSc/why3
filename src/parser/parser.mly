@@ -148,7 +148,7 @@ end
 
 (* Tokens *)
 
-%token <string> LIDENT UIDENT
+%token <string> LIDENT LIDENT_QUOTE UIDENT
 %token <Ptree.integer_constant> INTEGER
 %token <string> OP1 OP2 OP3 OP4 OPPREF
 %token <Ptree.real_constant> REAL
@@ -939,6 +939,9 @@ lident:
 | LIDENT          { mk_id $1 $startpos $endpos }
 | lident_keyword  { mk_id $1 $startpos $endpos }
 
+lident_quote:
+| LIDENT_QUOTE    { mk_id $1 $startpos $endpos }
+
 lident_keyword:
 | MODEL           { "model" }
 | RANGE           { "range" }
@@ -958,6 +961,7 @@ opaque_quote_lident:
 ident_rich:
 | uident        { $1 }
 | lident_rich   { $1 }
+| lident_quote  { $1 }
 
 lident_rich:
 | lident        { $1 }

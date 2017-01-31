@@ -55,9 +55,9 @@ let elim le_int le_real abs_real type_kept kn
       let lo,hi = Number.int_const_dec lo, Number.int_const_dec hi in
       let ty_decl = create_ty_decl ts in
       let ls_decl = create_param_decl to_int in
-      let pr = create_prsymbol (id_derive "_axiom" ts.ts_name) in
+      let pr = create_prsymbol (id_fresh (ts.ts_name.id_string ^ "'axiom")) in
       (* TODO: why call it dummy? *)
-      let v = create_vsymbol (id_fresh "dummy") (ty_app ts []) in
+      let v = create_vsymbol (id_fresh "i") (ty_app ts []) in
       let v_term = t_app to_int [t_var v] (Some ty_int) in
       let a_term = t_const (Number.ConstInt lo) ty_int in
       let b_term = t_const (Number.ConstInt hi) ty_int in
@@ -79,8 +79,8 @@ let elim le_int le_real abs_real type_kept kn
       let isFinite_decl = create_param_decl is_finite in
       (* create defining axiom *)
       (* [forall v:t. is_finite v -> | to_real v | <= max] *)
-      let pr = create_prsymbol (id_derive "_axiom" ts.ts_name) in
-      let v = create_vsymbol (id_fresh "dummy") (ty_app ts []) in
+      let pr = create_prsymbol (id_fresh (ts.ts_name.id_string ^ "'axiom")) in
+      let v = create_vsymbol (id_fresh "x") (ty_app ts []) in
       let v_term = t_app to_real [t_var v] (Some ty_real) in
       (* compute max *)
       let emax = BigInt.pow_int_pos_bigint 2 (BigInt.pred eb) in

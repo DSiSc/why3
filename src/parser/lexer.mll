@@ -103,7 +103,8 @@ let lalpha = ['a'-'z' '_']
 let ualpha = ['A'-'Z']
 let alpha = lalpha | ualpha
 let digit = ['0'-'9']
-let lident = lalpha (alpha | digit | '\'')*
+let lident = lalpha (alpha | digit)* ('\'' | digit)*
+let lident_quote = lident '\'' lident
 let uident = ualpha (alpha | digit | '\'')*
 let hexadigit = ['0'-'9' 'a'-'f' 'A'-'F']
 
@@ -135,6 +136,8 @@ rule token = parse
       { UNDERSCORE }
   | lident as id
       { try Hashtbl.find keywords id with Not_found -> LIDENT id }
+  | lident_quote as id
+      { try Hashtbl.find keywords id with Not_found -> LIDENT_QUOTE id }
   | uident as id
       { UIDENT id }
   | ['0'-'9'] ['0'-'9' '_']* as s
