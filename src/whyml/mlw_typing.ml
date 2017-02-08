@@ -1103,10 +1103,22 @@ let add_types ~wp uc tdl =
     | TS ts -> add_decl_with_tuples uc (Decl.create_ty_decl ts)
   in
   let add_range_decl uc rd =
-    add_decl_with_tuples uc (Decl.create_ty_decl rd.range_ts)
+    let uc = add_decl_with_tuples uc (Decl.create_ty_decl rd.range_ts) in
+    let a = BigInt.to_string rd.range_lo in
+    let b = BigInt.to_string rd.range_hi in
+    let uc = add_decl_with_tuples uc (Decl.create_param_decl rd.range_to_int) in
+    add_meta uc meta_range
+      [MAts rd.range_ts; MAls rd.range_to_int; MAstr a; MAstr b;]
   in
   let add_float_decl uc fd =
-    add_decl_with_tuples uc (Decl.create_ty_decl fd.float_ts)
+    let uc = add_decl_with_tuples uc (Decl.create_ty_decl fd.float_ts) in
+    let eb = BigInt.to_string fd.float_eb in
+    let sb = BigInt.to_string fd.float_sb in
+    let uc = add_decl_with_tuples uc (Decl.create_param_decl fd.float_to_real) in
+    let uc = add_decl_with_tuples uc (Decl.create_param_decl fd.float_is_finite) in
+    add_meta uc meta_float
+      [MAts fd.float_ts; MAls fd.float_to_real; MAls fd.float_is_finite;
+       MAstr eb; MAstr sb]
   in
   let add_invariant uc d = if d.td_inv = [] then uc else
     add_type_invariant d.td_loc uc d.td_ident d.td_params d.td_inv in
