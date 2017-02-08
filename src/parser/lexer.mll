@@ -137,7 +137,7 @@ rule token = parse
   | lident as id
       { try Hashtbl.find keywords id with Not_found -> LIDENT id }
   | lident_quote as id
-      { try Hashtbl.find keywords id with Not_found -> LIDENT_QUOTE id }
+      { LIDENT_QUOTE id }
   | uident as id
       { UIDENT id }
   | ['0'-'9'] ['0'-'9' '_']* as s
@@ -206,14 +206,14 @@ rule token = parse
       { DOTDOT }
   | "|"
       { BAR }
-  | "="
-      { EQUAL }
   | "<"
       { LT }
   | ">"
       { GT }
   | "<>"
       { LTGT }
+  | "="
+      { EQUAL }
   | "["
       { LEFTSQ }
   | "]"

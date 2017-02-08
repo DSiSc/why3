@@ -272,7 +272,7 @@ let syntax_range_literal s fmt c =
   in
   global_substitute_fmt opt_search_forward_literal_format f s fmt
 
-let syntax_float_literal s fmt c eb sb =
+let syntax_float_literal s fp fmt c =
   let f s b e fmt =
     let base = match s.[e-1] with
       | 'x' -> 16
@@ -287,7 +287,7 @@ let syntax_float_literal s fmt c eb sb =
       else
         None
     in
-    let e,m = Number.compute_float c eb sb in
+    let e,m = Number.compute_float c fp in
     match s.[b] with
     | 's' -> Number.print_in_base base digits fmt BigInt.zero
     | 'e' -> Number.print_in_base base digits fmt e
@@ -450,12 +450,12 @@ let get_rliteral_map task =
   Task.on_meta meta_syntax_literal sm_add_ts Mid.empty task
 
 let add_syntax_map td sm = match td.td_node with
-  | Meta (m, args) when meta_equal m meta_syntax_type
-    -> sm_add_ts sm args
-  | Meta (m, args) when meta_equal m meta_syntax_logic
-    -> sm_add_ls sm args
-  | Meta (m, args) when meta_equal m meta_remove_prop
-    -> sm_add_pr sm args
+  | Meta (m, args) when meta_equal m meta_syntax_type ->
+      sm_add_ts sm args
+  | Meta (m, args) when meta_equal m meta_syntax_logic ->
+      sm_add_ls sm args
+  | Meta (m, args) when meta_equal m meta_remove_prop ->
+      sm_add_pr sm args
   | _ -> sm
 
 (*let add_converter_map td cm = match td.td_node with
@@ -465,7 +465,7 @@ let add_syntax_map td sm = match td.td_node with
 
 let add_rliteral_map td sm = match td.td_node with
   | Meta (m, args) when meta_equal m meta_syntax_literal ->
-    sm_add_ts sm args
+      sm_add_ts sm args
   | _ -> sm
 
 let query_syntax sm id =

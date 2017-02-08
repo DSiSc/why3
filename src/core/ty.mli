@@ -34,9 +34,11 @@ val tv_of_string : string -> tvsymbol
 (** {2 Type symbols and types} *)
 
 type tysymbol = private {
-  ts_name : ident;
-  ts_args : tvsymbol list;
-  ts_def  : ty option;
+  ts_name      : ident;
+  ts_args      : tvsymbol list;
+  ts_def       : ty option;
+  ts_int_range : Number.int_range option;
+  ts_float_fmt : Number.float_format option;
 }
 
 and ty = private {
@@ -70,8 +72,13 @@ val ty_hash : ty -> int
 exception BadTypeArity of tysymbol * int
 exception DuplicateTypeVar of tvsymbol
 exception UnboundTypeVar of tvsymbol
+exception EmptyRange
+exception BadFloatSpec
 
 val create_tysymbol : preid -> tvsymbol list -> ty option -> tysymbol
+
+val create_range_tysymbol : preid -> Number.int_range -> tysymbol
+val create_float_tysymbol : preid -> Number.float_format -> tysymbol
 
 val ty_var : tvsymbol -> ty
 val ty_app : tysymbol -> ty list -> ty

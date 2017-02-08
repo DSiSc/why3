@@ -14,23 +14,6 @@ open Ident
 open Ty
 open Term
 
-(** {2 Special type declaration} *)
-
-type range_decl = {
-  range_ts        : tysymbol;
-  range_to_int    : lsymbol;
-  range_lo        : BigInt.t;
-  range_hi        : BigInt.t;
-}
-
-type float_decl = {
-  float_ts        : tysymbol;
-  float_to_real   : lsymbol;
-  float_is_finite : lsymbol;
-  float_eb        : BigInt.t;
-  float_sb        : BigInt.t;
-}
-
 (** Type declaration *)
 
 type constructor = lsymbol * lsymbol option list
@@ -773,6 +756,13 @@ let check_positivity kn d = match d.d_node with
       let check_decl (ts,cl) = List.iter (check_constr ts) cl in
       List.iter check_decl tdl
   | _ -> ()
+
+let known_add_decl kn d =
+  let kn = known_add_decl kn d in
+  check_positivity kn d;
+  check_foundness kn d;
+  check_match kn d;
+  kn
 
 (** Records *)
 

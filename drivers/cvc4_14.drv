@@ -26,8 +26,8 @@ transformation "eliminate_definition"
    (examples/logic/triangle_inequality.why)
 *)
 transformation "eliminate_inductive"
-transformation "eliminate_literal"
 transformation "eliminate_algebraic_if_poly"
+transformation "eliminate_literal"
 transformation "eliminate_epsilon"
 
 transformation "simplify_formula"
@@ -63,6 +63,11 @@ theory int.EuclideanDivision
 end
 *)
 
+(* TODO/FIXME: simply removing the properties inconsistent
+   with the prover's semantics is ABSOLUTELY NOT a solution,
+   because you may still have corollaries of those properties
+   in the context.
+
 theory ieee_float.GenericFloat
 
  prelude "; ---- floats ---- "
@@ -83,5 +88,6 @@ theory ieee_float.FloatConverter
  syntax function to_float64 "%1"
 
 end
+*)
 
 import "cvc4_bv.gen"

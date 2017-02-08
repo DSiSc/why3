@@ -43,9 +43,11 @@ let tv_of_string =
 (* type symbols and types *)
 
 type tysymbol = {
-  ts_name : ident;
-  ts_args : tvsymbol list;
-  ts_def  : ty option;
+  ts_name      : ident;
+  ts_args      : tvsymbol list;
+  ts_def       : ty option;
+  ts_int_range : Number.int_range option;
+  ts_float_fmt : Number.float_format option;
 }
 
 and ty = {
@@ -76,10 +78,12 @@ let ty_hash ty = Weakhtbl.tag_hash ty.ty_tag
 let ts_compare ts1 ts2 = id_compare ts1.ts_name ts2.ts_name
 let ty_compare ty1 ty2 = Pervasives.compare (ty_hash ty1) (ty_hash ty2)
 
-let mk_ts name args def = {
-  ts_name = id_register name;
-  ts_args = args;
-  ts_def  = def;
+let mk_ts name args def ir fp = {
+  ts_name      = id_register name;
+  ts_args      = args;
+  ts_def       = def;
+  ts_int_range = ir;
+  ts_float_fmt = fp;
 }
 
 module Hsty = Hashcons.Make (struct
@@ -152,12 +156,28 @@ exception BadTypeArity of tysymbol * int
 exception DuplicateTypeVar of tvsymbol
 exception UnboundTypeVar of tvsymbol
 
+(* FIXME: changing the signature of create_tysymbol is invasive.
+   Introducing separate create_*_tysymbol calls is error-prone.
+   We must choose wisely. *)
+
 let create_tysymbol name args def =
   let add s v = Stv.add_new (DuplicateTypeVar v) v s in
   let s = List.fold_left add Stv.empty args in
   let check v = Stv.mem v s || raise (UnboundTypeVar v) in
   ignore (Opt.map (ty_v_all check) def);
-  mk_ts name args def
+  mk_ts name args def None None
+
+exception EmptyRange
+exception BadFloatSpec
+
+let create_range_tysymbol name ir =
+  if BigInt.lt ir.Number.ir_upper ir.Number.ir_lower then raise EmptyRange;
+  mk_ts name [] None (Some ir) None
+
+let create_float_tysymbol name fp =
+  if fp.Number.fp_exponent_digits < 1 ||
+     fp.Number.fp_significand_digits < 1 then raise BadFloatSpec;
+  mk_ts name [] None None (Some fp)
 
 let ty_app s tl = match s.ts_def with
   | Some ty ->

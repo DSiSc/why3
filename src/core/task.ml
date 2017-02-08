@@ -15,12 +15,52 @@ open Term
 open Decl
 open Theory
 
+(** Clone and meta history *)
+
+type tdecl_set = {
+  tds_set : Stdecl.t;
+  tds_tag : Weakhtbl.tag;
+}
+
+module Hstds = Hashcons.Make (struct
+  type t = tdecl_set
+  let equal s1 s2 = Stdecl.equal s1.tds_set s2.tds_set
+  let hs_td td acc = Hashcons.combine acc (td_hash td)
+  let hash s = Stdecl.fold hs_td s.tds_set 0
+  let tag n s = { s with tds_tag = Weakhtbl.create_tag n }
+end)
+
+let mk_tds s = Hstds.hashcons {
+  tds_set = s;
+  tds_tag = Weakhtbl.dummy_tag;
+}
+
+let tds_empty = mk_tds Stdecl.empty
+let tds_add td s = mk_tds (Stdecl.add td s.tds_set)
+let tds_singleton td = mk_tds (Stdecl.singleton td)
+
+let tds_equal : tdecl_set -> tdecl_set -> bool = (==)
+let tds_hash tds = Weakhtbl.tag_hash tds.tds_tag
+let tds_compare tds1 tds2 = compare
+  (Weakhtbl.tag_hash tds1.tds_tag) (Weakhtbl.tag_hash tds2.tds_tag)
+
 type clone_map = tdecl_set Mid.t
+type meta_map = tdecl_set Mmeta.t
 
 let cm_find cm th = Mid.find_def tds_empty th.th_name cm
+let mm_find mm t = Mmeta.find_def tds_empty t mm
+
 let cm_add cm th td = Mid.change (function
   | None -> Some (tds_singleton td)
   | Some tds -> Some (tds_add td tds)) th.th_name cm
+
+let mm_add mm t td = Mmeta.change (function
+  | None -> Some (tds_singleton td)
+  | Some tds -> Some (tds_add td tds)) t mm
+
+let mm_add mm t td = if t.meta_excl
+  then Mmeta.add t (tds_singleton td) mm
+  else mm_add mm t td
 
 (** Task *)
 
@@ -110,7 +150,7 @@ let check_decl = function
   | d -> d
 
 let new_decl task d td =
-  let kn = known_add_decl (task_known task) (task_meta task) (check_decl d) in
+  let kn = known_add_decl (task_known task) (check_decl d) in
   mk_task td (check_task task) kn (task_clone task) (task_meta task)
 
 let new_decl task d td = try new_decl task d td with KnownIdent _ -> task

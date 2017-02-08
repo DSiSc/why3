@@ -32,8 +32,6 @@ let debug_type_only  = Debug.register_flag "type_only"
 exception UnboundTypeVar of string
 exception DuplicateTypeVar of string
 exception ClashTheory of string
-exception EmptyRange
-exception BadFloatSpec
 
 (** lazy declaration of tuples *)
 
@@ -47,21 +45,6 @@ let add_param_decl uc ls   = add_decl_with_tuples uc (create_param_decl ls)
 let add_logic_decl uc dl   = add_decl_with_tuples uc (create_logic_decl dl)
 let add_ind_decl uc s dl   = add_decl_with_tuples uc (create_ind_decl s dl)
 let add_prop_decl uc k p f = add_decl_with_tuples uc (create_prop_decl k p f)
-let add_range_decl uc rd   =
-  let uc = add_ty_decl uc rd.range_ts in
-  let a = BigInt.to_string rd.range_lo in
-  let b = BigInt.to_string rd.range_hi in
-  let uc = add_param_decl uc rd.range_to_int in
-  add_meta uc meta_range
-    (MAts rd.range_ts :: MAls rd.range_to_int :: MAstr a :: MAstr b :: [])
-let add_float_decl uc fd =
-  let uc = add_ty_decl uc fd.float_ts in
-  let eb = BigInt.to_string fd.float_eb in
-  let sb = BigInt.to_string fd.float_sb in
-  let uc = add_param_decl uc fd.float_to_real in
-  let uc = add_param_decl uc fd.float_is_finite in
-  add_meta uc meta_float
-    (MAts fd.float_ts :: MAls fd.float_to_real :: MAls fd.float_is_finite :: MAstr eb :: MAstr sb :: [] )
 
 (** symbol lookup *)
 
@@ -308,9 +291,9 @@ let rec dterm uc gvars denv {term_desc = desc; term_loc = loc} =
         then get_chain e12 ch else e12, ch in
       make_chain (dterm uc gvars denv e1) ch
   | Ptree.Tconst (Number.ConstInt _ as c) ->
-      DTconst (c, dty_of_ty ty_int)
+      DTconst (c, ty_int)
   | Ptree.Tconst (Number.ConstReal _ as c) ->
-      DTconst (c, dty_of_ty ty_real)
+      DTconst (c, ty_real)
   | Ptree.Tlet (x, e1, e2) ->
       let id = create_user_id x in
       let e1 = dterm uc gvars denv e1 in
@@ -388,17 +371,8 @@ let rec dterm uc gvars denv {term_desc = desc; term_loc = loc} =
     (* FIXME: accepts and silently ignores double casts: ((0:ty1):ty2) *)
       let e1 = dterm uc gvars denv e1 in
       let ty = ty_of_pty uc ty in
-      match e1.dt_node, ty.ty_node with
-      | DTconst (Number.ConstInt _ as c, _), Tyapp (ts, []) ->
-        if is_range_type (get_meta uc) ts then
-          DTconst (c, dty_of_ty ty)
-        else
-          DTcast (e1, ty)
-      | DTconst (Number.ConstReal _ as c, _), Tyapp (ts, []) ->
-        if is_float_type (get_meta uc) ts then
-          DTconst (c, dty_of_ty ty)
-        else
-          DTcast (e1, ty)
+      match e1.dt_node with
+      | DTconst (c,_) -> DTconst (c, ty)
       | _ -> DTcast (e1, ty))
 
 (** Export for program parsing *)
@@ -469,7 +443,15 @@ let add_types dl th =
                   apply ty
             in
             create_tysymbol id vl (Some (apply ty))
-        | TDabstract | TDalgebraic _ | TDrange _ | TDfloat _ ->
+        | TDrange (lo,hi) ->
+            let ir = { Number.ir_lower = lo;
+                       Number.ir_upper = hi } in
+            Loc.try2 ~loc:d.td_loc create_range_tysymbol id ir
+        | TDfloat (eb,sb) ->
+            let fp = { Number.fp_exponent_digits = eb;
+                       Number.fp_significand_digits = sb } in
+            Loc.try2 ~loc:d.td_loc create_float_tysymbol id fp
+        | TDabstract | TDalgebraic _ ->
             create_tysymbol id vl None
         | TDrecord _ ->
             assert false
@@ -490,7 +472,7 @@ let add_types dl th =
       Loc.error ~loc:(Mstr.find s def).td_loc (ClashSymbol s)
   in
   let csymbols = Hstr.create 17 in
-  let decl d (abstr,algeb,alias,range,float) =
+  let decl d (abstr,algeb,alias) =
     let ts = match Hstr.find tysymbols d.td_ident.id_str with
       | None ->
           assert false
@@ -498,8 +480,10 @@ let add_types dl th =
           ts
     in
     match d.td_def with
-      | TDabstract -> ts::abstr, algeb, alias, range, float
-      | TDalias _ -> abstr, algeb, ts::alias, range, float
+      | TDabstract | TDrange _ | TDfloat _ ->
+          ts::abstr, algeb, alias
+      | TDalias _ ->
+          abstr, algeb, ts::alias
       | TDalgebraic cl ->
           let ht = Hstr.create 17 in
           let constr = List.length cl in
@@ -526,57 +510,36 @@ let add_types dl th =
             Hstr.replace csymbols id.id_str loc;
             create_fsymbol ~opaque ~constr (create_user_id id) tyl ty, pjl
           in
-          abstr, (ts, List.map constructor cl) :: algeb, alias, range, float
+          abstr, (ts, List.map constructor cl) :: algeb, alias
       | TDrecord _ ->
           assert false
-      | TDrange (a,b) ->
-          (* FIXME: all safety checks must be done in Decl *)
-          let a_val = Number.compute_int a  in
-          let b_val = Number.compute_int b in
-          if BigInt.lt b_val a_val then
-            Loc.error ~loc:d.td_loc EmptyRange
-          else
-            let proj =
-              { d.td_ident with id_str = d.td_ident.id_str ^ "'int" } in
-            let id = create_user_id proj in
-            let ls = create_lsymbol id [ty_app ts []] (Some ty_int) in
-            let ri = {
-              range_ts     = ts;
-              range_lo     = a_val;
-              range_hi     = b_val;
-              range_to_int = ls } in
-            abstr, algeb, alias, ri::range, float
-      | TDfloat (eb,sb) ->
-          (* FIXME: all safety checks must be done in Decl *)
-          let eb_val = Number.compute_int eb in
-          let sb_val = Number.compute_int sb in
-          if BigInt.le eb_val (BigInt.of_int 1) ||
-            BigInt.le sb_val (BigInt.of_int 1) then
-            Loc.error ~loc:d.td_loc BadFloatSpec
-          else
-            let proj =
-              { d.td_ident with id_str = d.td_ident.id_str ^ "'real" } in
-            let proj_id = create_user_id proj in
-            let isF =
-              { d.td_ident with id_str = d.td_ident.id_str ^ "'isFinite" } in
-            let isF_id = create_user_id isF in
-            let ty = ty_app ts [] in
-            let proj = create_fsymbol proj_id [ty] ty_real in
-            let isF = create_psymbol isF_id [ty] in
-            let fi = {
-              float_ts        = ts;
-              float_eb        = eb_val;
-              float_sb        = sb_val;
-              float_to_real   = proj;
-              float_is_finite = isF } in
-            abstr, algeb, alias, range, fi::float
   in
-  let abstr,algeb,alias,range,float =
-    List.fold_right decl dl ([],[],[],[],[]) in
+  let abstr,algeb,alias = List.fold_right decl dl ([],[],[]) in
+  let add_ty_decl uc ts =
+    let uc = add_ty_decl uc ts in
+    let uc = if ts.ts_int_range = None then uc else
+      (* FIXME: "t'to_int" is probably better *)
+      let nm = ts.ts_name.id_string ^ "'int" in
+      let id = id_derive nm ts.ts_name in
+      let pj = create_fsymbol id [ty_app ts []] ty_int in
+      let uc = add_param_decl uc pj in
+      add_meta uc meta_range [MAts ts; MAls pj] in
+    let uc = if ts.ts_float_fmt = None then uc else
+      (* FIXME: "t'to_real" is probably better *)
+      let nm = ts.ts_name.id_string ^ "'real" in
+      let id = id_derive nm ts.ts_name in
+      let pj = create_fsymbol id [ty_app ts []] ty_real in
+      let uc = add_param_decl uc pj in
+      (* FIXME: "t'is_finite" is probably better *)
+      let nm = ts.ts_name.id_string ^ "'isFinite" in
+      let id = id_derive nm ts.ts_name in
+      let iF = create_psymbol id [ty_app ts []] in
+      let uc = add_param_decl uc iF in
+      add_meta uc meta_float [MAts ts; MAls pj; MAls iF] in
+    uc
+  in
   try
     let th = List.fold_left add_ty_decl th abstr in
-    let th = List.fold_left add_range_decl th range in
-    let th = List.fold_left add_float_decl th float in
     let th = if algeb = [] then th else add_data_decl th algeb in
     let th = List.fold_left add_ty_decl th alias in
     th
@@ -947,8 +910,6 @@ let () = Exn_printer.register (fun fmt e -> match e with
       Format.fprintf fmt "duplicate type parameter '%s" s
   | ClashTheory s ->
       Format.fprintf fmt "clash with previous theory %s" s
-  | EmptyRange ->
-      Format.fprintf fmt "empty range"
   | _ -> raise e)
 
 (*

@@ -37,11 +37,11 @@ let rec abstract_terms kn range_metas float_metas type_kept acc t =
   match t.t_node, t.t_ty with
   | Tconst (Number.ConstInt _ as c), Some {ty_node = Tyapp (ts,[])}
     when not (ts_equal ts ts_int || Sts.mem ts type_kept) ->
-      let (to_int,_,_) = Mts.find ts range_metas in
+      let to_int = Mts.find ts range_metas in
       add_literal acc t c to_int
   | Tconst (Number.ConstReal _ as c), Some {ty_node = Tyapp (ts,[])}
     when not (ts_equal ts ts_real || Sts.mem ts type_kept) ->
-      let (to_real,_,_,_) = Mts.find ts float_metas in
+      let to_real,_ = Mts.find ts float_metas in
       add_literal acc t c to_real
   | _ ->
       t_map_fold (abstract_terms kn range_metas float_metas type_kept) acc t
@@ -51,8 +51,10 @@ let elim le_int le_real abs_real type_kept kn
   match d.d_node with
   | Dtype ts when Mts.exists (fun ts' _ -> ts_equal ts ts') range_metas
                && not (Sts.mem ts type_kept) ->
-      let (to_int,lo,hi) = Mts.find ts range_metas in
-      let lo,hi = Number.int_const_dec lo, Number.int_const_dec hi in
+      let ir = Opt.get ts.ts_int_range in
+      let to_int = Mts.find ts range_metas in
+      let lo = Number.int_const_dec (BigInt.to_string ir.Number.ir_lower) in
+      let hi = Number.int_const_dec (BigInt.to_string ir.Number.ir_upper) in
       let ty_decl = create_ty_decl ts in
       let ls_decl = create_param_decl to_int in
       let pr = create_prsymbol (id_fresh (ts.ts_name.id_string ^ "'axiom")) in
@@ -69,8 +71,10 @@ let elim le_int le_real abs_real type_kept kn
       (known_lit, List.fold_left Task.add_decl task [ty_decl; ls_decl; ax_decl])
   | Dtype ts when Mts.exists (fun ts' _ -> ts_equal ts ts') float_metas
                && not (Sts.mem ts type_kept) ->
-      let (to_real,is_finite,eb,sb) = Mts.find ts float_metas in
-      let eb,sb = BigInt.of_string eb, BigInt.of_string sb in
+      let fp = Opt.get ts.ts_float_fmt in
+      let to_real,is_finite = Mts.find ts float_metas in
+      let eb = BigInt.of_int fp.Number.fp_exponent_digits in
+      let sb = BigInt.of_int fp.Number.fp_significand_digits in
       (* declare abstract type [t] *)
       let ty_decl = create_ty_decl ts in
       (* declare projection to_real *)
@@ -129,13 +133,12 @@ let eliminate_literal env =
       Trans.on_meta meta_float (fun float_metas ->
           let range_metas = List.fold_left (fun acc meta_arg ->
               match meta_arg with
-              | [MAts ts; MAls to_int; MAstr lo; MAstr hi] ->
-                  Mts.add ts (to_int,lo,hi) acc
+              | [MAts ts; MAls to_int] -> Mts.add ts to_int acc
               | _ -> assert false) Mts.empty range_metas in
           let float_metas = List.fold_left (fun acc meta_arg ->
               match meta_arg with
-              | [MAts ts; MAls to_real; MAls is_finite;  MAstr eb; MAstr sb] ->
-                  Mts.add ts (to_real,is_finite,eb,sb) acc
+              | [MAts ts; MAls to_real; MAls is_finite] ->
+                  Mts.add ts (to_real,is_finite) acc
               | _ -> assert false) Mts.empty float_metas in
           Trans.on_tagged_ts meta_keep_lit
             (fun type_kept ->

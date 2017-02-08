@@ -31,9 +31,6 @@ val dity_is_bool : dity -> bool
 
 val dvty_is_chainable : dvty -> bool
 
-val dity_int : dity
-val dity_real : dity
-
 (** Patterns *)
 
 type dpattern = private {
@@ -109,7 +106,7 @@ and dexpr_node =
   | DEplapp of plsymbol * dexpr list
   | DElsapp of lsymbol * dexpr list
   | DEapply of dexpr * dexpr
-  | DEconst of Number.constant * dity
+  | DEconst of Number.constant * ity
   | DElam of dbinder list * dexpr * dspec later
   | DElet of dlet_defn * dexpr
   | DEfun of dfun_defn * dexpr
@@ -143,8 +140,6 @@ and dfun_defn = preid * ghost * dbinder list * dexpr * dspec later
 and drec_defn = private { fds : dfun_defn list }
 
 type dval_decl = preid * ghost * dtype_v
-
-
 
 (** Environment *)
 

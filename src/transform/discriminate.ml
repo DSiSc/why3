@@ -242,10 +242,6 @@ let map metas_rewrite_pr env d =
       in
       Ssubst.fold conv_f substs ([],[])
   in
-(*
-  List.iter (fun d ->
-    Format.eprintf "%a@." Pretty.print_decl d) (List.rev decls);
-*)
   List.rev_append (List.rev_map create_decl decls) metas
 
 

@@ -108,8 +108,7 @@ val syntax_range_literal :
   string -> Number.integer_constant pp
 
 val syntax_float_literal :
-  string -> Format.formatter -> Number.real_constant ->
-  BigInt.t -> BigInt.t -> unit
+  string -> Number.float_format -> Number.real_constant pp
 
 (** {2 pretty-printing transformations (useful for caching)} *)
 

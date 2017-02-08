@@ -471,6 +471,7 @@ let ts_unit = ts_tuple 0
 let ty_unit = ty_tuple []
 
 let ity_int  = ity_of_ty Ty.ty_int
+let ity_real = ity_of_ty Ty.ty_real
 let ity_bool = ity_of_ty Ty.ty_bool
 let ity_unit = ity_of_ty ty_unit
 

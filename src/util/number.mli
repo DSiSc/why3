@@ -96,23 +96,32 @@ val print_in_base : int -> int option -> formatter -> BigInt.t -> unit
 
 (** Range checking *)
 
+type int_range = {
+  ir_lower : BigInt.t;
+  ir_upper : BigInt.t;
+}
+
 exception OutOfRange of integer_constant
 
-val check_range : integer_constant -> BigInt.t -> BigInt.t -> unit
-(** [check_range c lo hi] checks that [c] is between [lo] and [hi],
-    and raises [OutOfRange c] if not. *)
+val check_range : integer_constant -> int_range -> unit
+(** [check_range c ir] checks that [c] is in the range described
+    by [ir], and raises [OutOfRange c] if not. *)
 
 (** Float checking *)
 
+type float_format = {
+  fp_exponent_digits    : int;
+  fp_significand_digits : int; (* counting the hidden bit *)
+}
+
 exception NonRepresentableFloat of real_constant
 
-val compute_float : real_constant -> BigInt.t -> BigInt.t -> BigInt.t * BigInt.t
-(** [compute_float c eb sb] checks that [c] is a float literal
-    representable with [eb] bits in the exponent and [sb] bits
-    (counting the hidden bit) in the significand. Returns a pair [e,s]
-    with [s] the significand (without the hidden bit), and [e] the biased
+val compute_float : real_constant -> float_format -> BigInt.t * BigInt.t
+(** [compute_float c fp] checks that [c] is a float literal
+    representable in the format [fp]. Returns a pair [e,s] with
+    [s] the significand (without the hidden bit), and [e] the biased
     exponent. Raises [NonRepresentableFloat c] exception otherwise. *)
 
-val check_float : real_constant -> BigInt.t -> BigInt.t -> unit
-(** [check_float c eb sb] is the same as [compute_float c eb sb]
+val check_float : real_constant -> float_format -> unit
+(** [check_float c fp] is the same as [compute_float c fp]
     but does not return any value. *)

@@ -71,6 +71,7 @@ exception BadArity of lsymbol * int
 exception FunctionSymbolExpected of lsymbol
 exception PredicateSymbolExpected of lsymbol
 exception ConstructorExpected of lsymbol
+exception InvalidLiteralType of ty
 
 (** {2 Patterns} *)
 

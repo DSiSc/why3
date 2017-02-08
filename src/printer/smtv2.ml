@@ -86,7 +86,6 @@ type info = {
   mutable info_in_goal : bool;
   info_vc_term : vc_term_info;
   info_printer : ident_printer;
-  info_mm      : Theory.meta_map;
 }
 
 let debug_print_term message t =
@@ -174,9 +173,8 @@ let rec print_term info fmt t =
         | Some st, Number.ConstInt c ->
           syntax_range_literal st fmt c
         | Some st, Number.ConstReal c ->
-          let (_,_,eb,sb) = Theory.find_float info.info_mm ts in
-          let eb,sb = BigInt.of_string eb, BigInt.of_string sb in
-          syntax_float_literal st fmt c eb sb
+          let fp = Opt.get ts.ts_float_fmt in
+          syntax_float_literal st fp fmt c
         | None, _ -> Number.print number_format fmt c
         (* TODO/FIXME: we must assert here that the type is either
             ty_int or ty_real, otherwise it makes no sense to print
@@ -531,8 +529,7 @@ let print_task args ?old:_ fmt task =
     info_model = S.empty;
     info_in_goal = false;
     info_vc_term = vc_info;
-    info_printer = ident_printer ();
-    info_mm = Task.task_meta task } in
+    info_printer = ident_printer () } in
   print_prelude fmt args.prelude;
   set_produce_models fmt cntexample;
   print_th_prelude task fmt args.th_prelude;
@@ -541,8 +538,7 @@ let print_task args ?old:_ fmt task =
         print_decls t.Task.task_prev;
         begin match t.Task.task_decl.Theory.td_node with
         | Theory.Decl d ->
-            begin try
-              print_decl vc_loc cntexample args info fmt d
+            begin try print_decl vc_loc cntexample args info fmt d
             with Unsupported s -> raise (UnsupportedDecl (d,s)) end
         | _ -> () end
     | None -> () in

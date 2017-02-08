@@ -147,6 +147,12 @@ let lookup_meta s = Hstr.find_exn meta_table (UnknownMeta s) s
 
 let list_metas () = Hstr.fold (fun _ v acc -> v::acc) meta_table []
 
+let meta_range = register_meta "range_type" [MTtysymbol; MTlsymbol]
+    ~desc:"Projection@ of@ a@ range@ type."
+
+let meta_float = register_meta "float_type" [MTtysymbol; MTlsymbol; MTlsymbol]
+    ~desc:"Projection@ and@ finiteness@ of@ a@ floating-point@ type."
+
 (** Theory *)
 
 type theory = {
@@ -246,48 +252,6 @@ module Htdecl = Tdecl.H
 let td_equal : tdecl -> tdecl -> bool = (==)
 let td_hash td = td.td_tag
 
-(** meta history *)
-(* meta_map *)
-
-type tdecl_set = {
-  tds_set : Stdecl.t;
-  tds_tag : Weakhtbl.tag;
-}
-
-module Hstds = Hashcons.Make (struct
-  type t = tdecl_set
-  let equal s1 s2 = Stdecl.equal s1.tds_set s2.tds_set
-  let hs_td td acc = Hashcons.combine acc (td_hash td)
-  let hash s = Stdecl.fold hs_td s.tds_set 0
-  let tag n s = { s with tds_tag = Weakhtbl.create_tag n }
-end)
-
-let mk_tds s = Hstds.hashcons {
-  tds_set = s;
-  tds_tag = Weakhtbl.dummy_tag;
-}
-
-let tds_empty = mk_tds Stdecl.empty
-let tds_add td s = mk_tds (Stdecl.add td s.tds_set)
-let tds_singleton td = mk_tds (Stdecl.singleton td)
-
-let tds_equal : tdecl_set -> tdecl_set -> bool = (==)
-let tds_hash tds = Weakhtbl.tag_hash tds.tds_tag
-let tds_compare tds1 tds2 = compare
-  (Weakhtbl.tag_hash tds1.tds_tag) (Weakhtbl.tag_hash tds2.tds_tag)
-
-type meta_map = tdecl_set Mmeta.t
-
-let mm_find mm t = Mmeta.find_def tds_empty t mm
-
-let mm_add mm t td = Mmeta.change (function
-  | None -> Some (tds_singleton td)
-  | Some tds -> Some (tds_add td tds)) t mm
-
-let mm_add mm t td = if t.meta_excl
-  then Mmeta.add t (tds_singleton td) mm
-  else mm_add mm t td
-
 (** Constructors and utilities *)
 
 type theory_uc = {
@@ -298,7 +262,6 @@ type theory_uc = {
   uc_import : namespace list;
   uc_export : namespace list;
   uc_known  : known_map;
-  uc_meta   : meta_map;
   uc_local  : Sid.t;
   uc_used   : Sid.t;
 }
@@ -314,7 +277,6 @@ let empty_theory n p = {
   uc_import = [empty_ns];
   uc_export = [empty_ns];
   uc_known  = Mid.empty;
-  uc_meta   = Mmeta.empty;
   uc_local  = Sid.empty;
   uc_used   = Sid.empty;
 }
@@ -332,7 +294,6 @@ let close_theory uc = match uc.uc_export with
 
 let get_namespace uc = List.hd uc.uc_import
 let get_known uc = uc.uc_known
-let get_meta uc = uc.uc_meta
 let get_rev_decls uc = uc.uc_decls
 
 let open_namespace uc s = match uc.uc_import with
@@ -352,82 +313,6 @@ let close_namespace uc import =
       { uc with uc_prefix = prf; uc_import = i1::sti; uc_export = e1::ste; }
   | [], [_], [_] -> raise NoOpenedNamespace
   | _ -> assert false
-
-let meta_range = register_meta "range_type"
-    [MTtysymbol; MTlsymbol; MTstring; MTstring]
-    ~desc:"Store@ a@ range@ type@ range@ and@ projection."
-
-let meta_float = register_meta "float_type"
-    [MTtysymbol; MTlsymbol; MTlsymbol; MTstring; MTstring]
-    ~desc:"Store@ a@ float@ type@ information."
-
-exception UnknownLiteralType of tysymbol
-
-let find_range mm ts =
-  let tds = mm_find mm meta_range in
-  let f td acc = match td.td_node with
-    | Meta (_, (MAts ts' :: MAls to_int :: MAstr lo :: MAstr hi :: [])) ->
-      if ts_equal ts ts' then
-        Some (to_int, lo, hi)
-      else
-        acc
-    | _ -> assert false
-  in
-  match Stdecl.fold f tds.tds_set None with
-  | None -> raise (UnknownLiteralType ts)
-  | Some ri -> ri
-
-let find_float mm ts =
-  let tds = mm_find mm meta_float in
-  let f td acc = match td.td_node with
-    | Meta (_, (MAts ts' :: MAls to_real :: MAls is_finite :: MAstr eb :: MAstr sb :: [])) ->
-      if ts_equal ts ts' then
-        Some (to_real, is_finite, eb, sb)
-      else
-        acc
-    | _ -> assert false
-  in
-  match Stdecl.fold f tds.tds_set None with
-  | None -> raise (UnknownLiteralType ts)
-  | Some ri -> ri
-
-let is_range_type mm ts =
-  let tds = mm_find mm meta_range in
-  Stdecl.exists
-    (fun td -> match td.td_node with
-       | Meta (_, (MAts ts'::_)) -> ts_equal ts ts'
-       | _ -> false) tds.tds_set
-
-let is_float_type mm ts =
-  let tds = mm_find mm meta_float in
-  Stdecl.exists
-    (fun td -> match td.td_node with
-       | Meta (_, (MAts ts'::_)) -> ts_equal ts ts'
-       | _ -> false) tds.tds_set
-
-let check_literals mm d =
-  let rec check () t = match t.t_node, t.t_ty with
-    | Tconst (Number.ConstInt c), Some {ty_node = Tyapp (ts,[])}
-      when not (ts_equal ts ts_int) ->
-        let (_,lo,hi) = find_range mm ts in
-        let lo,hi = BigInt.of_string lo, BigInt.of_string hi in
-        Number.check_range c lo hi
-    | Tconst (Number.ConstReal c), Some {ty_node = Tyapp (ts,[])}
-      when not (ts_equal ts ts_real) ->
-        let (_,_,eb,sb) = find_float mm ts in
-        let eb,sb = BigInt.of_string eb, BigInt.of_string sb in
-        Number.check_float c eb sb
-    | _ -> t_fold check () t
-  in
-  decl_fold check () d
-
-let known_add_decl kn mm d =
-  let kn = known_add_decl kn d in
-  check_positivity kn d;
-  check_foundness kn d;
-  check_match kn d;
-  check_literals mm d;
-  kn
 
 (* Base constructors *)
 
@@ -453,28 +338,17 @@ let known_meta kn al =
 let add_tdecl uc td = match td.td_node with
   | Decl d -> { uc with
       uc_decls = td :: uc.uc_decls;
-      uc_known = known_add_decl uc.uc_known uc.uc_meta d;
+      uc_known = known_add_decl uc.uc_known d;
       uc_local = Sid.union uc.uc_local d.d_news }
   | Use th when Sid.mem th.th_name uc.uc_used -> uc
-  | Use th ->
-      let rec add_meta mm td = match td.td_node with
-        | Meta(t,_) -> mm_add mm t td
-        | Use th when Sid.mem th.th_name uc.uc_used -> mm
-        | Use th -> List.fold_left add_meta mm th.th_decls;
-        | _ -> mm
-      in
-      { uc with
-        uc_decls = td :: uc.uc_decls;
-        uc_known = merge_known uc.uc_known th.th_known;
-        uc_meta  = List.fold_left add_meta uc.uc_meta th.th_decls;
-        uc_used  =
-          Sid.union uc.uc_used (Sid.add th.th_name th.th_used) }
+  | Use th -> { uc with
+      uc_decls = td :: uc.uc_decls;
+      uc_known = merge_known uc.uc_known th.th_known;
+      uc_used  = Sid.union uc.uc_used (Sid.add th.th_name th.th_used) }
   | Clone (_,sm) -> known_clone uc.uc_known sm;
       { uc with uc_decls = td :: uc.uc_decls }
-  | Meta (t,al) -> known_meta uc.uc_known al;
-      { uc with
-        uc_decls = td :: uc.uc_decls;
-        uc_meta = mm_add uc.uc_meta t td }
+  | Meta (_,al) -> known_meta uc.uc_known al;
+      { uc with uc_decls = td :: uc.uc_decls }
 
 (** Declarations *)
 
@@ -673,7 +547,14 @@ let rec cl_find_ts cl ts =
   else try Mts.find ts cl.ts_table
   with Not_found ->
     let td' = Opt.map (cl_trans_ty cl) ts.ts_def in
-    let ts' = create_tysymbol (id_clone ts.ts_name) ts.ts_args td' in
+    let id' = id_clone ts.ts_name in
+    let ts' =
+      if ts.ts_int_range <> None then
+        create_range_tysymbol id' (Opt.get ts.ts_int_range)
+      else if ts.ts_float_fmt <> None then
+        create_float_tysymbol id' (Opt.get ts.ts_float_fmt)
+      else
+        create_tysymbol id' ts.ts_args td' in
     cl.ts_table <- Mts.add ts ts' cl.ts_table;
     ts'
 
@@ -751,7 +632,10 @@ let cl_init th inst =
 
 let cl_type cl inst ts =
   if Mts.mem ts inst.inst_ts then
-    if ts.ts_def = None then raise EmptyDecl
+    if ts.ts_def = None &&
+       ts.ts_int_range = None &&
+       ts.ts_float_fmt = None
+    then raise EmptyDecl
     else raise (CannotInstantiate ts.ts_name);
   create_ty_decl (cl_find_ts cl ts)
 

@@ -521,6 +521,10 @@ let () = Exn_printer.register
       fprintf fmt "Unbound type variable: %a" print_tv tv
   | Ty.UnexpectedProp ->
       fprintf fmt "Unexpected propositional type"
+  | Ty.EmptyRange ->
+      fprintf fmt "Empty integer range"
+  | Ty.BadFloatSpec ->
+      fprintf fmt "Invalid floating point format"
   | Term.BadArity ({ls_args = []} as ls, _) ->
       fprintf fmt "%s %a expects no arguments"
         (if ls.ls_value = None then "Predicate" else "Function") print_ls ls
@@ -546,8 +550,8 @@ let () = Exn_printer.register
       fprintf fmt "Not a term: %a" print_term t
   | Term.FmlaExpected t ->
       fprintf fmt "Not a formula: %a" print_term t
-  | Theory.UnknownLiteralType ts ->
-      fprintf fmt "Unknown literal type symbol %a" print_ts ts
+  | Term.InvalidLiteralType ty ->
+      fprintf fmt "Type %a cannot be used for a numeric literal" print_ty ty
   | Pattern.ConstructorExpected (ls,ty) ->
       fprintf fmt "%s %a is not a constructor of type %a"
         (if ls.ls_value = None then "Predicate" else "Function") print_ls ls
@@ -567,6 +571,8 @@ let () = Exn_printer.register
       fprintf fmt
         "Type symbol %a is a type alias and cannot be declared as algebraic"
         print_ts ts
+  | Decl.NonFoundedTypeDecl ts ->
+      fprintf fmt "Cannot construct a value of type %a" print_ts ts
   | Decl.NonPositiveTypeDecl (_ts, ls, ty) ->
       fprintf fmt "Constructor %a \
           contains a non strictly positive occurrence of type %a"
@@ -574,8 +580,6 @@ let () = Exn_printer.register
   | Decl.InvalidIndDecl (_ls, pr) ->
       fprintf fmt "Ill-formed inductive clause %a"
         print_pr pr
-  | Decl.NonFoundedTypeDecl ts ->
-      fprintf fmt "Cannot construct a value of type %a" print_ts ts
   | Decl.NonPositiveIndDecl (_ls, pr, ls1) ->
       fprintf fmt "Inductive clause %a contains \
           a non strictly positive occurrence of symbol %a"

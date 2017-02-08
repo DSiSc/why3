@@ -288,13 +288,23 @@ let print_in_base radix digits fmt i =
 
 (** Range checks *)
 
+type int_range = {
+  ir_lower : BigInt.t;
+  ir_upper : BigInt.t;
+}
+
 exception OutOfRange of integer_constant
 
-let check_range c lo hi =
+let check_range c {ir_lower = lo; ir_upper = hi} =
   let cval = compute_int c in
   if BigInt.lt cval lo || BigInt.gt cval hi then raise (OutOfRange c)
 
 (** Float checks *)
+
+type float_format = {
+  fp_exponent_digits    : int;
+  fp_significand_digits : int; (* counting the hidden bit *)
+}
 
 exception NonRepresentableFloat of real_constant
 
@@ -350,7 +360,9 @@ let float_parser c =
   in
   s, e
 
-let compute_float c eb sb =
+let compute_float c fp =
+  let eb = BigInt.of_int fp.fp_exponent_digits in
+  let sb = BigInt.of_int fp.fp_significand_digits in
   (* 2 ^ (sb - 1)    min representable normalized significand*)
   let smin = pow_int_pos_bigint 2 (sub sb one) in
   (* (2 ^ sb) - 1    max representable normalized significand*)
@@ -430,7 +442,7 @@ let compute_float c eb sb =
     end
   end
 
-let check_float c eb sb = ignore (compute_float c eb sb)
+let check_float c fp = ignore (compute_float c fp)
 
 let print_integer_constant fmt = function
   | IConstDec s -> fprintf fmt "%s" s

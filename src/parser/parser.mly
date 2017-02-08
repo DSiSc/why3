@@ -205,7 +205,7 @@ end
 %right OR BARBAR
 %right AND AMPAMP
 %nonassoc NOT
-%left EQUAL LT GT LTGT OP1
+%left EQUAL LTGT LT GT OP1
 %nonassoc LARROW
 %nonassoc RIGHTSQ    (* stronger than <- for e1[e2 <- e3] *)
 %left OP2
@@ -346,9 +346,11 @@ typedefn:
     { $1, $2, TDalias $3, $4 }
 (* FIXME: allow negative bounds *)
 | EQUAL LT RANGE INTEGER INTEGER GT
-    { false, Public, TDrange ($4, $5), [] }
+    { false, Public,
+      TDrange (Number.compute_int $4, Number.compute_int $5), [] }
 | EQUAL LT FLOAT INTEGER INTEGER GT
-    { false, Public, TDfloat ($4, $5), [] }
+    { false, Public,
+      TDfloat (small_integer $4, small_integer $5), [] }
 
 model:
 | EQUAL         { false }
@@ -984,12 +986,12 @@ lident_op:
 | LEFTSQ UNDERSCORE DOTDOT            RIGHTSQ { mixfix "[_..]" }
 
 op_symbol:
-| LT  { "<" }
-| GT  { ">" }
 | OP1 { $1 }
 | OP2 { $1 }
 | OP3 { $1 }
 | OP4 { $1 }
+| LT  { "<" }
+| GT  { ">" }
 
 %inline oppref:
 | o = OPPREF { mk_id (prefix o)  $startpos $endpos }
@@ -998,14 +1000,14 @@ prefix_op:
 | op_symbol { mk_id (prefix $1)  $startpos $endpos }
 
 %inline infix_op:
-| o = LT    { mk_id (infix "<")  $startpos $endpos }
-| o = GT    { mk_id (infix ">")  $startpos $endpos }
 | o = OP1   { mk_id (infix o)    $startpos $endpos }
 | o = OP2   { mk_id (infix o)    $startpos $endpos }
 | o = OP3   { mk_id (infix o)    $startpos $endpos }
 | o = OP4   { mk_id (infix o)    $startpos $endpos }
 | EQUAL     { mk_id (infix "=")  $startpos $endpos }
 | LTGT      { mk_id (infix "<>") $startpos $endpos }
+| LT        { mk_id (infix "<")  $startpos $endpos }
+| GT        { mk_id (infix ">")  $startpos $endpos }
 
 (* Qualified idents *)
 
@@ -1014,8 +1016,10 @@ qualid:
 | uqualid DOT ident_rich  { Qdot ($1, $3) }
 
 lqualid_rich:
-| lident_rich             { Qident $1 }
-| uqualid DOT lident_rich { Qdot ($1, $3) }
+| lident_rich               { Qident $1 }
+| lident_quote              { Qident $1 }
+| uqualid DOT lident_rich   { Qdot ($1, $3) }
+| uqualid DOT lident_quote  { Qdot ($1, $3) }
 
 lqualid:
 | lident              { Qident $1 }

@@ -126,8 +126,8 @@ type type_def =
   | TDalias     of pty
   | TDalgebraic of (loc * ident * param list) list
   | TDrecord    of field list
-  | TDrange     of integer_constant * integer_constant
-  | TDfloat     of integer_constant * integer_constant
+  | TDrange     of BigInt.t * BigInt.t
+  | TDfloat     of int * int
 
 type visibility = Public | Private | Abstract
 
