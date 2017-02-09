@@ -18,18 +18,23 @@ open Theory
 let meta_keep_lit = register_meta "literal:keep" [MTtysymbol]
   ~desc:"Preserve@ literals@ of@ a@ given@ type."
 
-let add_literal (known_lit, decl as acc) t c ls_proj =
+let add_literal (known_lit, decl as acc) t c ls_proj fin =
   try acc, Mterm.find t known_lit with Not_found ->
-  (* TODO: pretty-print the constant to have a readable name *)
-  let ls = create_lsymbol (id_fresh "dummy") [] t.t_ty in
-  let ls_decl = create_param_decl ls in
-  let pr = create_prsymbol (id_derive "_axiom" ls.ls_name) in
-  let ls_t = t_app ls [] t.t_ty in
-  let f = t_app ls_proj [ls_t] ls_proj.ls_value in
-  let f = t_equ f (t_const c (Opt.get f.t_ty)) in
-  let ax_decl = create_prop_decl Paxiom pr f in
-  let decl = ax_decl::ls_decl::decl in
-  (Mterm.add t ls_t known_lit, decl), ls_t
+    (* TODO: pretty-print the constant to have a readable name *)
+    let litname =
+      match fin with None -> "rliteral" | _ -> "fliteral" in
+    let ls = create_lsymbol (id_fresh litname) [] t.t_ty in
+    let ls_decl = create_param_decl ls in
+    let pr = create_prsymbol (id_fresh (litname^"_axiom")) in
+    let ls_t = t_app ls [] t.t_ty in
+    let f = t_app ls_proj [ls_t] ls_proj.ls_value in
+    let f = t_equ f (t_const c (Opt.get f.t_ty)) in
+    let f = match fin with
+      | None -> f
+      | Some isF -> t_and (t_app isF [ls_t] None) f in
+    let ax_decl = create_prop_decl Paxiom pr f in
+    let decl = ax_decl::ls_decl::decl in
+    (Mterm.add t ls_t known_lit, decl), ls_t
 
 (* TODO: remove int and real literals if not supported.
    NOTE: in this case, [add_literal] above is incorrect. *)
@@ -38,11 +43,11 @@ let rec abstract_terms kn range_metas float_metas type_kept acc t =
   | Tconst (Number.ConstInt _ as c), Some {ty_node = Tyapp (ts,[])}
     when not (ts_equal ts ts_int || Sts.mem ts type_kept) ->
       let to_int = Mts.find ts range_metas in
-      add_literal acc t c to_int
+      add_literal acc t c to_int None
   | Tconst (Number.ConstReal _ as c), Some {ty_node = Tyapp (ts,[])}
     when not (ts_equal ts ts_real || Sts.mem ts type_kept) ->
-      let to_real,_ = Mts.find ts float_metas in
-      add_literal acc t c to_real
+      let to_real,isF = Mts.find ts float_metas in
+      add_literal acc t c to_real (Some isF)
   | _ ->
       t_map_fold (abstract_terms kn range_metas float_metas type_kept) acc t
 
@@ -58,7 +63,6 @@ let elim le_int le_real abs_real type_kept kn
       let ty_decl = create_ty_decl ts in
       let ls_decl = create_param_decl to_int in
       let pr = create_prsymbol (id_fresh (ts.ts_name.id_string ^ "'axiom")) in
-      (* TODO: why call it dummy? *)
       let v = create_vsymbol (id_fresh "i") (ty_app ts []) in
       let v_term = t_app to_int [t_var v] (Some ty_int) in
       let a_term = t_const (Number.ConstInt lo) ty_int in
