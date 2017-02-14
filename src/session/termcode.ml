@@ -457,7 +457,7 @@ module Checksum = struct
     | CV1 -> ident_v1 b id
     | CV2 -> ident_v2 b id
 
-  let integer_constant b c =
+  let _integer_constant b c =
     Number.print_integer_constant Format.str_formatter c;
     let s = Format.flush_str_formatter () in
     string b s
@@ -525,7 +525,11 @@ module Checksum = struct
   let tysymbol b ts =
     ident b ts.Ty.ts_name;
     list tvsymbol b ts.Ty.ts_args;
-    option ty b ts.Ty.ts_def
+    match ts.Ty.ts_def with
+    | Ty.NoDef   -> char b 'n'
+    | Ty.Alias x -> char b 's'; ty b x
+    | Ty.Range _ -> char b 'r' (* FIXME *)
+    | Ty.Float _ -> char b 'f' (* FIXME *)
 
   let lsymbol b ls =
     ident b ls.ls_name;

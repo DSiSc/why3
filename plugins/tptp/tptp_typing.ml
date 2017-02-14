@@ -231,7 +231,7 @@ let find_ts ~loc env impl s args =
     try Hstr.find impl s with Not_found ->
       let args = List.map (fun _ -> create_tvsymbol (id_fresh "a")) args in
       let ss = if s = "int" || s = "real" then "_" ^ s else s in
-      let ts = SType (create_tysymbol (id_user ss loc) args None) in
+      let ts = SType (create_tysymbol (id_user ss loc) args NoDef) in
       Hstr.add impl s ts;
       ts in
   match ts with
@@ -373,7 +373,7 @@ and fmla denv env impl pol tvl { e_loc = loc; e_node = n } = match n with
             | Some false, Qexists (* premises *) ->
                 let _,ln,cn,_ = Loc.get loc in
                 let sk = Format.sprintf "_%s_%d_%d" s ln cn in
-                let ts = create_tysymbol (id_user sk loc) tvl None in
+                let ts = create_tysymbol (id_user sk loc) tvl NoDef in
                 let tv = ty_app ts (List.map ty_var tvl) in
                 Hstr.add impl sk (SType ts);
                 Mstr.add s (STSko tv) env, pol, tvl, vl, true
@@ -539,7 +539,7 @@ let typedecl denv env impl loc s (tvl,(el,e)) =
       | _ -> error ~loc DependentTy
     in
     let ss = if s = "int" || s = "real" then "_" ^ s else s in
-    let ts = create_tysymbol (id_user ss loc) (List.map ntv el) None in
+    let ts = create_tysymbol (id_user ss loc) (List.map ntv el) NoDef in
     Hstr.add impl s (SType ts)
   else
     (* function/predicate symbol *)

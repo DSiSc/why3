@@ -317,8 +317,8 @@ let close_namespace uc import =
 (* Base constructors *)
 
 let known_ts kn ts = match ts.ts_def with
-  | Some ty -> ty_s_fold (fun () ts -> known_id kn ts.ts_name) () ty
-  | None -> known_id kn ts.ts_name
+  | Alias ty -> ty_s_fold (fun () ts -> known_id kn ts.ts_name) () ty
+  | NoDef | Range _ | Float _ -> known_id kn ts.ts_name
 
 let known_clone kn sm =
   Mts.iter (fun _ ts -> known_ts kn ts) sm.sm_ts;
@@ -426,8 +426,7 @@ let warn_dubious_axiom uc k p syms =
         (fun id ->
           if Sid.mem id uc.uc_local then
           match (Ident.Mid.find id uc.uc_known).d_node with
-          | Dtype { ts_def = None } | Dparam _ ->
-            raise Exit
+          | Dtype { ts_def = NoDef } | Dparam _ -> raise Exit
           | _ -> ())
         syms;
       Warning.emit ?loc:p.id_loc "axiom %s does not contain any local abstract symbol"
@@ -541,20 +540,18 @@ let empty_clones s = {
 
 let rec cl_find_ts cl ts =
   if not (Sid.mem ts.ts_name cl.cl_local) then
-    let td = Opt.map (cl_trans_ty cl) ts.ts_def in
-    if Opt.equal ty_equal ts.ts_def td then ts else
-    create_tysymbol (id_clone ts.ts_name) ts.ts_args td
+    match ts.ts_def with
+      | Alias ty ->
+          let td = cl_trans_ty cl ty in
+          if ty_equal td ty then ts else
+          let id = id_clone ts.ts_name in
+          create_tysymbol id ts.ts_args (Alias td)
+      | NoDef | Range _ | Float _ -> ts
   else try Mts.find ts cl.ts_table
   with Not_found ->
-    let td' = Opt.map (cl_trans_ty cl) ts.ts_def in
     let id' = id_clone ts.ts_name in
-    let ts' =
-      if ts.ts_int_range <> None then
-        create_range_tysymbol id' (Opt.get ts.ts_int_range)
-      else if ts.ts_float_fmt <> None then
-        create_float_tysymbol id' (Opt.get ts.ts_float_fmt)
-      else
-        create_tysymbol id' ts.ts_args td' in
+    let td' = type_def_map (cl_trans_ty cl) ts.ts_def in
+    let ts' = create_tysymbol id' ts.ts_args td' in
     cl.ts_table <- Mts.add ts ts' cl.ts_table;
     ts'
 
@@ -632,10 +629,7 @@ let cl_init th inst =
 
 let cl_type cl inst ts =
   if Mts.mem ts inst.inst_ts then
-    if ts.ts_def = None &&
-       ts.ts_int_range = None &&
-       ts.ts_float_fmt = None
-    then raise EmptyDecl
+    if ts.ts_def = NoDef then raise EmptyDecl
     else raise (CannotInstantiate ts.ts_name);
   create_ty_decl (cl_find_ts cl ts)
 
@@ -735,7 +729,7 @@ let warn_clone_not_abstract loc th =
     List.iter (fun d -> match d.td_node with
       | Decl d ->
         begin match d.d_node with
-        | Dtype { ts_def = None }
+        | Dtype { ts_def = NoDef }
         | Dparam _ -> raise Exit
         | Dprop(Paxiom, _,_) -> raise Exit
         | _ -> ()
@@ -917,7 +911,7 @@ let tuple_theory = Hint.memo 17 (fun n ->
 
 let unit_theory =
   let uc = empty_theory (id_fresh "Unit") ["why3";"Unit"] in
-  let ts = create_tysymbol (id_fresh "unit") [] (Some (ty_tuple [])) in
+  let ts = create_tysymbol (id_fresh "unit") [] (Alias (ty_tuple [])) in
   let uc = use_export uc (tuple_theory 0) in
   let uc = add_ty_decl uc ts in
   close_theory uc

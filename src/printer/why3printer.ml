@@ -246,14 +246,22 @@ let print_constr fmt (cs,pjl) =
     (List.fold_right2 add_pj pjl cs.ls_args [])
 
 let print_type_decl fmt ts = match ts.ts_def with
-  | None ->
+  | NoDef ->
       fprintf fmt "@[<hov 2>type %a%a%a@]@\n@\n"
         print_ts ts print_ident_labels ts.ts_name
         (print_list nothing print_tv_arg) ts.ts_args
-  | Some ty ->
+  | Alias ty ->
       fprintf fmt "@[<hov 2>type %a%a%a =@ %a@]@\n@\n"
         print_ts ts print_ident_labels ts.ts_name
         (print_list nothing print_tv_arg) ts.ts_args print_ty ty
+  | Range _ir -> (* TODO *)
+      fprintf fmt "@[<hov 2>type %a%a%a =@ <range ...>@]@\n@\n"
+        print_ts ts print_ident_labels ts.ts_name
+        (print_list nothing print_tv_arg) ts.ts_args
+  | Float _fp -> (* TODO *)
+      fprintf fmt "@[<hov 2>type %a%a%a =@ <float ...>@]@\n@\n"
+        print_ts ts print_ident_labels ts.ts_name
+        (print_list nothing print_tv_arg) ts.ts_args
 
 let print_type_decl fmt ts =
   if not (query_remove ts.ts_name) then

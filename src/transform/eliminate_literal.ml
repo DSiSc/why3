@@ -56,8 +56,8 @@ let elim le_int le_real abs_real type_kept kn
   match d.d_node with
   | Dtype ts when Mts.exists (fun ts' _ -> ts_equal ts ts') range_metas
                && not (Sts.mem ts type_kept) ->
-      let ir = Opt.get ts.ts_int_range in
       let to_int = Mts.find ts range_metas in
+      let ir = match ts.ts_def with Range ir -> ir | _ -> assert false in
       let lo = Number.int_const_dec (BigInt.to_string ir.Number.ir_lower) in
       let hi = Number.int_const_dec (BigInt.to_string ir.Number.ir_upper) in
       let ty_decl = create_ty_decl ts in
@@ -75,8 +75,8 @@ let elim le_int le_real abs_real type_kept kn
       (known_lit, List.fold_left Task.add_decl task [ty_decl; ls_decl; ax_decl])
   | Dtype ts when Mts.exists (fun ts' _ -> ts_equal ts ts') float_metas
                && not (Sts.mem ts type_kept) ->
-      let fp = Opt.get ts.ts_float_fmt in
       let to_real,is_finite = Mts.find ts float_metas in
+      let fp = match ts.ts_def with Float fp -> fp | _ -> assert false in
       let eb = BigInt.of_int fp.Number.fp_exponent_digits in
       let sb = BigInt.of_int fp.Number.fp_significand_digits in
       (* declare abstract type [t] *)

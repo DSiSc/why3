@@ -183,7 +183,7 @@ let mfield_of_rs s = match s.rs_cty.cty_args, s.rs_field with
 let create_constructor ~constr id s fl =
   let exn = Invalid_argument "Expr.create_constructor" in
   let fs = List.fold_right (Spv.add_new exn) fl Spv.empty in
-  if s.its_privmut || s.its_def <> None then raise exn;
+  if s.its_privmut || s.its_def <> NoDef then raise exn;
   if s.its_mfields <> [] then begin
     if constr <> 1 then raise exn;
     let mfs = Spv.of_list s.its_mfields in

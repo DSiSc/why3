@@ -623,7 +623,7 @@ and tr_global_ts dep env evd (r : global_reference) =
           let (_,vars), _, t = decomp_type_quantifiers env ty in
           if not (is_Set t) && not (is_Type t) then raise NotFO;
           let id = preid_of_id id in
-          let ts = Ty.create_tysymbol id vars None in
+          let ts = Ty.create_tysymbol id vars NoDef in
           let decl = Decl.create_ty_decl ts in
           add_table global_ts r (Some ts);
           add_new_decl dep !dep' decl;
@@ -639,11 +639,11 @@ and tr_global_ts dep env evd (r : global_reference) =
             | Some b ->
                 let b = force b in
                 let tvm, env, t = decomp_type_lambdas Idmap.empty env vars b in
-                let def = Some (tr_type dep' tvm env evd t) in
+                let def = Alias (tr_type dep' tvm env evd t) in
                 Ty.create_tysymbol id vars def
                   (* FIXME: is it correct to use None when NotFO? *)
             | None ->
-                Ty.create_tysymbol id vars None
+                Ty.create_tysymbol id vars NoDef
           in
           let decl = Decl.create_ty_decl ts in
           add_table global_ts r (Some ts);
@@ -658,7 +658,7 @@ and tr_global_ts dep env evd (r : global_reference) =
             let (_,vars), _, t = decomp_type_quantifiers env ty in
             if not (is_Set t) && not (is_Type t) then raise NotFO;
             let id = preid_of_id (Nametab.basename_of_global r) in
-            let ts = Ty.create_tysymbol id vars None in
+            let ts = Ty.create_tysymbol id vars NoDef in
             add_table global_ts r (Some ts)
           in
           Array.iteri make_one_ts mib.mind_packets;

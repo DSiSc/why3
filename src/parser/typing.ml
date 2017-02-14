@@ -442,17 +442,17 @@ let add_types dl th =
               | PTparen ty ->
                   apply ty
             in
-            create_tysymbol id vl (Some (apply ty))
+            create_tysymbol id vl (Alias (apply ty))
         | TDrange (lo,hi) ->
             let ir = { Number.ir_lower = lo;
                        Number.ir_upper = hi } in
-            Loc.try2 ~loc:d.td_loc create_range_tysymbol id ir
+            Loc.try2 ~loc:d.td_loc create_tysymbol id vl (Range ir)
         | TDfloat (eb,sb) ->
             let fp = { Number.fp_exponent_digits = eb;
                        Number.fp_significand_digits = sb } in
-            Loc.try2 ~loc:d.td_loc create_float_tysymbol id fp
+            Loc.try2 ~loc:d.td_loc create_tysymbol id vl (Float fp)
         | TDabstract | TDalgebraic _ ->
-            create_tysymbol id vl None
+            create_tysymbol id vl NoDef
         | TDrecord _ ->
             assert false
       in
@@ -462,7 +462,8 @@ let add_types dl th =
   let th' =
     let add_ts (abstr,alias) d =
       let ts = visit d.td_ident.id_str in
-      if ts.ts_def = None then ts::abstr, alias else abstr, ts::alias in
+      if is_alias_type_def ts.ts_def then
+        abstr, ts::alias else ts::abstr, alias in
     let abstr,alias = List.fold_left add_ts ([],[]) dl in
     try
       let th = List.fold_left add_ty_decl th abstr in
@@ -517,26 +518,27 @@ let add_types dl th =
   let abstr,algeb,alias = List.fold_right decl dl ([],[],[]) in
   let add_ty_decl uc ts =
     let uc = add_ty_decl uc ts in
-    let uc = if ts.ts_int_range = None then uc else
-      (* FIXME: "t'to_int" is probably better *)
-      let nm = ts.ts_name.id_string ^ "'int" in
-      let id = id_derive nm ts.ts_name in
-      let pj = create_fsymbol id [ty_app ts []] ty_int in
-      let uc = add_param_decl uc pj in
-      add_meta uc meta_range [MAts ts; MAls pj] in
-    let uc = if ts.ts_float_fmt = None then uc else
-      (* FIXME: "t'to_real" is probably better *)
-      let nm = ts.ts_name.id_string ^ "'real" in
-      let id = id_derive nm ts.ts_name in
-      let pj = create_fsymbol id [ty_app ts []] ty_real in
-      let uc = add_param_decl uc pj in
-      (* FIXME: "t'is_finite" is probably better *)
-      let nm = ts.ts_name.id_string ^ "'isFinite" in
-      let id = id_derive nm ts.ts_name in
-      let iF = create_psymbol id [ty_app ts []] in
-      let uc = add_param_decl uc iF in
-      add_meta uc meta_float [MAts ts; MAls pj; MAls iF] in
-    uc
+    match ts.ts_def with
+    | NoDef | Alias _ -> uc
+    | Range _ ->
+        (* FIXME: "t'to_int" is probably better *)
+        let nm = ts.ts_name.id_string ^ "'int" in
+        let id = id_derive nm ts.ts_name in
+        let pj = create_fsymbol id [ty_app ts []] ty_int in
+        let uc = add_param_decl uc pj in
+        add_meta uc meta_range [MAts ts; MAls pj]
+    | Float _ ->
+        (* FIXME: "t'to_real" is probably better *)
+        let nm = ts.ts_name.id_string ^ "'real" in
+        let id = id_derive nm ts.ts_name in
+        let pj = create_fsymbol id [ty_app ts []] ty_real in
+        let uc = add_param_decl uc pj in
+        (* FIXME: "t'is_finite" is probably better *)
+        let nm = ts.ts_name.id_string ^ "'isFinite" in
+        let id = id_derive nm ts.ts_name in
+        let iF = create_psymbol id [ty_app ts []] in
+        let uc = add_param_decl uc iF in
+        add_meta uc meta_float [MAts ts; MAls pj; MAls iF]
   in
   try
     let th = List.fold_left add_ty_decl th abstr in
@@ -715,7 +717,7 @@ let rec clone_ns kn sl path ns2 ns1 s =
     | Some ts2 when ts_equal ts1 ts2 -> acc
     | Some _ when not (Sid.mem ts1.ts_name sl) ->
         raise (NonLocal ts1.ts_name)
-    | Some _ when ts1.ts_def <> None ->
+    | Some _ when ts1.ts_def <> NoDef ->
         raise (CannotInstantiate ts1.ts_name)
     | Some ts2 ->
         begin match (Mid.find ts1.ts_name kn).d_node with
@@ -723,7 +725,7 @@ let rec clone_ns kn sl path ns2 ns1 s =
           | _ -> raise (CannotInstantiate ts1.ts_name)
         end
     | None when not (Sid.mem ts1.ts_name sl) -> acc
-    | None when ts1.ts_def <> None -> acc
+    | None when ts1.ts_def <> NoDef -> acc
     | None ->
         begin match (Mid.find ts1.ts_name kn).d_node with
           | Decl.Dtype _ -> Loc.errorm
@@ -798,7 +800,7 @@ let type_inst th t s =
       let ts1 = find_tysymbol_ns t.th_export p in
       let id = id_user (ts1.ts_name.id_string ^ "_subst") loc in
       let tvl = List.map (fun id -> tv_of_string id.id_str) tvl in
-      let def = Some (ty_of_pty th pty) in
+      let def = Alias (ty_of_pty th pty) in
       let ts2 = Loc.try3 ~loc create_tysymbol id tvl def in
       if Mts.mem ts1 s.inst_ts
       then Loc.error ~loc (ClashSymbol ts1.ts_name.id_string);

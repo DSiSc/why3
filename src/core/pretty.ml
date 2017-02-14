@@ -317,8 +317,10 @@ let print_constr fmt (cs,pjl) =
 
 let print_ty_decl fmt ts =
   let print_def fmt = function
-    | None -> ()
-    | Some ty -> fprintf fmt " =@ %a" print_ty ty
+    | NoDef -> ()
+    | Alias ty -> fprintf fmt " =@ %a" print_ty ty
+    | Range _  -> fprintf fmt " =@ <range ...>" (* TODO *)
+    | Float _  -> fprintf fmt " =@ <float ...>" (* TODO *)
   in
   fprintf fmt "@[<hov 2>type %a%a%a%a@]"
     print_ts ts print_id_labels ts.ts_name
@@ -525,6 +527,8 @@ let () = Exn_printer.register
       fprintf fmt "Empty integer range"
   | Ty.BadFloatSpec ->
       fprintf fmt "Invalid floating point format"
+  | Ty.IllegalTypeParameters ->
+      fprintf fmt "This type cannot have type parameters"
   | Term.BadArity ({ls_args = []} as ls, _) ->
       fprintf fmt "%s %a expects no arguments"
         (if ls.ls_value = None then "Predicate" else "Function") print_ls ls

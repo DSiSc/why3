@@ -173,7 +173,9 @@ let rec print_term info fmt t =
         | Some st, Number.ConstInt c ->
           syntax_range_literal st fmt c
         | Some st, Number.ConstReal c ->
-          let fp = Opt.get ts.ts_float_fmt in
+          let fp = match ts.ts_def with
+            | Float fp -> fp
+            | _ -> assert false in
           syntax_float_literal st fp fmt c
         | None, _ -> Number.print number_format fmt c
         (* TODO/FIXME: we must assert here that the type is either
@@ -393,7 +395,7 @@ and print_triggers info fmt = function
     (print_triggers info) l
 
 let print_type_decl info fmt ts =
-  if ts.ts_def <> None then () else
+  if is_alias_type_def ts.ts_def then () else
   if Mid.mem ts.ts_name info.info_syn then () else
   fprintf fmt "(declare-sort %a %i)@\n@\n"
     (print_ident info) ts.ts_name (List.length ts.ts_args)

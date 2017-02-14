@@ -867,7 +867,7 @@ let add_types ~wp uc tdl =
               ~abst ~priv ~inv:false ~ghost_reg vl rl (Some def))
         | TDalias ty ->
             let def = ty_of_ity (parse ty) in
-            TS (create_tysymbol id vl (Some def))
+            TS (create_tysymbol id vl (Alias def))
         | TDalgebraic csl when Hstr.find mutables x ->
             let projs = Hstr.create 5 in
             let nogh = ref Sreg.empty in
@@ -932,15 +932,15 @@ let add_types ~wp uc tdl =
         | TDalgebraic _ | TDrecord _ when Hstr.find impures x ->
             PT (create_itysymbol id ~abst ~priv ~inv:false vl [] None)
         | TDalgebraic _ | TDrecord _ | TDabstract ->
-            TS (create_tysymbol id vl None)
+            TS (create_tysymbol id vl NoDef)
         | TDrange (lo,hi) ->
             let ir = { Number.ir_lower = lo;
                        Number.ir_upper = hi } in
-            TS (Loc.try2 ~loc:d.td_loc create_range_tysymbol id ir)
+            TS (Loc.try2 ~loc:d.td_loc create_tysymbol id vl (Range ir))
         | TDfloat (eb,sb) ->
             let fp = { Number.fp_exponent_digits = eb;
                        Number.fp_significand_digits = sb } in
-            TS (Loc.try2 ~loc:d.td_loc create_float_tysymbol id fp)
+            TS (Loc.try2 ~loc:d.td_loc create_tysymbol id vl (Float fp))
       in
       Hstr.add tysymbols x (Some ts);
       ts
@@ -1054,26 +1054,27 @@ let add_types ~wp uc tdl =
 
   let add_pure_type_decl uc ts =
     let uc = add_decl_with_tuples uc (Decl.create_ty_decl ts) in
-    let uc = if ts.ts_int_range = None then uc else
-      (* FIXME: "t'to_int" is probably better *)
-      let nm = ts.ts_name.id_string ^ "'int" in
-      let id = id_derive nm ts.ts_name in
-      let pj = create_fsymbol id [ty_app ts []] ty_int in
-      let uc = add_decl uc (Decl.create_param_decl pj) in
-      add_meta uc meta_range [MAts ts; MAls pj] in
-    let uc = if ts.ts_float_fmt = None then uc else
-      (* FIXME: "t'to_real" is probably better *)
-      let nm = ts.ts_name.id_string ^ "'real" in
-      let id = id_derive nm ts.ts_name in
-      let pj = create_fsymbol id [ty_app ts []] ty_real in
-      let uc = add_decl uc (Decl.create_param_decl pj) in
-      (* FIXME: "t'is_finite" is probably better *)
-      let nm = ts.ts_name.id_string ^ "'isFinite" in
-      let id = id_derive nm ts.ts_name in
-      let iF = Term.create_psymbol id [ty_app ts []] in
-      let uc = add_decl uc (Decl.create_param_decl iF) in
-      add_meta uc meta_float [MAts ts; MAls pj; MAls iF] in
-    uc
+    match ts.ts_def with
+    | NoDef | Alias _ -> uc
+    | Range _ ->
+        (* FIXME: "t'to_int" is probably better *)
+        let nm = ts.ts_name.id_string ^ "'int" in
+        let id = id_derive nm ts.ts_name in
+        let pj = create_fsymbol id [ty_app ts []] ty_int in
+        let uc = add_decl uc (Decl.create_param_decl pj) in
+        add_meta uc meta_range [MAts ts; MAls pj]
+    | Float _ ->
+        (* FIXME: "t'to_real" is probably better *)
+        let nm = ts.ts_name.id_string ^ "'real" in
+        let id = id_derive nm ts.ts_name in
+        let pj = create_fsymbol id [ty_app ts []] ty_real in
+        let uc = add_decl uc (Decl.create_param_decl pj) in
+        (* FIXME: "t'is_finite" is probably better *)
+        let nm = ts.ts_name.id_string ^ "'isFinite" in
+        let id = id_derive nm ts.ts_name in
+        let iF = Term.create_psymbol id [ty_app ts []] in
+        let uc = add_decl uc (Decl.create_param_decl iF) in
+        add_meta uc meta_float [MAts ts; MAls pj; MAls iF]
   in
   let add_type_decl uc = function
     | PT ts -> add_pdecl_with_tuples ~wp uc (create_ty_decl ts)

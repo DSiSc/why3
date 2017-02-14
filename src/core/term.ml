@@ -833,14 +833,14 @@ let t_const c ty =
     | _ -> raise (InvalidLiteralType ty) in
   begin match c with
     | Number.ConstInt c when not (ts_equal ts ts_int) ->
-        begin match ts.ts_int_range with
-          | Some ir -> Number.check_range c ir
-          | None -> raise (InvalidLiteralType ty)
+        begin match ts.ts_def with
+          | Range ir -> Number.check_range c ir
+          | _ -> raise (InvalidLiteralType ty)
         end
     | Number.ConstReal c when not (ts_equal ts ts_real) ->
-        begin match ts.ts_float_fmt with
-          | Some fp -> Number.check_float c fp
-          | None -> raise (InvalidLiteralType ty)
+        begin match ts.ts_def with
+          | Float fp -> Number.check_float c fp
+          | _ -> raise (InvalidLiteralType ty)
         end
     | _ -> ()
   end;
