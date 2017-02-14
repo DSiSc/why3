@@ -103,9 +103,13 @@ let lalpha = ['a'-'z' '_']
 let ualpha = ['A'-'Z']
 let alpha = lalpha | ualpha
 let digit = ['0'-'9']
-let lident = lalpha (alpha | digit)* ('\'' | digit)*
-let lident_quote = lident '\'' lident
-let uident = ualpha (alpha | digit | '\'')*
+let digit_or_us = ['0'-'9' '_']
+let alpha_no_us = ['a'-'z' 'A'-'Z']
+let suffix = (alpha_no_us | '\''* digit_or_us)* '\''*
+let lident = lalpha suffix
+let uident = ualpha suffix
+let lident_quote = lident ('\'' alpha_no_us suffix)+
+let uident_quote = uident ('\'' alpha_no_us suffix)+
 let hexadigit = ['0'-'9' 'a'-'f' 'A'-'F']
 
 let op_char_1 = ['=' '<' '>' '~']
@@ -140,6 +144,8 @@ rule token = parse
       { LIDENT_QUOTE id }
   | uident as id
       { UIDENT id }
+  | uident_quote as id
+      { UIDENT_QUOTE id }
   | ['0'-'9'] ['0'-'9' '_']* as s
       { INTEGER (Number.int_const_dec (Lexlib.remove_underscores s)) }
   | '0' ['x' 'X'] (['0'-'9' 'A'-'F' 'a'-'f']['0'-'9' 'A'-'F' 'a'-'f' '_']* as s)
