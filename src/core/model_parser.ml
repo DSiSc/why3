@@ -30,16 +30,22 @@ let debug = Debug.register_info_flag "model_parser"
 type model_value =
  | Integer of string
  | Decimal of (string * string)
+ | Boolean of bool
  | Array of model_array
+ | Record of model_record
  | Bitvector of string
  | Unparsed of string
 and  arr_index = {
-  arr_index_key : model_value;
+  arr_index_key : int;
   arr_index_value : model_value;
 }
 and model_array = {
   arr_others  : model_value;
   arr_indices : arr_index list;
+}
+and model_record = {
+  discrs : model_value list;
+  fields : model_value list;
 }
 
 let array_create_constant ~value =
@@ -65,32 +71,62 @@ let rec print_indices fmt indices =
   match indices with
   | [] -> ()
   | index::tail ->
-    fprintf fmt "%a => " print_model_value index.arr_index_key;
+    fprintf fmt "{ \"indice\" : %d, \"value\" : " index.arr_index_key;
     print_model_value fmt index.arr_index_value;
-    fprintf fmt ", ";
+    fprintf fmt "} , ";
     print_indices fmt tail
 and
 print_array fmt arr =
-  fprintf fmt "(";
+  fprintf fmt "{ \"type\" : \"Array\", \"val\" : ";
+  fprintf fmt "[ ";
   print_indices fmt arr.arr_indices;
-  fprintf fmt "others => ";
+  fprintf fmt "{ \"others\" : ";
   print_model_value fmt arr.arr_others;
-  fprintf fmt ")"
+  fprintf fmt " } ] }"
 and
-print_model_value_sanit sanit_print fmt value =
+print_record fmt r =
+  fprintf fmt "{ \"type\" : \"Record\", \"val\" : ";
+  fprintf fmt "{ \"Field\" : ";
+  print_record_fields fmt r.fields;
+  fprintf fmt ", ";
+  fprintf fmt "\"Discr\" : ";
+  print_record_discrs fmt r.discrs;
+  fprintf fmt " } }"
+and
+print_record_fields fmt f =
+  fprintf fmt "[ ";
+  Pp.print_list (fun fmt () -> fprintf fmt ", ")
+    print_model_value_sanit fmt f;
+  fprintf fmt " ]"
+and print_record_discrs fmt d =
+  fprintf fmt "[ ";
+  Pp.print_list (fun fmt () -> fprintf fmt ", ")
+    print_model_value_sanit fmt d;
+  fprintf fmt " ]"
+and
+
+print_model_value_sanit fmt value =
   (* Prints model value. *)
   match value with
-  | Integer s -> sanit_print fmt s
-  | Decimal (int_part, fract_part) ->
-    sanit_print fmt (int_part^"."^fract_part)
-  | Unparsed s -> sanit_print fmt s
+  | Integer s ->
+      fprintf fmt "{ \"type\" : \"Integer\", \"val\" : \"%s\" }" s
+  | Decimal (int_part, fract_part) -> fprintf fmt
+        "{ \"type\" : \"Float\", \"val\" \"%s.%s\" }" int_part fract_part
+  | Unparsed s -> fprintf fmt
+        "{ \"type\" : \"Unparsed\", \"val\" : \"%s\" }" s
   | Array a ->
-    print_array str_formatter a;
-    sanit_print fmt (flush_str_formatter ())
-  | Bitvector v -> sanit_print fmt v
+    print_array fmt a
+  | Record r ->
+    print_record fmt r
+  | Bitvector v -> fprintf fmt "{ \"type\" : \"Bv\", \"val\" : \"%s\" }" v
+  | Boolean b ->
+      if b then
+        fprintf fmt "{ \"type\" : \"Boolean\", \"val\" : true }"
+      else
+        fprintf fmt "{ \"type\" : \"Boolean\", \"val\" : false }"
 and
 print_model_value fmt value =
-  print_model_value_sanit (fun fmt s -> fprintf fmt "%s" s) fmt value
+  print_model_value_sanit fmt value
 
 
 (*
@@ -324,7 +360,7 @@ let interleave_with_source
 *)
 let print_model_element_json me_name_to_str fmt me =
   let print_value fmt =
-    fprintf fmt "%a" (print_model_value_sanit Json.string) me.me_value in
+    fprintf fmt "%a" print_model_value_sanit me.me_value in
   let print_kind fmt =
     match me.me_name.men_kind with
     | Result -> fprintf fmt "%a" Json.string "result"

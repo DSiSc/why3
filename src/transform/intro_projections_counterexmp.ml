@@ -15,6 +15,34 @@ open Decl
 open Theory
 open Ty
 
+let model_trace_regexp = Str.regexp "model_trace:"
+  (* The term labeled with "model_trace:name" will be in counterexample with name "name" *)
+
+
+let label_starts_with regexp l =
+  try
+    ignore(Str.search_forward regexp l.lab_string 0);
+    true
+  with Not_found -> false
+
+let string_starts_with regexp l =
+  try
+    ignore(Str.search_forward regexp l 0);
+    true
+  with Not_found -> false
+
+let get_label labels regexp =
+  Slab.choose (Slab.filter (label_starts_with regexp) labels)
+
+let is_proj_for_array_attr proj_name =
+  let b =
+    try
+      string_starts_with (Str.regexp "'First\\|'Last\\|\\.") proj_name
+    with Not_found -> false in
+  b
+
+
+
 (*
 (* Debugging functions *)
 let debug = Debug.register_info_flag "intro_projections_counterexmp"
@@ -65,14 +93,20 @@ let intro_const_equal_to_term
   decl_new_constant::decl_axiom::[]
 
 let introduce_constant ls t_rhs proj_name =
-  (* introduce new constant c and axiom stating c = t_rhs  *)
-  let const_label = Slab.add model_label ls.ls_name.id_label in
-  let const_label = append_to_model_element_name ~labels:const_label ~to_append:proj_name in
-  let const_loc = Opt.get ls.ls_name.id_loc in
-  let const_name = ls.ls_name.id_string^"_proj_constant_"^proj_name in
-  let axiom_name = ls.ls_name.id_string^"_proj_axiom_"^proj_name in
-  let id_new = Ident.id_user ~label:const_label const_name const_loc in
-  intro_const_equal_to_term ~term:t_rhs ~id_new:id_new ~axiom_name:axiom_name
+  (* We only allow projections to apply if they produce an element with a new
+     model trace. In practice, we forbid proj_name that are not record (".") or
+     array attributes like First and Last *)
+  if is_proj_for_array_attr proj_name then
+    (* introduce new constant c and axiom stating c = t_rhs  *)
+    let const_label = Slab.add model_label ls.ls_name.id_label in
+    let const_label = append_to_model_element_name ~labels:const_label ~to_append:proj_name in
+    let const_loc = Opt.get ls.ls_name.id_loc in
+    let const_name = ls.ls_name.id_string^"_proj_constant_"^proj_name in
+    let axiom_name = ls.ls_name.id_string^"_proj_axiom_"^proj_name in
+    let id_new = Ident.id_user ~label:const_label const_name const_loc in
+    intro_const_equal_to_term ~term:t_rhs ~id_new:id_new ~axiom_name:axiom_name
+  else
+    []
 
 let get_record_field_suffix projection =
   try
@@ -153,55 +187,54 @@ let rec projections_for_term ls term proj_name applied_projs env map_projs =
       in
       match pfs with
       | [] | [[]]->
-         (* There is no projection function for the term
-	    -> the projection consists of definition of constant c and axiom  c = p
-	  *)
-	  introduce_constant ls term proj_name
+          (* There is no projection function for the term
+             -> the projection consists of definition of constant c and axiom  c = p
+           *)
+          introduce_constant ls term proj_name
       | _ ->
           List.fold_left
-	    (fun ldecls proj_function ->
-	      (* Newly introduced map with projected indices *)
-	      let proj_map_name = ls.ls_name.id_string^"_proj_arr_constant"^proj_name in
-	      let proj_map_id = Ident.id_fresh proj_map_name in
-	      let proj_map_ty = Some (recreate_types ty_froms proj_function) in
-	      let proj_map_ls = Term.create_lsymbol proj_map_id [] proj_map_ty in
-	      let proj_map_decl = Decl.create_param_decl proj_map_ls in
-	      let proj_map_t = Term.t_app proj_map_ls [] proj_map_ty in
+            (fun ldecls proj_function ->
+              (* Newly introduced map with projected indices *)
+              let proj_map_name = ls.ls_name.id_string^"_proj_arr_constant"^proj_name in
+              let proj_map_id = Ident.id_fresh proj_map_name in
+              let proj_map_ty = Some (recreate_types ty_froms proj_function) in
+              let proj_map_ls = Term.create_lsymbol proj_map_id [] proj_map_ty in
+              (*let proj_map_decl = Decl.create_param_decl proj_map_ls in*)
+              let proj_map_t = Term.t_app proj_map_ls [] proj_map_ty in
 
               (* The quantified variables i's *)
-              let var_l = create_index_list (List.map snd ty_froms) in
+(*              let var_l = create_index_list (List.map snd ty_froms) in*)
 
-	      let map_theory = Env.read_theory env ["map"] "Map" in
-	      let select = (ns_find_ls map_theory.th_export ["get"]) in
+  (*            let map_theory = Env.read_theory env ["map"] "Map" in*)
+(*              let select = (ns_find_ls map_theory.th_export ["get"]) in*)
 
               (* Indices: proj_map[i], term[i]  *)
-	      let term_idx_comp_app = recreate_term_applications select term (List.map snd var_l) in
-              let proj_map_idx_comp_app = recreate_term_applications select proj_map_t (List.map snd var_l) in
+              (* let term_idx_comp_app = recreate_term_applications select term (List.map snd var_l) in*)
+              (*let proj_map_idx_comp_app = recreate_term_applications select proj_map_t (List.map snd var_l) in
 
-	      (* Formula f: forall i : t_from. proj_map[i] = pf_1(term[i]) *)
-	      let term_idx_projected_t : Term.term =
+              (* Formula f: forall i : t_from. proj_map[i] = pf_1(term[i]) *)
+              let term_idx_projected_t : Term.term =
                 List.fold_left (fun term_idx_comp_app proj_function ->
-                 Term.t_app proj_function [term_idx_comp_app] proj_function.ls_value)
-                   term_idx_comp_app proj_function in
-              let fla_to_be_quant = Term.t_equ proj_map_idx_comp_app term_idx_projected_t in
-              let fla_axiom = Term.t_forall_close (List.map fst var_l) [] fla_to_be_quant in
+                  Term.t_app proj_function [term_idx_comp_app] proj_function.ls_value)
+                  term_idx_comp_app proj_function in*)
+              (*let fla_to_be_quant = Term.t_equ proj_map_idx_comp_app term_idx_projected_t in*)
+              (*let fla_axiom = Term.t_forall_close (List.map fst var_l) [] fla_to_be_quant in*)
 
-	      (* Axiom about projection: axiom f *)
-	      let proj_axiom_name = ls.ls_name.id_string^"_proj_arr_axiom"^proj_name in
-	      let proj_axiom_id = Decl.create_prsymbol (Ident.id_fresh proj_axiom_name) in
-	      let proj_axiom = Decl.create_prop_decl Decl.Paxiom proj_axiom_id fla_axiom in
+              (* Axiom about projection: axiom f *)
+              (*let proj_axiom_name = ls.ls_name.id_string^"_proj_arr_axiom"^proj_name in*)
+              (*let proj_axiom_id = Decl.create_prsymbol (Ident.id_fresh proj_axiom_name) in*)
+              (*let proj_axiom = Decl.create_prop_decl Decl.Paxiom proj_axiom_id fla_axiom in*)
 
-	      (* Recursively call projecting of the term proj_map -> proj_map_projections  *)
-	      let proj_name = proj_name^(List.fold_left
-                 (fun acc x -> acc ^ get_record_field_suffix x)
-                    "" proj_function) in
-	      (*let applied_projs = Term.Sls.add proj_function applied_projs in*)
-	      let proj_map_projections_defs =
+              (* Recursively call projecting of the term proj_map -> proj_map_projections  *)
+              let proj_name = proj_name^(List.fold_left
+                                           (fun acc x -> acc ^ get_record_field_suffix x)
+                                           "" proj_function) in
+              let proj_map_projections_defs =
                 introduce_constant ls proj_map_t proj_name in
-              ldecls @ [proj_map_decl;proj_axiom] @ proj_map_projections_defs
+              ldecls (*@ (*[proj_map_decl;proj_axiom] @*) proj_map_projections_defs*)
             )
-	    []
-	    pfs
+            []
+            pfs
   end
 
   | _ ->
@@ -229,7 +262,7 @@ let rec projections_for_term ls term proj_name applied_projs env map_projs =
 	      let applied_projs = Term.Sls.add pf_1 applied_projs in
 	      (* Return declarations for projections of t_applied = pf_1 term *)
 	      let t_applied_projs =
-                 projections_for_term ls t_applied proj_name applied_projs env map_projs in
+                projections_for_term ls t_applied proj_name applied_projs env map_projs in
               l @ t_applied_projs
 	  )
 	  []
@@ -252,7 +285,8 @@ let intro_proj_for_ls env map_projs ls_projected =
      @param map_projs maps types to projection function for these types
      @param ls_projected the label symbol that should be projected
   *)
-  if not (Slab.mem model_proj_label ls_projected.ls_name.id_label) then
+  if not (Slab.mem model_proj_label ls_projected.ls_name.id_label)
+  then
     (* ls_projected has not a label "model_projected" *)
     []
   else
@@ -271,13 +305,6 @@ let introduce_projs env map_projs decl =
     let projection_decls = intro_proj_for_ls env map_projs ls_projected in
     projection_decls
 
-      (* TODO
-  | Dlogic lslist ->
-    debug_decl decl;
-    let new_decls = List.fold_left (fun list (ls,_) -> list @ (intro_proj_for_ls map_projs ls)) [] lslist in
-    (* TODO *)
-    [decl]
-      *)
   | _ -> []
 
 let introduce_projs env map_projs decl =
