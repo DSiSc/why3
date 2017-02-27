@@ -129,7 +129,7 @@ let rec do_intro info vc_loc vc_map vc_var t =
 	     should be in counterexample, introduce new constant in location
 	     loc with all labels necessary for collecting it for counterexample
 	     and make it equal to the variable *)
-          if Slab.exists is_counterexample_label ls.id_label then
+	  if Slab.exists is_counterexample_label ls.id_label then
 	    let const_label = if info.vc_pre_or_post then
 	      model_trace_for_postcondition ~labels:ls.id_label
 	    else
@@ -284,7 +284,13 @@ let rec intros info vc_loc vc_map vc_var f =
 	(d :: l @ decl, goal)
       else
         (d :: decl, goal)
-  | _ -> remove_positive_foralls vc_var f
+  | _ ->
+      let (dl, goal) = remove_positive_foralls vc_var f in
+      if info.vc_inside then
+        let l = do_intro info vc_loc vc_map vc_var f in
+        (l @ dl, goal)
+      else
+        (dl,goal)
 
 let do_intro_vc_vars_counterexmp info vc_loc pr t =
   (* TODO initial guess on number of counter-examples to print *)
