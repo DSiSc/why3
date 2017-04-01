@@ -51,8 +51,12 @@ module Single
     t'real r = round RNE (t'real x *. t'real  y)
 
   val mul (x y: t) : t
+    requires { t'isFinite x }
+    requires { t'isFinite y }
     requires { "expl:floating-point overflow"
-               mul_pre_ieee x y \/ mul_pre_real x y }
+               mul_pre_ieee x y }
+    requires { mul_pre_real x y }
+    ensures  { t'isFinite result }
     ensures  { mul_post_ieee x y result /\ mul_post_real x y result }
 
 
