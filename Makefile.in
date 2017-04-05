@@ -182,6 +182,8 @@ LIB_PARSER = ptree glob parser typing lexer
 
 LIB_TRANSFORM = simplify_formula inlining split_goal induction \
 		detect_polymorphism reduction_engine compute \
+		abstract_quantifiers eliminate_unknown_types \
+		eliminate_unknown_lsymbols eliminate_symbol \
 		eliminate_definition eliminate_algebraic \
 		eliminate_inductive eliminate_let eliminate_if \
 		libencoding discriminate encoding encoding_select \
