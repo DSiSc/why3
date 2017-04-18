@@ -26,6 +26,7 @@ module Increment = struct
 end
 
   open Ptree
+  open Parser_messages
 
   let infix  s = "infix "  ^ s
   let prefix s = "prefix " ^ s
@@ -142,7 +143,7 @@ end
   let error_loc loc = Loc.error ~loc Error
 
   let () = Exn_printer.register (fun fmt exn -> match exn with
-    | Error -> Format.fprintf fmt "syntax error"
+    | Error -> Format.fprintf fmt "syntax error %s" (message 1); failwith "TODO" (* TODO *)
     | _ -> raise exn)
 %}
 
@@ -219,6 +220,8 @@ end
 
 %start <Ptree.incremental -> unit> open_file
 %start <unit> logic_file program_file
+
+
 %%
 
 (* Theories, modules, namespaces *)
@@ -938,14 +941,16 @@ ident_nq:
 | uident_nq { $1 }
 | lident_nq { $1 }
 
-uident:
+%inline uident:
 | UIDENT          { mk_id $1 $startpos $endpos }
 | UIDENT_QUOTE    { mk_id $1 $startpos $endpos }
+(*| lident error    { raise (Parse_uident $1) }*)
 
 uident_nq:
 | UIDENT          { mk_id $1 $startpos $endpos }
 | UIDENT_QUOTE    { let loc = floc $startpos($1) $endpos($1) in
                     Loc.errorm ~loc "Symbol %s cannot be user-defined" $1 }
+(*| %on_error_reduce lident    { raise (Parse_uident $1) }*)
 
 lident:
 | LIDENT          { mk_id $1 $startpos $endpos }

@@ -242,14 +242,71 @@ rule token = parse
       { raise (IllegalCharacter c) }
 
 {
+
+(* TODO extracted directly form pre_parser *)
+(* [stack checkpoint] extracts the parser's stack out of a checkpoint. *)
+
+let stack checkpoint =
+  match checkpoint with
+  | Parser.MenhirInterpreter.HandlingError env ->
+      Parser.MenhirInterpreter.stack env
+  | _ ->
+      assert false (* this cannot happen, I promise *)
+
+(* -------------------------------------------------------------------------- *)
+
+(* [state checkpoint] extracts the number of the current state out of a
+   parser checkpoint. *)
+
+let state checkpoint : int =
+  match Lazy.force (stack checkpoint) with
+  | MenhirLib.General.Nil ->
+      (* Hmm... The parser is in its initial state. Its number is
+         usually 0. This is a BIG HACK. TEMPORARY *)
+      0
+  | MenhirLib.General.Cons (Parser.MenhirInterpreter.Element (s, _, _, _), _) ->
+      Parser.MenhirInterpreter.number s
+(* TODO end direct extraction *)
+
+exception Error of string
+
+
   let parse_logic_file env path lb =
+    let module I = Parser.MenhirInterpreter in
     open_file token (Lexing.from_string "") (Typing.open_file env path);
-    Loc.with_location (logic_file token) lb;
+    let checkpoint = Parser.Incremental.logic_file lb.Lexing.lex_curr_p
+    and supplier = I.lexer_lexbuf_to_supplier token lb
+    and succeed _t = ()
+    and fail checkpoint =
+       let s = try (Parser_messages.message (state checkpoint)) with
+       | Not_found -> let s = Format.sprintf "Unknown error at state %d" (state checkpoint) in s in
+       Loc.with_location (fun _x -> raise (Error s)) lb
+    in
+    I.loop_handle succeed fail supplier checkpoint;
     Typing.close_file ()
+(*
+    open_file token (Lexing.from_string "") (Typing.open_file env path);
+    Loc.with_location (logic_file token) lb; (* TODO *)
+    Typing.close_file ()
+*)
 
   let parse_program_file inc lb =
+    let module I = Parser.MenhirInterpreter in
     open_file token (Lexing.from_string "") inc;
+    let checkpoint = Parser.Incremental.program_file lb.Lexing.lex_curr_p
+    and supplier = I.lexer_lexbuf_to_supplier token lb
+    and succeed _t = ()
+    and fail checkpoint =
+       let s = try (Parser_messages.message (state checkpoint)) with
+       | Not_found -> let s = Format.sprintf "Unknown error at state %d" (state checkpoint) in s in
+       Loc.with_location (fun _x -> raise (Error s)) lb
+    in
+    I.loop_handle succeed fail supplier checkpoint
+(*
+    let checkpoint = Parser.Incremental.open_file lb in
+(*    open_file token (Lexing.from_string "") inc;*)
     Loc.with_location (program_file token) lb
+*)
 
   let read_channel env path file c =
     let lb = Lexing.from_channel c in
