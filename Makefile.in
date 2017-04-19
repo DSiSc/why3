@@ -255,12 +255,16 @@ regenerate_messages: src/parser/parser.mly
 	menhir src/parser/parser.mly --list-errors > src/parser/handcrafted.messages
 
 #TODO ad hoc error parser
-src/parser/handcrafted.messages: src/parser/parser.mly
-	menhir src/parser/parser.mly --update-errors src/parser/handcrafted.messages > src/parser/handcrafted.messages
+src/parser/handcrafted.messages.temp:
+	menhir src/parser/parser.mly --update-errors src/parser/handcrafted.messages > src/parser/handcrafted.messages.temp;\
+	cp src/parser/handcrafted.messages.temp src/parser/handcrafted.messages
 
-src/parser/parser_messages.ml: src/parser/parser.mly src/parser/handcrafted.messages
-	menhir src/parser/parser.mly --compile-errors src/parser/handcrafted.messages > src/parser/parser_messages.ml
+src/parser/parser_messages.ml: src/parser/parser.mly src/parser/handcrafted.messages.temp
+	menhir src/parser/parser.mly --compile-errors src/parser/handcrafted.messages.temp > src/parser/parser_messages.ml
 
+clean ::
+	rm -f src/parser/handcrafted.messages.temp
+	rm -f src/parser/parser_messages.ml
 
 # hide deprecated warnings for strings
 
