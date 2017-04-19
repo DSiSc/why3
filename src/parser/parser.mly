@@ -941,16 +941,14 @@ ident_nq:
 | uident_nq { $1 }
 | lident_nq { $1 }
 
-%inline uident:
+uident:
 | UIDENT          { mk_id $1 $startpos $endpos }
 | UIDENT_QUOTE    { mk_id $1 $startpos $endpos }
-(*| lident error    { raise (Parse_uident $1) }*)
 
 uident_nq:
 | UIDENT          { mk_id $1 $startpos $endpos }
 | UIDENT_QUOTE    { let loc = floc $startpos($1) $endpos($1) in
                     Loc.errorm ~loc "Symbol %s cannot be user-defined" $1 }
-(*| %on_error_reduce lident    { raise (Parse_uident $1) }*)
 
 lident:
 | LIDENT          { mk_id $1 $startpos $endpos }

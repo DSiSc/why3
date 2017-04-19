@@ -1,7 +1,7 @@
 
 (** {1 Integer square root} *)
 
-module square
+module Square
 
   use import int.Int
 
