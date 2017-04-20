@@ -252,12 +252,16 @@ src/session/compress.ml: config.status src/session/compress_none.ml
 endif
 
 regenerate_messages: src/parser/parser.mly
-	menhir src/parser/parser.mly --list-errors > src/parser/handcrafted.messages
+	menhir src/parser/parser.mly --list-errors > src/parser/handcrafted.temp
+
+regenerate_messages_canonical: src/parser/parser.mly
+	menhir src/parser/parser.mly --list-errors --canonical > src/parser/handcrafted.temp
 
 #TODO ad hoc error parser
 src/parser/handcrafted.messages.temp:
 	menhir src/parser/parser.mly --update-errors src/parser/handcrafted.messages > src/parser/handcrafted.messages.temp;\
-	cp src/parser/handcrafted.messages.temp src/parser/handcrafted.messages
+	find src/parser -name 'handcrafted.messages.temp' ! -empty -exec cp -vv {} src/parser/handcrafted.messages \;
+# TODO here only copy if handcrafted.messages.temp is not empty with ad hoc command
 
 src/parser/parser_messages.ml: src/parser/parser.mly src/parser/handcrafted.messages.temp
 	menhir src/parser/parser.mly --compile-errors src/parser/handcrafted.messages.temp > src/parser/parser_messages.ml

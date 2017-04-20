@@ -143,7 +143,7 @@ end
   let error_loc loc = Loc.error ~loc Error
 
   let () = Exn_printer.register (fun fmt exn -> match exn with
-    | Error -> Format.fprintf fmt "syntax error %s" (message 1); failwith "TODO" (* TODO *)
+    | Error -> Format.fprintf fmt "syntax error %s" (message 1)
     | _ -> raise exn)
 %}
 
@@ -215,6 +215,19 @@ end
 %nonassoc prec_prefix_op
 %nonassoc LEFTSQ
 %nonassoc OPPREF
+
+(* Errors reductions *)
+%on_error_reduce
+  ty
+  comma_list2(ty)
+  ty_arg
+  comma_list1(ty)
+  pdecl
+  theory
+  theory_or_module
+  theory_decl
+  module_decl
+  list(theory_or_module)
 
 (* Entry points *)
 
@@ -949,6 +962,7 @@ uident_nq:
 | UIDENT          { mk_id $1 $startpos $endpos }
 | UIDENT_QUOTE    { let loc = floc $startpos($1) $endpos($1) in
                     Loc.errorm ~loc "Symbol %s cannot be user-defined" $1 }
+(* TODO this case can be removed ? *)
 
 lident:
 | LIDENT          { mk_id $1 $startpos $endpos }
@@ -960,6 +974,7 @@ lident_nq:
 | lident_keyword  { mk_id $1 $startpos $endpos }
 | LIDENT_QUOTE    { let loc = floc $startpos($1) $endpos($1) in
                     Loc.errorm ~loc "Symbol %s cannot be user-defined" $1 }
+(* TODO this case can be removed ? *)
 
 lident_keyword:
 | MODEL           { "model" }

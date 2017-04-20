@@ -17,7 +17,7 @@ program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE LEFTPAR RANGE WRITES
 ## In state 82, spurious reduction of production ty -> ty_arg 
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+A type is being read. The read token should be a COMMA, an ARROW or a RIGHTPAR.
 
 program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE LEFTPAR WRITES 
 ##
@@ -31,20 +31,7 @@ program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE LEFTPAR WRITES
 ## LEFTPAR 
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE RANGE ARROW QUOTE_LIDENT WHILE 
-##
-## Ends in an error in state: 98.
-##
-## ty -> ty . ARROW ty [ WRITES WITH VARIANT VAL USE UNDERSCORE TYPE TO THEN STRING SO SEMICOLON RIGHTSQ RIGHTPAR RIGHTBRC RETURNS REQUIRES READS RAISES PREDICATE POSITION OR OP4 OP3 OP2 OP1 NAMESPACE META LTGT LT LRARROW LET LEMMA LEFTSQ LARROW INVARIANT INDUCTIVE IN GT GOAL FUNCTION EXCEPTION EQUAL ENSURES END ELSE DOWNTO DOTDOT DOT DONE DO DIVERGES CONSTANT COMMA COLON COINDUCTIVE CLONE BY BARBAR BAR AXIOM AS ARROW AND AMPAMP ]
-## ty -> ty ARROW ty . [ WRITES WITH VARIANT VAL USE UNDERSCORE TYPE TO THEN STRING SO SEMICOLON RIGHTSQ RIGHTPAR RIGHTBRC RETURNS REQUIRES READS RAISES PREDICATE POSITION OR OP4 OP3 OP2 OP1 NAMESPACE META LTGT LT LRARROW LET LEMMA LEFTSQ LARROW INVARIANT INDUCTIVE IN GT GOAL FUNCTION EXCEPTION EQUAL ENSURES END ELSE DOWNTO DOTDOT DOT DONE DO DIVERGES CONSTANT COMMA COLON COINDUCTIVE CLONE BY BARBAR BAR AXIOM AS ARROW AND AMPAMP ]
-##
-## The known suffix of the stack is as follows:
-## ty ARROW ty 
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
+A type is expected. This should be a comma_list2(ty), a RIGHTPAR or a ty followed by a RIGHTPAR.
 
 program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE RANGE ARROW WRITES 
 ##
@@ -56,7 +43,7 @@ program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE RANGE ARROW WRITES
 ## ty ARROW 
 ##
 
-<YOUR SYNTAX ERROR MESSAGE HERE>
+A type is expected.
 
 program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE RANGE RANGE WHILE 
 ##
@@ -67,59 +54,6 @@ program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE RANGE RANGE WHILE
 ##
 ## The known suffix of the stack is as follows:
 ## ty_arg 
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE RANGE WHILE 
-##
-## Ends in an error in state: 91.
-##
-## ty -> lqualid . nonempty_list(ty_arg) [ WRITES WITH VARIANT VAL USE UNDERSCORE TYPE TO THEN STRING SO SEMICOLON RIGHTSQ RIGHTPAR RIGHTBRC RETURNS REQUIRES READS RAISES PREDICATE POSITION OR OP4 OP3 OP2 OP1 NAMESPACE META LTGT LT LRARROW LET LEMMA LEFTSQ LARROW INVARIANT INDUCTIVE IN GT GOAL FUNCTION EXCEPTION EQUAL ENSURES END ELSE DOWNTO DOTDOT DOT DONE DO DIVERGES CONSTANT COMMA COLON COINDUCTIVE CLONE BY BARBAR BAR AXIOM AS ARROW AND AMPAMP ]
-## ty_arg -> lqualid . [ WRITES WITH VARIANT VAL USE UNDERSCORE TYPE TO THEN STRING SO SEMICOLON RIGHTSQ RIGHTPAR RIGHTBRC RETURNS REQUIRES READS RAISES PREDICATE POSITION OR OP4 OP3 OP2 OP1 NAMESPACE META LTGT LT LRARROW LET LEMMA LEFTSQ LARROW INVARIANT INDUCTIVE IN GT GOAL FUNCTION EXCEPTION EQUAL ENSURES END ELSE DOWNTO DOTDOT DOT DONE DO DIVERGES CONSTANT COMMA COLON COINDUCTIVE CLONE BY BARBAR BAR AXIOM AS ARROW AND AMPAMP ]
-##
-## The known suffix of the stack is as follows:
-## lqualid 
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE RANGE WRITES 
-##
-## Ends in an error in state: 956.
-##
-## pdecl -> EXCEPTION labels(uident_nq) ty . [ VAL USE TYPE PREDICATE NAMESPACE META LET LEMMA INDUCTIVE GOAL FUNCTION EXCEPTION END CONSTANT COINDUCTIVE CLONE AXIOM ]
-## ty -> ty . ARROW ty [ VAL USE TYPE PREDICATE NAMESPACE META LET LEMMA INDUCTIVE GOAL FUNCTION EXCEPTION END CONSTANT COINDUCTIVE CLONE AXIOM ARROW ]
-##
-## The known suffix of the stack is as follows:
-## EXCEPTION labels(uident_nq) ty 
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 91, spurious reduction of production ty_arg -> lqualid 
-## In state 82, spurious reduction of production ty -> ty_arg 
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
-program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE WITH 
-##
-## Ends in an error in state: 955.
-##
-## pdecl -> EXCEPTION labels(uident_nq) . [ VAL USE TYPE PREDICATE NAMESPACE META LET LEMMA INDUCTIVE GOAL FUNCTION EXCEPTION END CONSTANT COINDUCTIVE CLONE AXIOM ]
-## pdecl -> EXCEPTION labels(uident_nq) . ty [ VAL USE TYPE PREDICATE NAMESPACE META LET LEMMA INDUCTIVE GOAL FUNCTION EXCEPTION END CONSTANT COINDUCTIVE CLONE AXIOM ]
-##
-## The known suffix of the stack is as follows:
-## EXCEPTION labels(uident_nq) 
-##
-## WARNING: This example involves spurious reductions.
-## This implies that, although the LR(1) items shown above provide an
-## accurate view of the past (what has been recognized so far), they
-## may provide an INCOMPLETE view of the future (what was expected next).
-## In state 4, spurious reduction of production list(label) -> 
-## In state 7, spurious reduction of production labels(uident_nq) -> uident_nq list(label) 
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>
@@ -4068,26 +4002,20 @@ program_file: MODULE WRITES
 
 Error while parsing module name. An uident_nq was expected.
 
-program_file: THEORY UIDENT END WRITES 
-##
-## Ends in an error in state: 585.
-##
-## list(theory_or_module) -> theory_or_module . list(theory_or_module) [ EOF ]
-##
-## The known suffix of the stack is as follows:
-## theory_or_module 
-##
-
-<YOUR SYNTAX ERROR MESSAGE HERE>
-
 program_file: WRITES 
 ##
-## Ends in an error in state: 582.
+## Ends in an error in state: 969.
 ##
-## program_file' -> . program_file [ # ]
+## program_file -> list(theory_or_module) . EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
-## 
+## list(theory_or_module) 
+##
+## WARNING: This example involves spurious reductions.
+## This implies that, although the LR(1) items shown above provide an
+## accurate view of the past (what has been recognized so far), they
+## may provide an INCOMPLETE view of the future (what was expected next).
+## In state 582, spurious reduction of production list(theory_or_module) -> 
 ##
 
 <YOUR SYNTAX ERROR MESSAGE HERE>

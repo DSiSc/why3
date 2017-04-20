@@ -243,6 +243,12 @@ rule token = parse
 
 {
 
+exception Error of string
+
+let () = Exn_printer.register (fun fmt exn -> match exn with
+    | Error s -> Format.fprintf fmt "%s" s
+    | _ -> raise exn)
+
 (* TODO extracted directly form pre_parser *)
 (* [stack checkpoint] extracts the parser's stack out of a checkpoint. *)
 
@@ -267,9 +273,6 @@ let state checkpoint : int =
   | MenhirLib.General.Cons (Parser.MenhirInterpreter.Element (s, _, _, _), _) ->
       Parser.MenhirInterpreter.number s
 (* TODO end direct extraction *)
-
-exception Error of string
-
 
   let parse_logic_file env path lb =
     let module I = Parser.MenhirInterpreter in

@@ -1,0 +1,20 @@
+
+module Strange
+
+let range a = absurd || (a = 3)
+
+end
+
+(* why3prove strange.mlw :
+theory Strange
+  (* use why3.BuiltIn.BuiltIn *)
+
+  (* use why3.Bool.Bool *)
+
+  (* use why3.Unit.Unit *)
+
+  (* use why3.Prelude.Prelude *)
+
+  goal WP_parameter_range : false
+end
+*)
