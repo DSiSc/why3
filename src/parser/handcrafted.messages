@@ -4000,7 +4000,8 @@ program_file: MODULE WRITES
 ## MODULE 
 ##
 
-Error while parsing module name. An uident_nq was expected.
+A module name was being parsed.
+Found "$0" corresponding to token $1. Token UIDENT_NQ was expected.
 
 program_file: WRITES 
 ##

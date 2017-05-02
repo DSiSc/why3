@@ -249,67 +249,128 @@ let () = Exn_printer.register (fun fmt exn -> match exn with
     | Error s -> Format.fprintf fmt "%s" s
     | _ -> raise exn)
 
-(* TODO extracted directly form pre_parser *)
-(* [stack checkpoint] extracts the parser's stack out of a checkpoint. *)
+let match_tokens t =
+  match t with
+  | None -> assert false (* TODO *)
+  | Some t ->
+      match t with
+      | LIDENT _ -> "LIDENT"
+      | LIDENT_QUOTE _ -> "LIDENT_QUOTE"
+      | UIDENT _ -> "UIDENT"
+      | UIDENT_QUOTE _ -> "UIDENT_QUOTE"
+      | INTEGER _ -> "INTEGER"
+      | OP1 _ -> "OP1"
+      | OP2 _ -> "OP2"
+      | OP3 _ -> "OP3"
+      | OP4 _ -> "OP4"
+      | OPPREF _ -> "OPPREF"
+      | REAL _ -> "REAL"
+      | STRING _ -> "STRING"
+      | POSITION _ -> "POSITION"
+      | QUOTE_UIDENT _ -> "QUOTE_UIDENT"
+      | QUOTE_LIDENT _ -> "QUOTE_LIDENT"
+      | OPAQUE_QUOTE_LIDENT _ -> "OPAQUE_QUOTE_LIDENT"
+      | AS -> "AS"
+      | AXIOM -> "AXIOM"
+      | BY -> "BY"
+      | CLONE -> "CLONE"
+      | COINDUCTIVE -> "COINDUCTIVE"
+      | CONSTANT -> "CONSTANT"
+      | ELSE -> "ELSE"
+      | END -> "END"
+      | EPSILON -> "EPSILON"
+      | EXISTS -> "EXISTS"
+      | EXPORT -> "EXPORT"
+      | FALSE -> "FALSE"
+      | FLOAT -> "FLOAT"
+      | FORALL -> "FORALL"
+      | FUNCTION -> "FUNCTION"
+      | GOAL -> "GOAL"
+      | IF -> "IF"
+      | IMPORT -> "IMPORT"
+      | IN -> "IN"
+      | INDUCTIVE -> "INDUCTIVE"
+      | LEMMA -> "LEMMA"
+      | LET -> "LET"
+      | MATCH -> "MATCH"
+      | META -> "META"
+      | NAMESPACE -> "NAMESPACE"
+      | NOT -> "NOT"
+      | PROP -> "PROP"
+      | PREDICATE -> "PREDICATE"
+      | RANGE -> "RANGE"
+      | SO -> "SO"
+      | THEN -> "THEN"
+      | THEORY -> "THEORY"
+      | TRUE -> "TRUE"
+      | TYPE -> "TYPE"
+      | USE -> "USE"
+      | WITH -> "WITH"
 
-let stack checkpoint =
-  match checkpoint with
-  | Parser.MenhirInterpreter.HandlingError env ->
-      Parser.MenhirInterpreter.stack env
-  | _ ->
-      assert false (* this cannot happen, I promise *)
+      | _ -> "TODO unrecognized token please report" (* TODO
 
-(* -------------------------------------------------------------------------- *)
 
-(* [state checkpoint] extracts the number of the current state out of a
-   parser checkpoint. *)
 
-let state checkpoint : int =
-  match Lazy.force (stack checkpoint) with
-  | MenhirLib.General.Nil ->
-      (* Hmm... The parser is in its initial state. Its number is
-         usually 0. This is a BIG HACK. TEMPORARY *)
-      0
-  | MenhirLib.General.Cons (Parser.MenhirInterpreter.Element (s, _, _, _), _) ->
-      Parser.MenhirInterpreter.number s
-(* TODO end direct extraction *)
+
+(* program keywords *)
+
+%token ABSTRACT ABSURD ANY ASSERT ASSUME BEGIN CHECK
+%token DIVERGES DO DONE DOWNTO ENSURES EXCEPTION FOR
+%token FUN GHOST INVARIANT LOOP MODEL MODULE MUTABLE
+%token PRIVATE RAISE RAISES READS REC REQUIRES RETURNS
+%token TO TRY VAL VARIANT WHILE WRITES
+
+(* symbols *)
+
+%token AND ARROW
+%token BAR
+%token COLON COMMA
+%token DOT DOTDOT EQUAL LAMBDA LT GT LTGT
+%token LEFTPAR LEFTPAR_STAR_RIGHTPAR LEFTSQ
+%token LARROW LRARROW OR
+%token RIGHTPAR RIGHTSQ
+%token UNDERSCORE
+
+%token EOF
+
+(* program symbols *)
+
+%token AMPAMP BARBAR LEFTBRC RIGHTBRC SEMICOLON
+*)
 
   let parse_logic_file env path lb =
+    (* This records the last token which was read (for error messages) *)
+    let last = ref None in
     let module I = Parser.MenhirInterpreter in
     open_file token (Lexing.from_string "") (Typing.open_file env path);
     let checkpoint = Parser.Incremental.logic_file lb.Lexing.lex_curr_p
-    and supplier = I.lexer_lexbuf_to_supplier token lb
+    and supplier =
+      I.lexer_lexbuf_to_supplier (fun x -> let t = token x in last := Some t; t) lb
     and succeed _t = ()
     and fail checkpoint =
-       let s = try (Parser_messages.message (state checkpoint)) with
-       | Not_found -> let s = Format.sprintf "Unknown error at state %d" (state checkpoint) in s in
-       Loc.with_location (fun _x -> raise (Error s)) lb
+      let t = Lexing.lexeme lb in
+      let token = match_tokens !last in
+      let s = Report.report (t, token) checkpoint in
+      Loc.with_location (fun _x -> raise (Error s)) lb
     in
     I.loop_handle succeed fail supplier checkpoint;
     Typing.close_file ()
-(*
-    open_file token (Lexing.from_string "") (Typing.open_file env path);
-    Loc.with_location (logic_file token) lb; (* TODO *)
-    Typing.close_file ()
-*)
 
   let parse_program_file inc lb =
+    let last = ref None in
     let module I = Parser.MenhirInterpreter in
     open_file token (Lexing.from_string "") inc;
     let checkpoint = Parser.Incremental.program_file lb.Lexing.lex_curr_p
-    and supplier = I.lexer_lexbuf_to_supplier token lb
+    and supplier =
+      I.lexer_lexbuf_to_supplier (fun x -> let t = token x in last := Some t; t) lb
     and succeed _t = ()
     and fail checkpoint =
-       let s = try (Parser_messages.message (state checkpoint)) with
-       | Not_found -> let s = Format.sprintf "Unknown error at state %d" (state checkpoint) in s in
-       Loc.with_location (fun _x -> raise (Error s)) lb
+      let t = Lexing.lexeme lb in
+      let token = match_tokens !last in
+      let s = Report.report (t, token) checkpoint in
+      Loc.with_location (fun _x -> raise (Error s)) lb
     in
     I.loop_handle succeed fail supplier checkpoint
-(*
-    let checkpoint = Parser.Incremental.open_file lb in
-(*    open_file token (Lexing.from_string "") inc;*)
-    Loc.with_location (program_file token) lb
-*)
 
   let read_channel env path file c =
     let lb = Lexing.from_channel c in
