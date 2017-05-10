@@ -3423,7 +3423,8 @@ Qed.
 
 (* Why3 goal *)
 Lemma big_float_is_int : forall (m:mode) (i:t), (is_finite i) -> (((le i
-  (neg (of_int m pow2sb))) \/ (le (of_int m pow2sb) i)) -> (is_int i)).
+  (neg (of_int m (bv.Pow2int.pow2 (sb - 1%Z)%Z)))) \/ (le (of_int m
+  (bv.Pow2int.pow2 (sb - 1%Z)%Z)) i)) -> (is_int i)).
   intros m i h1 h2.
   destruct i; try easy.
   apply B754_zero_is_int.

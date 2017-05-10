@@ -652,7 +652,7 @@ theory GenericFloat
 
   axiom big_float_is_int: forall m i.
     is_finite i ->
-    i .<= neg (of_int m pow2sb) \/ (of_int m pow2sb) .<= i ->
+    i .<= neg (of_int m (pow2 (sb-1))) \/ (of_int m (pow2 (sb-1))) .<= i ->
       is_int i
 
   axiom roundToIntegral_is_int: forall m:mode, x:t. is_finite x ->
