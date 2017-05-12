@@ -17,7 +17,9 @@ program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE LEFTPAR RANGE WRITES
 ## In state 82, spurious reduction of production ty -> ty_arg 
 ##
 
-A type is being read. The read token should be a COMMA, an ARROW or a RIGHTPAR.
+while parsing a type expression
+found "$0" (token $1)
+expecting a "," or "->" or ")"
 
 program_file: MODULE UIDENT_QUOTE EXCEPTION UIDENT_QUOTE LEFTPAR WRITES 
 ##
@@ -4000,8 +4002,9 @@ program_file: MODULE WRITES
 ## MODULE 
 ##
 
-A module name was being parsed.
-Found "$0" corresponding to token $1. Token UIDENT_NQ was expected.
+module name expected.
+found "$0" (token $1).
+expecting a capitalized identifier (token UIDENT_NQ)
 
 program_file: WRITES 
 ##
