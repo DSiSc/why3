@@ -1256,7 +1256,7 @@ let open_module ({id_str = nm; id_loc = loc} as id) =
   let slice = Stack.top state in
   if Mstr.mem nm slice.file then Loc.errorm ~loc
     "module %s is already defined in this file" nm;
-  let muc = create_module slice.env ~path:slice.path (create_user_id id) in
+  let muc = create_module ~path:slice.path (create_user_id id) in
   slice.muc <- Some muc
 
 let close_module loc =
@@ -1275,7 +1275,7 @@ let top_muc_on_demand loc slice = match slice.muc with
       assert (Mstr.is_empty slice.file);
       if slice.path <> [] then Loc.errorm ~loc
         "All declarations in library files must be inside modules";
-      let muc = create_module slice.env ~path:[] (id_fresh "Top") in
+      let muc = create_module ~path:[] (id_fresh "Top") in
       slice.muc <- Some muc;
       muc
 

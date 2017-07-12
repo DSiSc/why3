@@ -13,17 +13,7 @@ theory Int
   let constant zero : int = 0
   let constant one  : int = 1
 
-  val (=) (x y : int) : bool ensures { result <-> x = y }
-
-  val function  (-_) int : int
-  val function  (+)  int int : int
-  val function  (*)  int int : int
-  val predicate (<)  int int : bool
-
-  let function  (-)  (x y : int) = x + -y
-  let predicate (>)  (x y : int) = y < x
-  let predicate (<=) (x y : int) = x < y || x = y
-  let predicate (>=) (x y : int) = y <= x
+  use export Int
 
   clone export algebra.OrderedUnitaryCommutativeRing with
     type t = int, constant zero = zero, constant one = one,

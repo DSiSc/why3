@@ -117,6 +117,28 @@ val pd_tuple : int -> pdecl
 val pd_func : pdecl
 val pd_func_app : pdecl
 
+(** {2 Int module} *)
+
+val rs_int_eq : rsymbol
+val rs_int_ng : rsymbol
+val rs_int_pl : rsymbol
+val rs_int_mn : rsymbol
+val rs_int_ml : rsymbol
+val rs_int_lt : rsymbol
+val rs_int_le : rsymbol
+val rs_int_gt : rsymbol
+val rs_int_ge : rsymbol
+
+val pd_int_eq : pdecl
+val pd_int_ng : pdecl
+val pd_int_pl : pdecl
+val pd_int_mn : pdecl
+val pd_int_ml : pdecl
+val pd_int_lt : pdecl
+val pd_int_le : pdecl
+val pd_int_gt : pdecl
+val pd_int_ge : pdecl
+
 (** {2 Known identifiers} *)
 
 type known_map = pdecl Mid.t

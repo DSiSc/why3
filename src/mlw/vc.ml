@@ -75,15 +75,15 @@ type vc_env = {
   exn_count : int ref;
 }
 
-let mk_env {Theory.th_export = ns} kn tuc = {
+let mk_env kn tuc = {
   known_map = kn;
   ts_ranges = tuc.Theory.uc_ranges;
-  ps_int_le = Theory.ns_find_ls ns ["infix <="];
-  ps_int_ge = Theory.ns_find_ls ns ["infix >="];
-  ps_int_lt = Theory.ns_find_ls ns ["infix <"];
-  ps_int_gt = Theory.ns_find_ls ns ["infix >"];
-  fs_int_pl = Theory.ns_find_ls ns ["infix +"];
-  fs_int_mn = Theory.ns_find_ls ns ["infix -"];
+  ps_int_le = ls_of_rs rs_int_le;
+  ps_int_ge = ls_of_rs rs_int_ge;
+  ps_int_lt = ls_of_rs rs_int_lt;
+  ps_int_gt = ls_of_rs rs_int_gt;
+  fs_int_pl = ls_of_rs rs_int_pl;
+  fs_int_mn = ls_of_rs rs_int_mn;
   exn_count = ref 0;
 }
 
@@ -91,11 +91,6 @@ let mk_env {Theory.th_export = ns} kn tuc = {
    a unique integer, so that we can move code inside
    try-with expressions without capturing exceptions *)
 let new_exn env = incr env.exn_count; !(env.exn_count)
-
-(* FIXME: cannot verify int.why because of a cyclic dependency.
-   int.Int is used for the "for" loops and for integer variants.
-   We should be able to extract the necessary lsymbols from kn. *)
-let mk_env env kn tuc = mk_env (Env.read_theory env ["int"] "Int") kn tuc
 
 (* explanation labels *)
 
@@ -1440,13 +1435,13 @@ let mk_vc_decl kn id f =
     Eval_match.eval_match kn f in
   create_pure_decl (create_prop_decl Pgoal pr f)
 
-let vc env kn tuc d = match d.pd_node with
+let vc kn tuc d = match d.pd_node with
   | PDlet (LDsym (s, {c_node = Cfun e; c_cty = cty})) ->
-      let env = mk_env env kn tuc in
+      let env = mk_env kn tuc in
       let f = vc_fun env (Debug.test_noflag debug_sp) cty e in
       [mk_vc_decl kn s.rs_name f]
   | PDlet (LDrec rdl) ->
-      let env = mk_env env kn tuc in
+      let env = mk_env kn tuc in
       let fl = vc_rec env (Debug.test_noflag debug_sp) rdl in
       List.map2 (fun rd f -> mk_vc_decl kn rd.rec_sym.rs_name f) rdl fl
   | PDtype tdl ->
@@ -1464,7 +1459,7 @@ let vc env kn tuc d = match d.pd_node with
           e_let ld e) d.itd_invariant e_void in
         let e = List.fold_right e_let ldl e in
         let c = c_fun [] [] [] Mxs.empty Mpv.empty e in
-        let f = vc_fun (mk_env env kn tuc)
+        let f = vc_fun (mk_env kn tuc)
           (Debug.test_noflag debug_sp) c.c_cty e in
         mk_vc_decl kn d.itd_its.its_ts.ts_name f :: vcl in
       let add_invariant d vcl =

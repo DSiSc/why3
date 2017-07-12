@@ -16,4 +16,4 @@ val wp_label : Ident.label (* switch to classical WP (Cfun only) *)
 val kp_label : Ident.label (* preserve preconditions after the call *)
 val wb_label : Ident.label (* treat an abstract block as a whitebox *)
 
-val vc : Env.env -> known_map -> Theory.theory_uc -> pdecl -> pdecl list
+val vc : known_map -> Theory.theory_uc -> pdecl -> pdecl list

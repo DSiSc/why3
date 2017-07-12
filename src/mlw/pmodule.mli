@@ -92,10 +92,9 @@ type pmodule_uc = private {
   muc_known  : known_map;
   muc_local  : Sid.t;
   muc_used   : Sid.t;
-  muc_env    : Env.env;
 }
 
-val create_module : Env.env -> ?path:string list -> preid -> pmodule_uc
+val create_module : ?path:string list -> preid -> pmodule_uc
 val close_module  : pmodule_uc -> pmodule
 
 val open_scope   : pmodule_uc -> string -> pmodule_uc

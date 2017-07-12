@@ -196,10 +196,9 @@ type pmodule_uc = {
   muc_known  : known_map;
   muc_local  : Sid.t;
   muc_used   : Sid.t;
-  muc_env    : Env.env;
 }
 
-let empty_module env n p = {
+let empty_module n p = {
   muc_theory = create_theory ~path:p n;
   muc_units  = [];
   muc_import = [empty_ns];
@@ -207,7 +206,6 @@ let empty_module env n p = {
   muc_known  = Mid.empty;
   muc_local  = Sid.empty;
   muc_used   = Sid.empty;
-  muc_env    = env;
 }
 
 let close_module, restore_module =
@@ -356,10 +354,8 @@ let add_pdecl_raw ?(warn=true) uc d =
 
 (** {2 Builtin symbols} *)
 
-let dummy_env = Env.create_env []
-
 let builtin_module =
-  let uc = empty_module dummy_env (id_fresh "BuiltIn") ["why3";"BuiltIn"] in
+  let uc = empty_module (id_fresh "BuiltIn") ["why3";"BuiltIn"] in
   let uc = add_pdecl_no_logic uc pd_int in
   let uc = add_pdecl_no_logic uc pd_real in
   let uc = add_pdecl_no_logic uc pd_equ in
@@ -367,13 +363,13 @@ let builtin_module =
   { m with mod_theory = builtin_theory }
 
 let bool_module =
-  let uc = empty_module dummy_env (id_fresh "Bool") ["why3";"Bool"] in
+  let uc = empty_module (id_fresh "Bool") ["why3";"Bool"] in
   let uc = add_pdecl_no_logic uc pd_bool in
   let m = close_module uc in
   { m with mod_theory = bool_theory }
 
 let highord_module =
-  let uc = empty_module dummy_env (id_fresh "HighOrd") ["why3";"HighOrd"] in
+  let uc = empty_module (id_fresh "HighOrd") ["why3";"HighOrd"] in
   let uc = add_pdecl_no_logic uc pd_func in
   let uc = add_pdecl_no_logic uc pd_func_app in
   let m = close_module uc in
@@ -381,24 +377,31 @@ let highord_module =
 
 let tuple_module = Hint.memo 17 (fun n ->
   let nm = "Tuple" ^ string_of_int n in
-  let uc = empty_module dummy_env (id_fresh nm) ["why3";nm] in
+  let uc = empty_module (id_fresh nm) ["why3";nm] in
   let uc = add_pdecl_no_logic uc (pd_tuple n) in
   let m = close_module uc in
   { m with mod_theory = tuple_theory n })
 
 let unit_module =
-  let uc = empty_module dummy_env (id_fresh "Unit") ["why3";"Unit"] in
+  let uc = empty_module (id_fresh "Unit") ["why3";"Unit"] in
   let uc = use_export uc (tuple_module 0) in
   let add uc d = add_pdecl_raw ~warn:false uc d in
   let td = create_alias_decl (id_fresh "unit") [] ity_unit in
   close_module (List.fold_left add uc (create_type_decl [td]))
 
-let create_module env ?(path=[]) n =
-  let m = empty_module env n path in
+let create_module ?(path=[]) n =
+  let m = empty_module n path in
   let m = use_export m builtin_module in
   let m = use_export m bool_module in
   let m = use_export m unit_module in
   m
+
+let int_module =
+  let uc = create_module ~path:["why3";"Int"] (id_fresh "Int") in
+  let add uc d = add_pdecl_raw ~warn:false uc d in
+  close_module (List.fold_left add uc
+    [ pd_int_eq; pd_int_ng; pd_int_pl; pd_int_ml;
+      pd_int_lt; pd_int_mn; pd_int_gt; pd_int_le; pd_int_ge ])
 
 let add_use uc d = Sid.fold (fun id uc ->
   if id_equal id ts_func.ts_name then
@@ -407,7 +410,7 @@ let add_use uc d = Sid.fold (fun id uc ->
   | Some n -> use_export uc (tuple_module n)
   | None -> uc) (Mid.set_diff d.pd_syms uc.muc_known) uc
 
-let mk_vc uc d = Vc.vc uc.muc_env uc.muc_known uc.muc_theory d
+let mk_vc uc d = Vc.vc uc.muc_known uc.muc_theory d
 
 let add_pdecl ?(warn=true) ~vc uc d =
   let uc = add_use uc d in
@@ -1164,6 +1167,7 @@ end)
 let mlw_language_builtin =
   let builtin s =
     if s = unit_module.mod_theory.th_name.id_string then unit_module else
+    if s = int_module.mod_theory.th_name.id_string then int_module else
     if s = builtin_theory.th_name.id_string then builtin_module else
     if s = highord_theory.th_name.id_string then highord_module else
     if s = bool_theory.th_name.id_string then bool_module else

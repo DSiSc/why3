@@ -597,6 +597,85 @@ let pd_tuple = Stdlib.Hint.memo 17 (fun n ->
       mk_decl (PDtype [mk_itd (its_tuple n) [] [rs_tuple n] [] []]) [dt]
   | _ -> assert false)
 
+(** {2 Built-in Int module} *)
+
+let ld_int_eq, rs_int_eq =
+  let x = create_pvsymbol (id_fresh "x") ~ghost:false ity_int in
+  let y = create_pvsymbol (id_fresh "y") ~ghost:false ity_int in
+  let r = create_vsymbol (id_fresh "result") ty_bool in
+  let q = create_post r (t_iff (t_equ (t_var r) t_bool_true)
+                               (t_equ (t_var x.pv_vs) (t_var y.pv_vs))) in
+  let cty = create_cty ~mask:MaskVisible [x; y] [] [q]
+    Mxs.empty Mpv.empty eff_empty ity_bool in
+  let_sym (id_fresh "infix =") ~ghost:false ~kind:RKnone (c_any cty)
+
+let ld_int_ng, rs_int_ng =
+  let x = create_pvsymbol (id_fresh "x") ~ghost:false ity_int in
+  let cty = create_cty ~mask:MaskVisible [x] [] []
+    Mxs.empty Mpv.empty eff_empty ity_int in
+  let_sym (id_fresh "prefix -") ~ghost:false ~kind:RKfunc (c_any cty)
+
+let ld_int_pl, rs_int_pl =
+  let x = create_pvsymbol (id_fresh "x") ~ghost:false ity_int in
+  let y = create_pvsymbol (id_fresh "y") ~ghost:false ity_int in
+  let cty = create_cty ~mask:MaskVisible [x; y] [] []
+    Mxs.empty Mpv.empty eff_empty ity_int in
+  let_sym (id_fresh "infix +") ~ghost:false ~kind:RKfunc (c_any cty)
+
+let ld_int_mn, rs_int_mn =
+  let x = create_pvsymbol (id_fresh "x") ~ghost:false ity_int in
+  let y = create_pvsymbol (id_fresh "y") ~ghost:false ity_int in
+  let e = e_app rs_int_ng [e_var y] [] ity_int in
+  let e = e_app rs_int_pl [e_var x; e] [] ity_int in
+  let c = c_fun ~mask:MaskVisible [x; y] [] [] Mxs.empty Mpv.empty e in
+  let_sym (id_fresh "infix -") ~ghost:false ~kind:RKfunc c
+
+let ld_int_ml, rs_int_ml =
+  let x = create_pvsymbol (id_fresh "x") ~ghost:false ity_int in
+  let y = create_pvsymbol (id_fresh "y") ~ghost:false ity_int in
+  let cty = create_cty ~mask:MaskVisible [x; y] [] []
+    Mxs.empty Mpv.empty eff_empty ity_int in
+  let_sym (id_fresh "infix *") ~ghost:false ~kind:RKfunc (c_any cty)
+
+let ld_int_lt, rs_int_lt =
+  let x = create_pvsymbol (id_fresh "x") ~ghost:false ity_int in
+  let y = create_pvsymbol (id_fresh "y") ~ghost:false ity_int in
+  let cty = create_cty ~mask:MaskVisible [x; y] [] []
+    Mxs.empty Mpv.empty eff_empty ity_bool in
+  let_sym (id_fresh "infix <") ~ghost:false ~kind:RKpred (c_any cty)
+
+let ld_int_le, rs_int_le =
+  let x = create_pvsymbol (id_fresh "x") ~ghost:false ity_int in
+  let y = create_pvsymbol (id_fresh "y") ~ghost:false ity_int in
+  let e = e_or (e_app rs_int_lt [e_var x; e_var y] [] ity_bool)
+               (e_app rs_int_eq [e_var x; e_var y] [] ity_bool) in
+  let c = c_fun ~mask:MaskVisible [x; y] [] [] Mxs.empty Mpv.empty e in
+  let_sym (id_fresh "infix <=") ~ghost:false ~kind:RKpred c
+
+let ld_int_gt, rs_int_gt =
+  let x = create_pvsymbol (id_fresh "x") ~ghost:false ity_int in
+  let y = create_pvsymbol (id_fresh "y") ~ghost:false ity_int in
+  let e = e_app rs_int_lt [e_var y; e_var x] [] ity_bool in
+  let c = c_fun ~mask:MaskVisible [x; y] [] [] Mxs.empty Mpv.empty e in
+  let_sym (id_fresh "infix >") ~ghost:false ~kind:RKpred c
+
+let ld_int_ge, rs_int_ge =
+  let x = create_pvsymbol (id_fresh "x") ~ghost:false ity_int in
+  let y = create_pvsymbol (id_fresh "y") ~ghost:false ity_int in
+  let e = e_app rs_int_le [e_var y; e_var x] [] ity_bool in
+  let c = c_fun ~mask:MaskVisible [x; y] [] [] Mxs.empty Mpv.empty e in
+  let_sym (id_fresh "infix >=") ~ghost:false ~kind:RKpred c
+
+let pd_int_eq = create_let_decl ld_int_eq
+let pd_int_ng = create_let_decl ld_int_ng
+let pd_int_pl = create_let_decl ld_int_pl
+let pd_int_mn = create_let_decl ld_int_mn
+let pd_int_ml = create_let_decl ld_int_ml
+let pd_int_lt = create_let_decl ld_int_lt
+let pd_int_le = create_let_decl ld_int_le
+let pd_int_gt = create_let_decl ld_int_gt
+let pd_int_ge = create_let_decl ld_int_ge
+
 (** {2 Known identifiers} *)
 
 type known_map = pdecl Mid.t
