@@ -21,10 +21,8 @@ import "discrimination.gen"
 
 transformation "inline_trivial"
 transformation "eliminate_builtin"
-transformation "detect_polymorphism"
-transformation "eliminate_definition_if_poly"
 transformation "eliminate_inductive"
-transformation "eliminate_algebraic_if_poly"
+transformation "compile_match"
 transformation "eliminate_epsilon"
 
 transformation "simplify_formula"

@@ -16,7 +16,7 @@ prelude "(set-logic AUFNIRA)"
 
 *)
 
-printer "smtv2_cvc_ce"
+printer "smtv2"
 filename "%f-%t-%g.smt2"
 
 invalid "^sat$"
