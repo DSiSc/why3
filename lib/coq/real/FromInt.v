@@ -1,7 +1,7 @@
 (********************************************************************)
 (*                                                                  *)
 (*  The Why3 Verification Platform   /   The Why3 Development Team  *)
-(*  Copyright 2010-2016   --   INRIA - CNRS - Paris-Sud University  *)
+(*  Copyright 2010-2017   --   INRIA - CNRS - Paris-Sud University  *)
 (*                                                                  *)
 (*  This software is distributed under the terms of the GNU Lesser  *)
 (*  General Public License version 2.1, with the special exception  *)
@@ -17,44 +17,51 @@ Require int.Int.
 Require real.Real.
 
 (* Why3 comment *)
-(* from_int is replaced with (Reals.Raxioms.IZR x) by the coq driver *)
+(* from_int is replaced with (BuiltIn.IZR x) by the coq driver *)
 
 (* Why3 goal *)
-Lemma Zero : ((Reals.Raxioms.IZR 0%Z) = 0%R).
+Lemma Zero : ((BuiltIn.IZR 0%Z) = 0%R).
+Proof.
 split.
 Qed.
 
 (* Why3 goal *)
-Lemma One : ((Reals.Raxioms.IZR 1%Z) = 1%R).
+Lemma One : ((BuiltIn.IZR 1%Z) = 1%R).
+Proof.
 split.
 Qed.
 
 (* Why3 goal *)
 Lemma Add : forall (x:Z) (y:Z),
-  ((Reals.Raxioms.IZR (x + y)%Z) = ((Reals.Raxioms.IZR x) + (Reals.Raxioms.IZR y))%R).
+  ((BuiltIn.IZR (x + y)%Z) = ((BuiltIn.IZR x) + (BuiltIn.IZR y))%R).
+Proof.
 exact plus_IZR.
 Qed.
 
 (* Why3 goal *)
 Lemma Sub : forall (x:Z) (y:Z),
-  ((Reals.Raxioms.IZR (x - y)%Z) = ((Reals.Raxioms.IZR x) - (Reals.Raxioms.IZR y))%R).
+  ((BuiltIn.IZR (x - y)%Z) = ((BuiltIn.IZR x) - (BuiltIn.IZR y))%R).
+Proof.
 exact minus_IZR.
 Qed.
 
 (* Why3 goal *)
 Lemma Mul : forall (x:Z) (y:Z),
-  ((Reals.Raxioms.IZR (x * y)%Z) = ((Reals.Raxioms.IZR x) * (Reals.Raxioms.IZR y))%R).
+  ((BuiltIn.IZR (x * y)%Z) = ((BuiltIn.IZR x) * (BuiltIn.IZR y))%R).
+Proof.
 exact mult_IZR.
 Qed.
 
 (* Why3 goal *)
-Lemma Neg : forall (x:Z),
-  ((Reals.Raxioms.IZR (-x)%Z) = (-(Reals.Raxioms.IZR x))%R).
+Lemma Neg : forall (x:Z), ((BuiltIn.IZR (-x)%Z) = (-(BuiltIn.IZR x))%R).
+Proof.
 exact opp_IZR.
 Qed.
 
 (* Why3 goal *)
 Lemma Monotonic : forall (x:Z) (y:Z), (x <= y)%Z ->
-  ((Reals.Raxioms.IZR x) <= (Reals.Raxioms.IZR y))%R.
+  ((BuiltIn.IZR x) <= (BuiltIn.IZR y))%R.
+Proof.
 exact (IZR_le).
 Qed.
+

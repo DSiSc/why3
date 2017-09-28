@@ -1,7 +1,7 @@
 (********************************************************************)
 (*                                                                  *)
 (*  The Why3 Verification Platform   /   The Why3 Development Team  *)
-(*  Copyright 2010-2016   --   INRIA - CNRS - Paris-Sud University  *)
+(*  Copyright 2010-2017   --   INRIA - CNRS - Paris-Sud University  *)
 (*                                                                  *)
 (*  This software is distributed under the terms of the GNU Lesser  *)
 (*  General Public License version 2.1, with the special exception  *)
@@ -145,15 +145,8 @@ end
 
 module M = Session_scheduler.Make(O)
 
-let print_res fname pa ps old_ps =
-  dprintf verbose
-    "@[<hov 2>From file %s:@\nResult@ for@ the@ proof@ attempt@ %a:\
-             @ %a@\nPreviously@ it@ was@ %a@]@."
-    fname print_external_proof pa print_attempt_status ps
-    print_attempt_status old_ps
-
 let print_proof_goal fmt pa =
-  pp_print_string fmt pa.proof_parent.goal_name.Ident.id_string
+  pp_print_string fmt (goal_name pa.proof_parent).Ident.id_string
 
 
 let same_result r1 r2 =
@@ -167,13 +160,6 @@ let same_result r1 r2 =
     | Call_provers.Failure f1, Call_provers.Failure f2 -> f1 = f2
     | _ -> false
 
-let same_status old_res new_res =
-  match old_res, new_res with
-  | InternalFailure old_exn, InternalFailure new_exn ->
-    (Printexc.to_string old_exn) = (Printexc.to_string new_exn)
-  | Done(old_res), Done(new_res) -> same_result old_res new_res
-  | _ -> false
-
 let is_valid pr =
   match pr.Call_provers.pr_answer with
   | Call_provers.Valid -> true
@@ -186,7 +172,7 @@ let is_successful env = (* means all goals proved*)
     let rec iter = function
         | File f -> file_iter iter f
         | Theory th -> theory_iter iter th
-        | Goal g -> if not (Opt.inhabited (g.goal_verified)) then raise Exit
+        | Goal g -> if not (Opt.inhabited (goal_verified g)) then raise Exit
         | Proof_attempt _ | Transf _ | Metas _ -> assert false in
     session_iter iter env.session;
     true

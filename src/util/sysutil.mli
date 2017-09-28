@@ -1,7 +1,7 @@
 (********************************************************************)
 (*                                                                  *)
 (*  The Why3 Verification Platform   /   The Why3 Development Team  *)
-(*  Copyright 2010-2016   --   INRIA - CNRS - Paris-Sud University  *)
+(*  Copyright 2010-2017   --   INRIA - CNRS - Paris-Sud University  *)
 (*                                                                  *)
 (*  This software is distributed under the terms of the GNU Lesser  *)
 (*  General Public License version 2.1, with the special exception  *)
@@ -52,7 +52,9 @@ val copy_dir : string -> string -> unit
 val path_of_file : string -> string list
 (** [path_of_file filename] return the absolute path of [filename] *)
 
+(* unused ?
 val normalize_filename : string -> string
+ *)
 (** [normalize_filename filename] removes from [filename] occurrences of
     "." and ".." that denote respectively the current directory and
     parent directory, whenever possible *)

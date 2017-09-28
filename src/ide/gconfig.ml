@@ -1,7 +1,7 @@
 (********************************************************************)
 (*                                                                  *)
 (*  The Why3 Verification Platform   /   The Why3 Development Team  *)
-(*  Copyright 2010-2016   --   INRIA - CNRS - Paris-Sud University  *)
+(*  Copyright 2010-2017   --   INRIA - CNRS - Paris-Sud University  *)
 (*                                                                  *)
 (*  This software is distributed under the terms of the GNU Lesser  *)
 (*  General Public License version 2.1, with the special exception  *)
@@ -547,6 +547,7 @@ let show_about_window () =
                 "Sylvie Boldo";
                 "Martin Clochard";
                 "Simon Cruanes";
+                "Sylvain Dailler";
                 "Clément Fumex";
                 "Leon Gondelman";
                 "David Hauzar";
@@ -561,7 +562,7 @@ let show_about_window () =
                 "Piotr Trojanek";
                 "Makarius Wenzel";
                ]
-      ~copyright:"Copyright 2010-2016 Inria, CNRS, Paris-Sud University"
+      ~copyright:"Copyright 2010-2017 Inria, CNRS, Paris-Sud University"
       ~license:("See file " ^ Filename.concat Config.datadir "LICENSE")
       ~website:"http://why3.lri.fr"
       ~website_label:"http://why3.lri.fr"
@@ -889,16 +890,20 @@ let provers_page c (notebook:GPack.notebook) =
   let provers_box =
     GPack.button_box `VERTICAL ~border_width:5 ~spacing:5
       ~packing:frame2#add () in
-  let group = ref None in
+  let group =
+    let b =
+      GButton.radio_button ~label:"(none)" ~packing:provers_box#add
+                           ~active:(c.default_prover = "") () in
+    let (_ : GtkSignal.id) =
+      b#connect#toggled ~callback:(fun () -> c.default_prover <- "") in
+    b#group in
   Mprover.iter
     (fun _ p ->
       let name = prover_parseable_format p.prover in
       let label = Pp.string_of_wnl print_prover p.prover in
       let b =
-        GButton.radio_button ~label ?group:!group ~packing:provers_box#add ()
-          ~active:(name = c.default_prover)
-      in
-      if !group = None then group := Some b#group;
+        GButton.radio_button ~label ~group ~packing:provers_box#add
+                             ~active:(name = c.default_prover) () in
       let (_ : GtkSignal.id) =
         b#connect#toggled ~callback:(fun () -> c.default_prover <- name)
       in ())

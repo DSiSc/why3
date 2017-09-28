@@ -1,7 +1,7 @@
 (********************************************************************)
 (*                                                                  *)
 (*  The Why3 Verification Platform   /   The Why3 Development Team  *)
-(*  Copyright 2010-2016   --   INRIA - CNRS - Paris-Sud University  *)
+(*  Copyright 2010-2017   --   INRIA - CNRS - Paris-Sud University  *)
 (*                                                                  *)
 (*  This software is distributed under the terms of the GNU Lesser  *)
 (*  General Public License version 2.1, with the special exception  *)
@@ -15,7 +15,6 @@ open Stdlib
 open Whyconf
 open Theory
 open Task
-open Driver
 
 let usage_msg = sprintf
   "Usage: %s [options] [[file|-] [-T <theory> [-G <goal>]...]...]..."
@@ -151,11 +150,7 @@ let option_list = [
 let config, _, env =
   Whyconf.Args.initialize option_list add_opt_file usage_msg
 
-let driver_file s =
-  if Sys.file_exists s || String.contains s '/' || String.contains s '.' then s
-  else Filename.concat Config.datadir (Filename.concat "drivers" (s ^ ".drv"))
-
-let opt_driver = ref (match List.rev_map driver_file !opt_driver with
+let opt_driver = ref (match !opt_driver with
   | f::ef -> Some (f, ef)
   | [] -> None)
 
@@ -243,37 +238,6 @@ let output_task drv fname _tname th task dir =
   let ext = String.sub dest i (String.length dest - i) in
   let cout = open_out (Filename.concat dir (name ^ ext)) in
   Driver.print_task drv (formatter_of_out_channel cout) task;
-  close_out cout
-
-let output_task_prepared drv fname _tname th task dir =
-  let fname = Filename.basename fname in
-  let fname =
-    try Filename.chop_extension fname with _ -> fname in
-  let tname = th.th_name.Ident.id_string in
-  let dest = Driver.file_of_task drv fname tname task in
-  (* Uniquify the filename before the extension if it exists*)
-  let i = try String.rindex dest '.' with _ -> String.length dest in
-  let name = Ident.string_unique !fname_printer (String.sub dest 0 i) in
-  let ext = String.sub dest i (String.length dest - i) in
-  let cout = open_out (Filename.concat dir (name ^ ext)) in
-  (* TODO print the counterexample *)
-  let _counterexample = Driver.print_task_prepared drv (formatter_of_out_channel cout) task in
-  close_out cout
-
-let output_theory drv fname _tname th task dir =
-  let fname = Filename.basename fname in
-  let fname =
-    try Filename.chop_extension fname with _ -> fname in
-  let dest = Driver.file_of_theory drv fname th in
-  let file = Filename.concat dir dest in
-  let old =
-    if Sys.file_exists file then begin
-      let backup = file ^ ".bak" in
-      Sys.rename file backup;
-      Some (open_in backup)
-    end else None in
-  let cout = open_out file in
-  Driver.print_task ?old drv (formatter_of_out_channel cout) task;
   close_out cout
 
 let do_task drv fname tname (th : Theory.theory) (task : Task.task) =
@@ -385,7 +349,7 @@ let do_input env drv = function
 
 let () =
   try
-    let load (f,ef) = load_driver env f ef in
+    let load (f,ef) = load_driver (Whyconf.get_main config) env f ef in
     let drv = Opt.map load !opt_driver in
     Queue.iter (do_input env drv) opt_queue
   with e when not (Debug.test_flag Debug.stack_trace) ->

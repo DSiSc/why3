@@ -1,7 +1,7 @@
 (********************************************************************)
 (*                                                                  *)
 (*  The Why3 Verification Platform   /   The Why3 Development Team  *)
-(*  Copyright 2010-2016   --   INRIA - CNRS - Paris-Sud University  *)
+(*  Copyright 2010-2017   --   INRIA - CNRS - Paris-Sud University  *)
 (*                                                                  *)
 (*  This software is distributed under the terms of the GNU Lesser  *)
 (*  General Public License version 2.1, with the special exception  *)
@@ -27,19 +27,34 @@ let debug = Debug.register_info_flag "model_parser"
 ****************************************************************
 *)
 
+type float_type =
+  | Plus_infinity
+  | Minus_infinity
+  | Plus_zero
+  | Minus_zero
+  | Not_a_number
+  | Float_value of string * string * string
+
 type model_value =
  | Integer of string
  | Decimal of (string * string)
+ | Float of float_type
+ | Boolean of bool
  | Array of model_array
+ | Record of model_record
  | Bitvector of string
  | Unparsed of string
 and  arr_index = {
-  arr_index_key : model_value;
+  arr_index_key : string; (* Even array indices can exceed MAX_INT with Z3 *)
   arr_index_value : model_value;
 }
 and model_array = {
   arr_others  : model_value;
   arr_indices : arr_index list;
+}
+and model_record = {
+  discrs : model_value list;
+  fields : model_value list;
 }
 
 let array_create_constant ~value =
@@ -61,37 +76,97 @@ let array_add_element ~array ~index ~value =
     arr_indices = arr_index::array.arr_indices;
   }
 
-let rec print_indices fmt indices =
-  match indices with
-  | [] -> ()
-  | index::tail ->
-    fprintf fmt "%a => " print_model_value index.arr_index_key;
-    print_model_value fmt index.arr_index_value;
-    fprintf fmt ", ";
-    print_indices fmt tail
-and
-print_array fmt arr =
-  fprintf fmt "(";
-  print_indices fmt arr.arr_indices;
-  fprintf fmt "others => ";
-  print_model_value fmt arr.arr_others;
-  fprintf fmt ")"
-and
-print_model_value_sanit sanit_print fmt value =
-  (* Prints model value. *)
-  match value with
-  | Integer s -> sanit_print fmt s
-  | Decimal (int_part, fract_part) ->
-    sanit_print fmt (int_part^"."^fract_part)
-  | Unparsed s -> sanit_print fmt s
-  | Array a ->
-    print_array str_formatter a;
-    sanit_print fmt (flush_str_formatter ())
-  | Bitvector v -> sanit_print fmt v
-and
-print_model_value fmt value =
-  print_model_value_sanit (fun fmt s -> fprintf fmt "%s" s) fmt value
+let convert_float_value f =
+  match f with
+  | Plus_infinity ->
+      let m = Mstr.add "cons" (Json.String "Plus_infinity") Stdlib.Mstr.empty in
+      Json.Record m
+  | Minus_infinity ->
+      let m = Mstr.add "cons" (Json.String "Minus_infinity") Stdlib.Mstr.empty in
+      Json.Record m
+  | Plus_zero ->
+      let m = Mstr.add "cons" (Json.String "Plus_zero") Stdlib.Mstr.empty in
+      Json.Record m
+  | Minus_zero ->
+      let m = Mstr.add "cons" (Json.String "Minus_zero") Stdlib.Mstr.empty in
+      Json.Record m
+  | Not_a_number ->
+      let m = Mstr.add "cons" (Json.String "Not_a_number") Stdlib.Mstr.empty in
+      Json.Record m
+  | Float_value (b, eb, sb) ->
+      let m = Mstr.add "cons" (Json.String "Float_value") Stdlib.Mstr.empty in
+      let m = Mstr.add "sign" (Json.String b) m in
+      let m = Mstr.add "exponent" (Json.String eb) m in
+      let m = Mstr.add "significand" (Json.String sb) m in
+      Json.Record m
 
+let rec convert_model_value value : Json.json =
+  match value with
+  | Integer s ->
+      let m = Mstr.add "type" (Json.String "Integer") Stdlib.Mstr.empty in
+      let m = Mstr.add "val" (Json.String s) m in
+      Json.Record m
+  | Float f ->
+      let m = Mstr.add "type" (Json.String "Float") Stdlib.Mstr.empty in
+      let m = Mstr.add "val" (convert_float_value f) m in
+      Json.Record m
+  | Decimal (int_part, fract_part) ->
+      let m = Mstr.add "type" (Json.String "Decimal") Stdlib.Mstr.empty in
+      let m = Mstr.add "val" (Json.String (int_part^"."^fract_part)) m in
+      Json.Record m
+  | Unparsed s ->
+      let m = Mstr.add "type" (Json.String "Unparsed") Stdlib.Mstr.empty in
+      let m = Mstr.add "val" (Json.String s) m in
+      Json.Record m
+  | Bitvector v ->
+      let m = Mstr.add "type" (Json.String "Bv") Stdlib.Mstr.empty in
+      let m = Mstr.add "val" (Json.String v) m in
+      Json.Record m
+  | Boolean b ->
+      let m = Mstr.add "type" (Json.String "Boolean") Stdlib.Mstr.empty in
+      let m = Mstr.add "val" (Json.Bool b) m in
+      Json.Record m
+  | Array a ->
+      let l = convert_array a in
+      let m = Mstr.add "type" (Json.String "Array") Stdlib.Mstr.empty in
+      let m = Mstr.add "val" (Json.List l) m in
+      Json.Record m
+  | Record r ->
+      convert_record r
+
+and convert_array a =
+  let m_others =
+    Mstr.add "others" (convert_model_value a.arr_others)  Stdlib.Mstr.empty in
+  convert_indices a.arr_indices @ [Json.Record m_others]
+
+and convert_indices indices =
+  match indices with
+  | [] -> []
+  | index :: tail ->
+    let m = Mstr.add "indice" (Json.String index.arr_index_key) Stdlib.Mstr.empty in
+    let m = Mstr.add "value" (convert_model_value index.arr_index_value) m in
+    Json.Record m :: convert_indices tail
+
+and convert_record r =
+  let m = Mstr.add "type" (Json.String "Record") Stdlib.Mstr.empty in
+  let fields = convert_fields r.fields in
+  let discrs = convert_discrs r.discrs in
+  let m_field_discr = Mstr.add "Field" fields Stdlib.Mstr.empty in
+  let m_field_discr = Mstr.add "Discr" discrs m_field_discr in
+  let m = Mstr.add "val" (Json.Record m_field_discr) m in
+  Json.Record m
+
+and convert_fields fields =
+  Json.List (List.map convert_model_value fields)
+
+and convert_discrs discrs =
+  Json.List (List.map convert_model_value discrs)
+
+let print_model_value_sanit fmt v =
+  let v = convert_model_value v in
+  Json.print_json fmt v
+
+let print_model_value = print_model_value_sanit
 
 (*
 ***************************************************************
@@ -162,8 +237,8 @@ let print_location fmt m_element =
 **  Model definitions
 ***************************************************************
 *)
-module IntMap = Map.Make(struct type t  = int let compare = compare end)
-module StringMap = Map.Make(String)
+module IntMap = Stdlib.Mint
+module StringMap = Stdlib.Mstr
 
 type model_file = model_element list IntMap.t
 type model_files = model_file StringMap.t
@@ -203,6 +278,9 @@ let print_model_elements ?(sep = "\n") me_name_trans fmt m_elements =
   Pp.print_list (fun fmt () -> Pp.string fmt sep) (print_model_element me_name_trans) fmt m_elements
 
 let print_model_file fmt me_name_trans filename model_file =
+  (* Relativize does not work on nighly bench: using basename instead. It
+     hides the local paths.  *)
+  let filename = Filename.basename filename  in
   fprintf fmt "File %s:" filename;
   IntMap.iter
     (fun line m_elements ->
@@ -221,7 +299,11 @@ let print_model
     ?(me_name_trans = why_name_trans)
     fmt
     model =
-  StringMap.iter (print_model_file fmt me_name_trans) model.model_files
+  (* Simple and easy way to print file sorted alphabetically
+   FIXME: but StringMap.iter is supposed to iter in alphabetic order, so waste of time and memory here !
+   *)
+  let l = StringMap.bindings model.model_files in
+  List.iter (fun (k, e) -> print_model_file fmt me_name_trans k e) l
 
 let model_to_string
     ?(me_name_trans = why_name_trans)
@@ -324,7 +406,7 @@ let interleave_with_source
 *)
 let print_model_element_json me_name_to_str fmt me =
   let print_value fmt =
-    fprintf fmt "%a" (print_model_value_sanit Json.string) me.me_value in
+    fprintf fmt "%a" print_model_value_sanit me.me_value in
   let print_kind fmt =
     match me.me_name.men_kind with
     | Result -> fprintf fmt "%a" Json.string "result"

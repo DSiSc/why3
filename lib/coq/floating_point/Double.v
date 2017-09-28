@@ -1,7 +1,7 @@
 (********************************************************************)
 (*                                                                  *)
 (*  The Why3 Verification Platform   /   The Why3 Development Team  *)
-(*  Copyright 2010-2016   --   INRIA - CNRS - Paris-Sud University  *)
+(*  Copyright 2010-2017   --   INRIA - CNRS - Paris-Sud University  *)
 (*                                                                  *)
 (*  This software is distributed under the terms of the GNU Lesser  *)
 (*  General Public License version 2.1, with the special exception  *)
@@ -92,7 +92,8 @@ Qed.
 (* Why3 goal *)
 Lemma Exact_rounding_for_integers : forall (m:floating_point.Rounding.mode)
   (i:Z), (((-9007199254740992%Z)%Z <= i)%Z /\ (i <= 9007199254740992%Z)%Z) ->
-  ((round m (Reals.Raxioms.IZR i)) = (Reals.Raxioms.IZR i)).
+  ((round m (BuiltIn.IZR i)) = (BuiltIn.IZR i)).
+Proof.
 intros m i Hi.
 now apply Exact_rounding_for_integers.
 Qed.

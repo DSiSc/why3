@@ -1,7 +1,7 @@
 (********************************************************************)
 (*                                                                  *)
 (*  The Why3 Verification Platform   /   The Why3 Development Team  *)
-(*  Copyright 2010-2016   --   INRIA - CNRS - Paris-Sud University  *)
+(*  Copyright 2010-2017   --   INRIA - CNRS - Paris-Sud University  *)
 (*                                                                  *)
 (*  This software is distributed under the terms of the GNU Lesser  *)
 (*  General Public License version 2.1, with the special exception  *)
@@ -47,7 +47,7 @@ let env : Env.env = Env.create_env (Whyconf.loadpath main)
 let alt_ergo_driver : Driver.driver =
   try
     Printexc.record_backtrace true;
-    Driver.load_driver env alt_ergo.Whyconf.driver []
+    Whyconf.load_driver main env alt_ergo.Whyconf.driver []
   with e ->
     let s = Printexc.get_backtrace () in
     eprintf "Failed to load driver for alt-ergo: %a@.%s@."
@@ -161,10 +161,6 @@ module Task =
     let register_task parent_id task =
       let id = gen_id () in
       let vid, expl, _ = Termcode.goal_expl_task ~root:false task in
-      let expl = match expl with
-        | Some s -> s
-        | None -> vid.Ident.id_string
-      in
       let id_loc = match vid.Ident.id_loc with
           None -> []
         | Some l -> begin match mk_loc (Loc.get l) with
