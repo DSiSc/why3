@@ -8,16 +8,13 @@
 
 module Elt
 
-  use export int.Int
-  use export array.Array
-
   type elt
 
   val predicate le elt elt
 
   clone relations.TotalPreOrder with type t = elt, predicate rel = le
 
-  clone export array.Sorted with type elt = elt, predicate le = le
+  clone export seq.Sorted with type t = elt, predicate le = le
 
 end
 
@@ -30,11 +27,13 @@ end
 
 module Merge
 
+  use import int.Int
+  use import ref.Refint
+  use import seq.Seq
+  use import seq.Occ
+  use import seq.Permut
+  use import array.Array
   clone export Elt
-  use export ref.Refint
-  use export array.Array
-  use import map.Occ
-  use export array.ArrayPermut
 
   (* merges tmp[l..m[ and tmp[m..r[ into a[l..r[ *)
   let merge (tmp a: array elt) (l m r: int) : unit
@@ -94,7 +93,13 @@ end
 
 module TopDownMergesort
 
-  clone import Merge
+  use import int.Int
+  use import ref.Refint
+  use import seq.Seq
+  use import seq.Occ
+  use import seq.Permut
+  use import array.Array
+  use import Merge
   use import mach.int.Int
 
   let rec mergesort_rec (a tmp: array elt) (l r: int) : unit
@@ -131,7 +136,13 @@ end
 
 module BottomUpMergesort
 
-  clone import Merge
+  use import int.Int
+  use import ref.Refint
+  use import seq.Seq
+  use import seq.Occ
+  use import seq.Permut
+  use import array.Array
+  use import Merge
   use import mach.int.Int
   use import int.MinMax
 
@@ -207,7 +218,13 @@ end
 
 module NaturalMergesort
 
-  clone import Merge
+  use import int.Int
+  use import ref.Refint
+  use import seq.Seq
+  use import seq.Occ
+  use import seq.Permut
+  use import array.Array
+  use import Merge
   use import mach.int.Int
   use import int.MinMax
 

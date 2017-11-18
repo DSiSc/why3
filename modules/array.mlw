@@ -10,27 +10,22 @@ modification of an array does not modify its length.
 module Array
 
   use import int.Int
-  use import map.Map as M
+  use import seq.Seq
 
   type array 'a = private {
-    mutable ghost elts : int -> 'a;
+    mutable ghost elts : seq 'a;
                 length : int
-  } invariant { 0 <= length }
+  } invariant { 0 <= length = len elts }
 
-  function ([]) (a: array 'a) (i: int) : 'a = a.elts i
+  meta coercion function elts
 
   val ([]) (a: array 'a) (i: int) : 'a
     requires { "expl:index in array bounds" 0 <= i < length a }
     ensures  { result = a[i] }
 
-  val ghost function ([<-]) (a: array 'a) (i: int) (v: 'a): array 'a
-    ensures { result.length = a.length }
-    ensures { result.elts = a.elts[i <- v] }
-
   val ([]<-) (a: array 'a) (i: int) (v: 'a) : unit writes {a}
     requires { "expl:index in array bounds" 0 <= i < length a }
-    ensures  { a.elts = M.set (old a).elts i v }
-    ensures  { a = (old a)[i <- v] }
+    ensures  { a.elts = (old a).elts[i <- v] }
 
   (** unsafe get/set operations with no precondition *)
 
@@ -118,6 +113,11 @@ module Array
         a[ofs2 + k] <- a[ofs1 + k]
       done
 
+  val init (n: int) (f: int -> 'a) : array 'a
+    requires { "expl:array creation size" n >= 0 }
+    ensures { forall i:int. 0 <= i < n -> result[i] = f i }
+    ensures { result.length = n }
+
   (*** TODO?
      - concat : 'a array list -> 'a array
      - to_list
@@ -126,188 +126,19 @@ module Array
 
 end
 
-module Init
-
-  use import int.Int
-  use export Array
-  use HighOrd
-
-  val init (n: int) (f: int -> 'a) : array 'a
-    requires { "expl:array creation size" n >= 0 }
-    ensures { forall i:int. 0 <= i < n -> result[i] = f i }
-    ensures { result.length = n }
-
-
-end
-
-(** {2 Sorted Arrays} *)
-
-module IntArraySorted
-
-  use import int.Int
-  use import Array
-  clone import map.MapSorted as M with type elt = int, predicate le = (<=)
-
-  predicate sorted_sub (a : array int) (l u : int) =
-    M.sorted_sub a.elts l u
-  (** [sorted_sub a l u] is true whenever the array segment [a(l..u-1)]
-      is sorted w.r.t order relation [le] *)
-
-  predicate sorted (a : array int) =
-    M.sorted_sub a.elts 0 a.length
-  (** [sorted a] is true whenever the array [a] is sorted w.r.t [le] *)
-
-end
-
-module Sorted
-
-  use import int.Int
-  use import Array
-
-  type elt
-
-  predicate le elt elt
-
-  predicate sorted_sub (a: array elt) (l u: int) =
-    forall i1 i2 : int. l <= i1 <= i2 < u -> le a[i1] a[i2]
-  (** [sorted_sub a l u] is true whenever the array segment [a(l..u-1)]
-      is sorted w.r.t order relation [le] *)
-
-  predicate sorted (a: array elt) =
-    forall i1 i2 : int. 0 <= i1 <= i2 < length a -> le a[i1] a[i2]
-  (** [sorted a] is true whenever the array [a] is sorted w.r.t [le] *)
-
-end
-
-(** {2 Arrays Equality} *)
-
-module ArrayEq
-
-  use import int.Int
-  use import Array
-  use import map.MapEq
-
-  predicate array_eq_sub (a1 a2: array 'a) (l u: int) =
-    a1.length = a2.length /\ 0 <= l <= a1.length /\ 0 <= u <= a1.length /\
-    map_eq_sub a1.elts a2.elts l u
-
-  predicate array_eq (a1 a2: array 'a) =
-    a1.length = a2.length /\ map_eq_sub a1.elts a2.elts 0 (length a1)
-
-end
-
-module ArrayExchange
-
-  use import int.Int
-  use import Array
-  use import map.MapExchange as M
-
-  predicate exchange (a1 a2: array 'a) (i j: int) =
-    a1.length = a2.length /\
-    M.exchange a1.elts a2.elts 0 a1.length i j
-  (** [exchange a1 a2 i j] means that arrays [a1] and [a2] only differ
-      by the swapping of elements at indices [i] and [j] *)
-
-end
-
-(** {2 Permutation} *)
-
-module ArrayPermut
-
-  use import int.Int
-  use import Array
-  use import map.MapPermut as M
-  use import map.MapEq
-  use import ArrayEq
-  use export ArrayExchange
-
-  predicate permut (a1 a2: array 'a) (l u: int) =
-    a1.length = a2.length /\ 0 <= l <= a1.length /\ 0 <= u <= a1.length /\
-    M.permut a1.elts a2.elts l u
-  (** [permut a1 a2 l u] is true when the segment
-      [a1(l..u-1)] is a permutation of the segment [a2(l..u-1)].
-      Values outside of the interval (l..u-1) are ignored. *)
-
-  predicate permut_sub (a1 a2: array 'a) (l u: int) =
-    map_eq_sub a1.elts a2.elts 0 l /\
-    permut a1 a2 l u /\
-    map_eq_sub a1.elts a2.elts u (length a1)
-  (** [permut_sub a1 a2 l u] is true when the segment
-      [a1(l..u-1)] is a permutation of the segment [a2(l..u-1)]
-      and values outside of the interval (l..u-1) are equal. *)
-
-  predicate permut_all (a1 a2: array 'a) =
-    a1.length = a2.length /\ M.permut a1.elts a2.elts 0 a1.length
-  (** [permut_all a1 a2 l u] is true when array [a1] is a permutation
-      of array [a2]. *)
-
-  lemma exchange_permut_sub:
-    forall a1 a2: array 'a, i j l u: int.
-    exchange a1 a2 i j -> l <= i < u -> l <= j < u ->
-    0 <= l -> u <= length a1 -> permut_sub a1 a2 l u
-
-  (** we can always enlarge the interval *)
-
-  lemma permut_sub_weakening:
-    forall a1 a2: array 'a, l1 u1 l2 u2: int.
-    permut_sub a1 a2 l1 u1 -> 0 <= l2 <= l1 -> u1 <= u2 <= length a1 ->
-    permut_sub a1 a2 l2 u2
-
-  (** {3 lemmas about [permut_all]} *)
-
-  lemma exchange_permut_all:
-    forall a1 a2: array 'a, i j: int.
-    exchange a1 a2 i j -> permut_all a1 a2
-
-end
-
 module ArraySwap
 
   use import int.Int
   use import Array
-  use export ArrayExchange
+  use import seq.Exchange
 
-  let swap (a:array 'a) (i:int) (j:int) : unit
+  let swap (a: array 'a) (i: int) (j: int) : unit
     requires { 0 <= i < length a /\ 0 <= j < length a }
     writes   { a }
     ensures  { exchange (old a) a i j }
   = let v = a[i] in
     a[i] <- a[j];
     a[j] <- v
-
-end
-
-(** {2 Sum of elements} *)
-
-module ArraySum
-
-  use import Array
-  use import map.MapSum as M
-
-  (** [sum a l h] is the sum of [a[i]] for [l <= i < h] *)
-  function sum (a: array int) (l h: int) : int = M.sum a.elts l h
-
-end
-
-(** {2 Number of array elements satisfying a given predicate} *)
-
-module NumOf
-  use import Array
-  use int.NumOf as N
-
-  (** the number of [a[i]] such that [l <= i < u] and [pr i a[i]] *)
-  function numof (pr: int -> 'a -> bool) (a: array 'a) (l u: int) : int =
-    N.numof (fun i -> pr i a[i]) l u
-
-end
-
-module NumOfEq
-  use import Array
-  use int.NumOf as N
-
-  (** the number of [a[i]] such that [l <= i < u] and [a[i] = v] *)
-  function numof (a: array 'a) (v: 'a) (l u: int) : int =
-    N.numof (fun i -> a[i] = v) l u
 
 end
 
@@ -331,33 +162,6 @@ module ToList
 
 end
 
-module ToSeq
-  use import int.Int
-  use import Array
-  use seq.Seq as S
-
-  let rec function to_seq_sub (a: array 'a) (l u: int) : S.seq 'a
-    requires { l >= 0 /\ u <= a.length }
-    variant { u - l }
-  = if u <= l then S.empty else S.cons a[l] (to_seq_sub a (l+1) u)
-
-  let rec lemma to_seq_length (a: array 'a) (l u: int)
-    requires { 0 <= l <= u <= length a }
-    variant  { u - l }
-    ensures  { S.length (to_seq_sub a l u) = u - l }
-  = if l < u then to_seq_length a (l+1) u
-
-  let rec lemma to_seq_nth (a: array 'a) (l i u: int)
-    requires { 0 <= l <= i < u <= length a }
-    variant  { i - l }
-    ensures  { S.get (to_seq_sub a l u) (i - l) = a[i] }
-  = if l < i then to_seq_nth a (l+1) i u
-
-  let function to_seq (a: array 'a) : S.seq 'a = to_seq_sub a 0 (length a)
-  meta coercion function to_seq
-
-end
-
 (** {2 Number of inversions in an array of integers}
 
     We show that swapping two elements that are ill-sorted decreases
@@ -366,8 +170,9 @@ end
 
 module Inversions
 
+  use import seq.Seq
   use import Array
-  use import ArrayExchange
+  use import seq.Exchange
   use import int.Int
   use import int.Sum
   use import int.NumOf
