@@ -212,8 +212,9 @@ let rs_of_ls ls =
     create_pvsymbol (id_fresh "u") (ity_of_ty ty)) ls.ls_args in
   let t_args = List.map (fun v -> t_var v.pv_vs) v_args in
   let q = make_post (t_app ls t_args ls.ls_value) in
-  let ity = ity_of_ty (t_type q) in
-  let c = create_cty v_args [] [q] Mxs.empty Mpv.empty eff_empty ity in
+  let ity = ity_of_ty (t_type q) and eff = eff_empty in
+  let eff = if ls.ls_constr = 0 then eff_spoil eff ity else eff in
+  let c = create_cty v_args [] [q] Mxs.empty Mpv.empty eff ity in
   mk_rs ls.ls_name c (RLls ls) None
 
 let ls_of_rs rs = match rs.rs_logic with
@@ -484,8 +485,7 @@ let e_const c ity =
 
 let e_nat_const n =
   assert (n >= 0);
-  let a = Number.int_const_of_int n in
-  e_const (Number.ConstInt a) ity_int
+  e_const (Number.const_of_int n) ity_int
 
 let e_ghostify gh ({e_effect = eff} as e) =
   if not gh then e else
@@ -764,20 +764,22 @@ let c_fun ?(mask=MaskVisible) args p q xq old e =
     | StaleVariable (v,r) -> localize_reset_stale v r [e] in
   mk_cexp (Cfun e) c
 
+let is_rs_tuple s = match s.rs_logic with
+  | RLls ls -> is_fs_tuple ls
+  | _ -> false
+
 let c_app s vl ityl ity =
   let cty = cty_apply s.rs_cty vl ityl ity in
-  let cty = match s.rs_logic with
-    | RLls ls when ityl = [] && is_fs_tuple ls -> cty_tuple vl
-    | _ -> cty in
+  let cty = if ityl = [] && is_rs_tuple s then cty_tuple vl else cty in
   mk_cexp (Capp (s,vl)) cty
 
 let c_pur s vl ityl ity =
-  if not (ity_pure ity) then Loc.errorm "This expression must have pure type";
+  if not ity.ity_pure then Loc.errorm "This expression must have pure type";
   let v_args = List.map (create_pvsymbol ~ghost:false (id_fresh "u")) ityl in
   let t_args = List.map (fun v -> t_var v.pv_vs) (vl @ v_args) in
   let res = Opt.map (fun _ -> ty_of_ity ity) s.ls_value in
   let q = make_post (t_app s t_args res) in
-  let eff = eff_ghostify true eff_empty in
+  let eff = eff_ghostify true (eff_spoil eff_empty ity) in
   let cty = create_cty v_args [] [q] Mxs.empty Mpv.empty eff ity in
   mk_cexp (Cpur (s,vl)) cty
 
@@ -794,12 +796,14 @@ let let_head hd e = List.fold_left (fun e ld -> e_let ld e) e hd
 
 let e_app s el ityl ity =
   let trues l = List.map Util.ttrue l in
+  let falses l = List.map Util.ffalse l in
   let rec down al el = match al, el with
     | {pv_ghost = gh}::al, {e_mask = m}::el ->
         if not gh && mask_ghost m then raise Exit;
         gh :: down al el
     | _, el -> trues el in
   let ghl = if rs_ghost s then trues el else
+    if ityl = [] && is_rs_tuple s then falses el else
     try down s.rs_cty.cty_args el with Exit -> trues el in
   let hd, vl = List.fold_right2 add_proxy ghl el ([],[]) in
   let_head hd (e_exec (c_app s vl ityl ity))
@@ -831,8 +835,6 @@ let e_false = e_app rs_false [] [] ity_bool
 
 let rs_tuple = Hint.memo 17 (fun n ->
   ignore (its_tuple n); rs_of_ls (fs_tuple n))
-
-let is_rs_tuple rs = rs_equal rs (rs_tuple (List.length rs.rs_cty.cty_args))
 
 let e_tuple el =
   let ity = ity_tuple (List.map (fun e -> e.e_ity) el) in
@@ -1011,6 +1013,9 @@ let e_exn xs e =
 let e_pure t =
   let ity = Opt.fold (Util.const ity_of_ty_pure) ity_bool t.t_ty in
   let eff = eff_ghostify true (eff_read (t_freepvs Spv.empty t)) in
+  let eff = match t.t_node with
+    | Tvar _ -> eff (* no magic *)
+    | _ -> eff_spoil eff ity in
   mk_expr (Epure t) ity MaskGhost eff
 
 let e_assert ak f =
@@ -1241,9 +1246,7 @@ let ambig_cty c =
   let sarg = List.fold_right freeze_pv c.cty_args isb_empty in
   let sarg = Spv.fold freeze_pv c.cty_effect.eff_reads sarg in
   let sres = ity_freeze isb_empty c.cty_result in
-  not (Mtv.set_submap sres.isb_var sarg.isb_var) ||
-  not (Mtv.set_submap sres.isb_pur
-       (Mtv.set_union sarg.isb_var sarg.isb_pur))
+  not (Mtv.set_submap sres.isb_var sarg.isb_var)
 
 let ambig_ls s =
   let sarg = List.fold_left ty_freevars Stv.empty s.ls_args in

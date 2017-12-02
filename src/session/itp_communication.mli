@@ -48,8 +48,9 @@ type message_notification =
   | Information           of string
   (** Number of task scheduled, running, etc *)
   | Task_Monitor          of int * int * int
-  (** A file was read or reloaded and now contains a parsing or typing error *)
-  | Parse_Or_Type_Error   of Loc.position * string
+  (** A file was read or reloaded and now contains a parsing or typing error.
+     second loc is relative to the session file *)
+  | Parse_Or_Type_Error   of Loc.position * Loc.position * string
   (** [File_Saved f] f was saved *)
   | File_Saved            of string
   (** An error happened that could not be identified in server *)
@@ -126,7 +127,6 @@ type ide_request =
   | Unfocus_req
   | Remove_subtree          of node_ID
   | Copy_paste              of node_ID * node_ID
-  | Copy_detached           of node_ID
   | Save_file_req           of string * string
   (** [Save_file_req(filename, content_of_file)] saves the file *)
   | Get_first_unproven_node of node_ID

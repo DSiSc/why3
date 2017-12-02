@@ -48,7 +48,7 @@ let check_field stv f =
   let ftv = ity_freevars Stv.empty f.pv_ity in
   if not (Stv.subset ftv stv) then Loc.error ?loc
     (UnboundTypeVar (Stv.choose (Stv.diff ftv stv)));
-  if not f.pv_ity.ity_imm then Loc.errorm ?loc
+  if not f.pv_ity.ity_pure then Loc.errorm ?loc
     "This field has non-pure type, it cannot be used \
      in a recursive type definition"
 
@@ -346,12 +346,12 @@ let create_type_decl dl =
         (* create max attribute *)
         let max_id = id_derive (nm ^ "'maxInt") id in
         let max_ls = create_fsymbol max_id [] ty_int  in
-        let max_defn = t_const Number.(ConstInt ir.ir_upper) ty_int in
+        let max_defn = t_const Number.(const_of_big_int ir.ir_upper) ty_int in
         let max_decl = create_logic_decl [make_ls_defn max_ls [] max_defn] in
         (* create min attribute *)
         let min_id = id_derive (nm ^ "'minInt") id in
         let min_ls = create_fsymbol min_id [] ty_int  in
-        let min_defn = t_const Number.(ConstInt ir.ir_lower) ty_int in
+        let min_defn = t_const Number.(const_of_big_int ir.ir_lower) ty_int in
         let min_decl = create_logic_decl [make_ls_defn min_ls [] min_defn] in
         let pure = [create_ty_decl ts; pj_decl; max_decl; min_decl] in
         let meta = Theory.(meta_range, [MAts ts; MAls pj_ls]) in
@@ -557,7 +557,7 @@ let create_let_decl ld =
 let create_exn_decl xs =
   if not (ity_closed xs.xs_ity) then Loc.errorm ?loc:xs.xs_name.id_loc
     "Top-level exception %a has a polymorphic type" print_xs xs;
-  if not (ity_immutable xs.xs_ity) then Loc.errorm ?loc:xs.xs_name.id_loc
+  if not xs.xs_ity.ity_pure then Loc.errorm ?loc:xs.xs_name.id_loc
     "The type of top-level exception %a has mutable components" print_xs xs;
   mk_decl (PDexn xs) []
 

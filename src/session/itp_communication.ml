@@ -45,7 +45,7 @@ type message_notification =
   | Help                  of string
   | Information           of string
   | Task_Monitor          of int * int * int
-  | Parse_Or_Type_Error   of Loc.position * string
+  | Parse_Or_Type_Error   of Loc.position * Loc.position * string
   | File_Saved            of string
   | Error                 of string
   | Open_File_Error       of string
@@ -111,7 +111,6 @@ type ide_request =
   | Unfocus_req
   | Remove_subtree          of node_ID
   | Copy_paste              of node_ID * node_ID
-  | Copy_detached           of node_ID
   | Save_file_req           of string * string
   | Get_first_unproven_node of node_ID
   | Save_req
@@ -123,8 +122,8 @@ type ide_request =
 let modify_session (r: ide_request) =
   match r with
   | Command_req _ | Add_file_req _ | Remove_subtree _ | Copy_paste _
-  | Copy_detached _ -> true
+  | Reload_req -> true
   | Set_config_param _ | Get_file_contents _
   | Get_task _ | Save_file_req _ | Get_first_unproven_node _
-  | Save_req | Reload_req | Exit_req
+  | Save_req | Exit_req
   | Interrupt_req | Focus_req _ | Unfocus_req -> false

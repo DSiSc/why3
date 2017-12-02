@@ -25,6 +25,9 @@ let get_session_dir ~allow_mkdir files =
       if Sys.is_directory first then
         (* first is a directory *)
         first
+      else if Filename.basename first = "why3session.xml" then
+        (* first is a session file *)
+        Filename.dirname first
       else
         if Queue.is_empty files then
           (* first was the only file *)
@@ -148,15 +151,15 @@ let load_strategies cont =
        let code = Strategy_parser.parse env config code in
        let shortcut = st.Whyconf.strategy_shortcut in
        Debug.dprintf debug "[session server info] Strategy '%s' loaded.@." name;
-       Stdlib.Hstr.add cont.Controller_itp.controller_strategies shortcut
-                       (name, st.Whyconf.strategy_desc, code)
+       Stdlib.Hstr.add cont.Controller_itp.controller_strategies name
+                       (name, shortcut, st.Whyconf.strategy_desc, code)
      with Strategy_parser.SyntaxError msg ->
        Format.eprintf "Fatal: loading strategy '%s' failed: %s@." name msg;
        exit 1)
     strategies
 
 let list_strategies cont =
-  Stdlib.Hstr.fold (fun s (a,_,_) acc -> (s,a)::acc) cont.Controller_itp.controller_strategies []
+  Stdlib.Hstr.fold (fun _ (name,short,_,_) acc -> (short,name)::acc) cont.Controller_itp.controller_strategies []
 
 
 let symbol_name s =
