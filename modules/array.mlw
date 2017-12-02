@@ -10,14 +10,17 @@ modification of an array does not modify its length.
 module Array
 
   use import int.Int
-  use import seq.Seq
+  use export seq.Seq
 
-  type array 'a = private {
-    mutable ghost elts : seq 'a;
-                length : int
-  } invariant { 0 <= length = len elts }
+  type array 'a = abstract {
+    mutable elts : seq 'a;
+            size : int
+  } invariant { 0 <= size = length elts }
 
   meta coercion function elts
+
+  val length (a: array 'a) : int
+    ensures  { result = length a }
 
   val ([]) (a: array 'a) (i: int) : 'a
     requires { "expl:index in array bounds" 0 <= i < length a }
