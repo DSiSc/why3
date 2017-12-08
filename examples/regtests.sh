@@ -56,14 +56,13 @@ test_generated () {
   cd ..
   mkdir -p $TMPREAL/lib
   echo "Testing isabelle realization"
-  echo $PWD
   # First copy current realization in a tmp directory
-  cp -r lib/isabelle/ $TMPREAL/lib/
+  `cp -r lib/isabelle/ $TMPREAL/lib/`
   # We want to use the makefile to be sure to check the realizations that are
   # built
   make GENERATED_PREFIX_ISABELLE="tmp/lib/isabelle" update-isabelle > /dev/null 2> /dev/null
-  TMPDIFF= diff -r lib/isabelle $TMPREAL/lib/isabelle
-  if test $TMPDIFF = "" ; then
+  TMPDIFF=`diff -r -q lib/isabelle $TMPREAL/lib/isabelle`
+  if test "$TMPDIFF" = "" ; then
     printf "ISABELLE realization OK\n"
   else
     printf "ISABELLE REALIZATION FAILED, please regenerate and prove it\n"
@@ -72,18 +71,18 @@ test_generated () {
 
   echo "Testing coq realization"
   # First copy current realization in a tmp directory
-  cp -r lib/coq/ $TMPREAL/lib/
+  `cp -r lib/coq/ $TMPREAL/lib/`
   # We want to use the makefile to be sure to check the realizations that are
   # built
   make GENERATED_PREFIX_COQ="tmp/lib/coq" update-coq > /dev/null 2> /dev/null
-  TMPDIFF= diff -r lib/coq $TMPREAL/lib/coq
-  if test $TMPDIFF = "" ; then
+  TMPDIFF=`diff -r -q lib/coq $TMPREAL/lib/coq`
+  if test "$TMPDIFF" = "" ; then
     printf "COQ realization OK\n"
   else
     printf "COQ REALIZATION FAILED, please regenerate and prove it\n"
+    printf "Generated realization are in Why3/tmp. Use --only-realization to only test realization\n"
   fi
   cd $TMPPWD
-  echo $PWD
   # Current directory is /examples
 }
 
@@ -114,7 +113,7 @@ run_dir () {
     shapes="$shapes $1/*/why3shapes.*"
 }
 
-if test $ONLY_REALIZATION = ""
+if test "$ONLY_REALIZATION" = "" ; then
     echo "=== Standard Library ==="
     run_dir stdlib
     echo ""
@@ -153,7 +152,7 @@ if test $ONLY_REALIZATION = ""
     echo "Shapes   size : "`wc -cl $shapes | tail -1`
 fi
 
-if test $CHECK_REALIZATION = "true" ; then
+if test "$CHECK_REALIZATION" = "true" ; then
     test_generated
 fi
 
