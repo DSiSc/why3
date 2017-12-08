@@ -66,6 +66,7 @@ test_generated () {
     printf "ISABELLE realization OK\n"
   else
     printf "ISABELLE REALIZATION FAILED, please regenerate and prove it\n"
+    printf "$TMPDIFF\n"
     printf "Generated realization are in Why3/tmp. Use --only-realization to only test realization\n"
   fi
 
@@ -80,6 +81,7 @@ test_generated () {
     printf "COQ realization OK\n"
   else
     printf "COQ REALIZATION FAILED, please regenerate and prove it\n"
+    printf "$TMPDIFF\n"
     printf "Generated realization are in Why3/tmp. Use --only-realization to only test realization\n"
   fi
   cd $TMPPWD
