@@ -1409,11 +1409,10 @@ $(ISABELLELIBS_BV): bin/why3realize.@OCAMLBEST@ drivers/isabelle-realizations.au
 	$(HIDE)mkdir -p lib/isabelle/bv
 	$(HIDE)WHY3CONFIG="" bin/why3realize.@OCAMLBEST@ -L theories -D $(ISABELLEREALIZEDRV) -T bv.$(notdir $(basename $@)) -o $(GENERATED_PREFIX_ISABELLE)/bv/
 
-ifeq (@enable_isabelle_libs@,yes)
-
 lib/isabelle/last_build: $(ISABELLEVERSIONSPECIFICTARGETS)
 # $(ISABELLELIBS_INT) $(ISABELLELIBS_BOOL) $(ISABELLELIBS_REAL) $(ISABELLELIBS_NUMBER) $(ISABELLELIBS_SET) $(ISABELLELIBS_MAP) $(ISABELLELIBS_LIST) $(ISABELLELIBS_OPTION) $(ISABELLELIBS_BV)
 
+ifeq (@enable_isabelle_libs@,yes)
 
 ifneq (@enable_local@,yes)
 	cp -r lib/isabelle "$(LIBDIR)/why3"
@@ -1454,8 +1453,9 @@ install_local:: lib/isabelle/last_build
 # do not update isabelle realizations systematically
 # all: update-isabelle
 
-clean::
-	rm -f lib/isabelle/*/*.xml
+# Removed cleaning of xml
+#clean::
+#	rm -f lib/isabelle/*/*.xml
 
 endif
 
