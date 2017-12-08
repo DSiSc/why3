@@ -664,22 +664,19 @@ fi
 
 # Isabelle
 
+# Default version used for generation of realization in the case Isabelle is not
+# detected or Why3 is compiled with disable-isabelle.
+ISABELLEVERSION=2017
+
 if test "$enable_isabelle_libs" = no; then
     enable_isabelle_support=no
     reason_isabelle_support=" (disabled by user)"
 else
     AC_CHECK_PROG(ISABELLE,isabelle,isabelle,no)
     if test "$ISABELLE" = no ; then
-        # This is used to force the generation of realizations.
-        if test "$enable_isabelle_no_install" = yes; then
-           enable_isabelle_support=yes
-           ISABELLEVERSION=2017
-           AC_MSG_WARN(Isabelle not detected.)
-        else
-           enable_isabelle_support=no
-           AC_MSG_WARN(Cannot find isabelle.)
-           reason_isabelle_support=" (isabelle not found)"
-        fi
+       enable_isabelle_support=no
+       AC_MSG_WARN(Cannot find isabelle.)
+       reason_isabelle_support=" (isabelle not found)"
     else
         AC_MSG_CHECKING(Isabelle version)
         ISABELLEDETECTEDVERSION=`$ISABELLE version | sed -n -e 's|Isabelle\([[^:]]*\).*$|\1|p' `

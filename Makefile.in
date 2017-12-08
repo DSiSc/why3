@@ -995,11 +995,6 @@ endif
 # Coq realizations
 ####################
 
-ifeq (@enable_coq_support@,yes)
-
-ifeq (@enable_coq_libs@,yes)
-
-
 COQVERSIONSPECIFIC=
 
 COQVERSIONSPECIFICTARGETS=$(addprefix lib/coq/, $(COQVERSIONSPECIFIC))
@@ -1095,36 +1090,6 @@ drivers/coq-realizations.aux: Makefile
 	echo 'theory floating_point.'"$$f"' meta "realized_theory" "floating_point.'"$$f"'", "" end'; done; \
 	) > $@
 
-install_no_local::
-	$(MKDIR_P) $(LIBDIR)/why3/coq
-	$(INSTALL_DATA) lib/coq/BuiltIn.vo lib/coq/HighOrd.vo $(LIBDIR)/why3/coq/
-	$(MKDIR_P) $(LIBDIR)/why3/coq/int
-	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_INT)) $(LIBDIR)/why3/coq/int/
-	$(MKDIR_P) $(LIBDIR)/why3/coq/bool
-	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_BOOL)) $(LIBDIR)/why3/coq/bool/
-	$(MKDIR_P) $(LIBDIR)/why3/coq/real
-	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_REAL)) $(LIBDIR)/why3/coq/real/
-	$(MKDIR_P) $(LIBDIR)/why3/coq/number
-	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_NUMBER)) $(LIBDIR)/why3/coq/number/
-	$(MKDIR_P) $(LIBDIR)/why3/coq/set
-	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_SET)) $(LIBDIR)/why3/coq/set/
-	$(MKDIR_P) $(LIBDIR)/why3/coq/map
-	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_MAP)) $(LIBDIR)/why3/coq/map/
-	$(MKDIR_P) $(LIBDIR)/why3/coq/list
-	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_LIST)) $(LIBDIR)/why3/coq/list/
-	$(MKDIR_P) $(LIBDIR)/why3/coq/option
-	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_OPTION)) $(LIBDIR)/why3/coq/option/
-	$(MKDIR_P) $(LIBDIR)/why3/coq/seq
-	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_SEQ)) $(LIBDIR)/why3/coq/seq/
-	$(MKDIR_P) $(LIBDIR)/why3/coq/bv
-	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_BV)) $(LIBDIR)/why3/coq/bv/
-ifeq (@enable_coq_fp_libs@,yes)
-	$(MKDIR_P) $(LIBDIR)/why3/coq/floating_point
-	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_FP)) $(LIBDIR)/why3/coq/floating_point/
-	$(MKDIR_P) $(LIBDIR)/why3/coq/ieee_float
-	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_IEEEFLOAT)) $(LIBDIR)/why3/coq/ieee_float/
-endif
-
 update-coq: update-coq-int update-coq-bool update-coq-real update-coq-number update-coq-set update-coq-map update-coq-list update-coq-option update-coq-fp update-coq-seq update-coq-bv update-coq-ieee_float
 
 update-coq-int: bin/why3realize.@OCAMLBEST@ drivers/coq-realizations.aux theories/int.why
@@ -1163,13 +1128,40 @@ update-coq-ieee_float: bin/why3realize.@OCAMLBEST@ drivers/coq-realizations.aux 
 update-coq-fp: bin/why3realize.@OCAMLBEST@ drivers/coq-realizations.aux theories/floating_point.why
 	for f in $(COQLIBS_FP_FILES); do WHY3CONFIG="" bin/why3realize.@OCAMLBEST@ -L theories -D drivers/coq-realize.drv -T floating_point.$$f -o $(GENERATED_PREFIX_COQ)/floating_point/; done
 
-else
 
-drivers/coq-realizations.aux: Makefile
-	$(SHOW) 'Generate $@'
-	$(HIDE)echo "(* generated automatically at compilation time *)" > $@
+ifeq (@enable_coq_support@,yes)
 
-COQLIBS_FILES = lib/coq/BuiltIn lib/coq/HighOrd
+ifeq (@enable_coq_libs@,yes)
+
+install_no_local::
+	$(MKDIR_P) $(LIBDIR)/why3/coq
+	$(INSTALL_DATA) lib/coq/BuiltIn.vo lib/coq/HighOrd.vo $(LIBDIR)/why3/coq/
+	$(MKDIR_P) $(LIBDIR)/why3/coq/int
+	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_INT)) $(LIBDIR)/why3/coq/int/
+	$(MKDIR_P) $(LIBDIR)/why3/coq/bool
+	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_BOOL)) $(LIBDIR)/why3/coq/bool/
+	$(MKDIR_P) $(LIBDIR)/why3/coq/real
+	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_REAL)) $(LIBDIR)/why3/coq/real/
+	$(MKDIR_P) $(LIBDIR)/why3/coq/number
+	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_NUMBER)) $(LIBDIR)/why3/coq/number/
+	$(MKDIR_P) $(LIBDIR)/why3/coq/set
+	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_SET)) $(LIBDIR)/why3/coq/set/
+	$(MKDIR_P) $(LIBDIR)/why3/coq/map
+	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_MAP)) $(LIBDIR)/why3/coq/map/
+	$(MKDIR_P) $(LIBDIR)/why3/coq/list
+	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_LIST)) $(LIBDIR)/why3/coq/list/
+	$(MKDIR_P) $(LIBDIR)/why3/coq/option
+	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_OPTION)) $(LIBDIR)/why3/coq/option/
+	$(MKDIR_P) $(LIBDIR)/why3/coq/seq
+	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_SEQ)) $(LIBDIR)/why3/coq/seq/
+	$(MKDIR_P) $(LIBDIR)/why3/coq/bv
+	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_BV)) $(LIBDIR)/why3/coq/bv/
+ifeq (@enable_coq_fp_libs@,yes)
+	$(MKDIR_P) $(LIBDIR)/why3/coq/floating_point
+	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_FP)) $(LIBDIR)/why3/coq/floating_point/
+	$(MKDIR_P) $(LIBDIR)/why3/coq/ieee_float
+	$(INSTALL_DATA) $(addsuffix .vo, $(COQLIBS_IEEEFLOAT)) $(LIBDIR)/why3/coq/ieee_float/
+endif
 
 endif
 
@@ -1199,12 +1191,6 @@ clean-coq:
 	rm -f $(COQVO) $(COQVD) $(addsuffix .glob, $(COQLIBS_FILES))
 
 clean:: clean-coq
-
-else
-
-drivers/coq-realizations.aux: Makefile
-	$(SHOW) 'Generate $@'
-	$(HIDE)echo "(* generated automatically at compilation time *)" > $@
 
 endif
 
@@ -1297,7 +1283,6 @@ clean::
 # Isabelle realizations
 #######################
 
-ifeq (@enable_isabelle_libs@,yes)
 
 ISABELLEVERSIONSPECIFIC=ROOT why3.ML Why3_BV.thy Why3_Number.thy Why3_Real.thy Why3_Set.thy
 
@@ -1368,28 +1353,6 @@ else
   ISABELLE_TARGET_DIR=$(LIBDIR)/why3/isabelle
 endif
 
-lib/isabelle/last_build: $(ISABELLEVERSIONSPECIFICTARGETS)
-# $(ISABELLELIBS_INT) $(ISABELLELIBS_BOOL) $(ISABELLELIBS_REAL) $(ISABELLELIBS_NUMBER) $(ISABELLELIBS_SET) $(ISABELLELIBS_MAP) $(ISABELLELIBS_LIST) $(ISABELLELIBS_OPTION) $(ISABELLELIBS_BV)
-ifneq (@enable_local@,yes)
-	cp -r lib/isabelle "$(LIBDIR)/why3"
-endif
-	@(if isabelle components -l | grep -q "$(ISABELLE_TARGET_DIR)$$"; then \
-	    echo "Building the Why3 heap for Isabelle/HOL:"; \
-	    isabelle build -bc Why3; \
-	    touch $@; \
-	  else \
-	    echo "[Warning] Cannot pre-build the Isabelle heap because"; \
-	    echo "  the Isabelle component configuration does not contain"; \
-	    echo "  [$(ISABELLE_TARGET_DIR)]"; \
-	  fi)
-
-install_no_local::
-	$(INSTALL_DATA) drivers/isabelle-realizations.aux $(DATADIR)/why3/drivers/
-
-install_no_local:: lib/isabelle/last_build
-
-install_local:: lib/isabelle/last_build
-
 update-isabelle: $(ISABELLELIBS_INT) $(ISABELLELIBS_BOOL) $(ISABELLELIBS_REAL) $(ISABELLELIBS_NUMBER) $(ISABELLELIBS_SET) $(ISABELLELIBS_MAP) $(ISABELLELIBS_LIST) $(ISABELLELIBS_OPTION) $(ISABELLELIBS_BV)
 
 $(ISABELLELIBS_INT): bin/why3realize.@OCAMLBEST@ drivers/isabelle-realizations.aux \
@@ -1446,6 +1409,33 @@ $(ISABELLELIBS_BV): bin/why3realize.@OCAMLBEST@ drivers/isabelle-realizations.au
 	$(HIDE)mkdir -p lib/isabelle/bv
 	$(HIDE)WHY3CONFIG="" bin/why3realize.@OCAMLBEST@ -L theories -D $(ISABELLEREALIZEDRV) -T bv.$(notdir $(basename $@)) -o $(GENERATED_PREFIX_ISABELLE)/bv/
 
+ifeq (@enable_isabelle_libs@,yes)
+
+lib/isabelle/last_build: $(ISABELLEVERSIONSPECIFICTARGETS)
+# $(ISABELLELIBS_INT) $(ISABELLELIBS_BOOL) $(ISABELLELIBS_REAL) $(ISABELLELIBS_NUMBER) $(ISABELLELIBS_SET) $(ISABELLELIBS_MAP) $(ISABELLELIBS_LIST) $(ISABELLELIBS_OPTION) $(ISABELLELIBS_BV)
+
+
+ifneq (@enable_local@,yes)
+	cp -r lib/isabelle "$(LIBDIR)/why3"
+endif
+	@(if isabelle components -l | grep -q "$(ISABELLE_TARGET_DIR)$$"; then \
+	    echo "Building the Why3 heap for Isabelle/HOL:"; \
+	    isabelle build -bc Why3; \
+	    touch $@; \
+	  else \
+	    echo "[Warning] Cannot pre-build the Isabelle heap because"; \
+	    echo "  the Isabelle component configuration does not contain"; \
+	    echo "  [$(ISABELLE_TARGET_DIR)]"; \
+	  fi)
+
+install_no_local::
+	$(INSTALL_DATA) drivers/isabelle-realizations.aux $(DATADIR)/why3/drivers/
+
+install_no_local:: lib/isabelle/last_build
+
+install_local:: lib/isabelle/last_build
+
+
 # do not update isabelle realizations systematically
 # all: update-isabelle
 
@@ -1454,12 +1444,18 @@ clean::
 
 else
 
-drivers/isabelle-realizations.aux: Makefile
-	$(SHOW) 'Generate $@'
-	$(HIDE)echo "(* generated automatically at compilation time *)" > $@
-
 install_no_local::
 	$(INSTALL_DATA) drivers/isabelle-realizations.aux $(DATADIR)/why3/drivers/
+
+install_no_local:: lib/isabelle/last_build
+
+install_local:: lib/isabelle/last_build
+
+# do not update isabelle realizations systematically
+# all: update-isabelle
+
+clean::
+	rm -f lib/isabelle/*/*.xml
 
 endif
 

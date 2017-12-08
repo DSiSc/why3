@@ -35,7 +35,7 @@ done
 
 TMP=$PWD/why3regtests.out
 TMPERR=$PWD/why3regtests.err
-TMPREAL=$PWD/tmp
+TMPREAL=/tmp
 
 # Current directory is /examples
 cd `dirname $0`
@@ -50,44 +50,39 @@ export sessions=""
 export shapes=""
 
 test_generated () {
-  # Current directory is /examples
-  TMPPWD=$PWD
   # Current directory is /why3
-  cd ..
   mkdir -p $TMPREAL/lib
   echo "Testing isabelle realization"
   # First copy current realization in a tmp directory
-  `cp -r lib/isabelle/ $TMPREAL/lib/`
-  # We want to use the makefile to be sure to check the realizations that are
-  # built
-  make GENERATED_PREFIX_ISABELLE="tmp/lib/isabelle" update-isabelle > /dev/null 2> /dev/null
-  TMPDIFF=`diff -r -q lib/isabelle $TMPREAL/lib/isabelle`
+  cp -r ../lib/isabelle/ $TMPREAL/lib/
+  # We want to use the makefile to be sure to check exhaustively the
+  # realizations that are built
+  make -C .. GENERATED_PREFIX_ISABELLE="$TMPREAL/lib/isabelle" update-isabelle > /dev/null 2> /dev/null
+  TMPDIFF=`diff -r -q -x '*.bak' ../lib/isabelle $TMPREAL/lib/isabelle`
   if test "$TMPDIFF" = "" ; then
     printf "ISABELLE realization OK\n"
   else
     printf "ISABELLE REALIZATION FAILED, please regenerate and prove it\n"
     printf "$TMPDIFF\n"
-    printf "Generated realization are in Why3/tmp. Use --only-realization to only test realization\n"
+    printf "Generated realization are in /tmp. Use --only-realization to only test realization\n"
     res=1
   fi
 
   echo "Testing coq realization"
   # First copy current realization in a tmp directory
-  `cp -r lib/coq/ $TMPREAL/lib/`
-  # We want to use the makefile to be sure to check the realizations that are
-  # built
-  make GENERATED_PREFIX_COQ="tmp/lib/coq" update-coq > /dev/null 2> /dev/null
-  TMPDIFF=`diff -r -q lib/coq $TMPREAL/lib/coq`
+  cp -r ../lib/coq/ $TMPREAL/lib/
+  # We want to use the makefile to be sure to check exhaustively the
+  # realizations that are built
+  make -C .. GENERATED_PREFIX_COQ="$TMPREAL/lib/coq" update-coq > /dev/null 2> /dev/null
+  TMPDIFF=`diff -r -q -x '*.bak' ../lib/coq $TMPREAL/lib/coq`
   if test "$TMPDIFF" = "" ; then
     printf "COQ realization OK\n"
   else
     printf "COQ REALIZATION FAILED, please regenerate and prove it\n"
     printf "$TMPDIFF\n"
-    printf "Generated realization are in Why3/tmp. Use --only-realization to only test realization\n"
+    printf "Generated realization are in /tmp. Use --only-realization to only test realization\n"
     res=1
   fi
-  cd $TMPPWD
-  # Current directory is /examples
 }
 
 run_dir () {
