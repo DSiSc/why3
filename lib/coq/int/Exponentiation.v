@@ -106,7 +106,6 @@ rewrite IHm.
 now rewrite Power_1.
 Qed.
 
-
 (* Why3 goal *)
 Lemma Power_comm1 : forall (x:t) (y:t), ((infix_as x y) = (infix_as y x)) ->
   forall (n:Z), (0%Z <= n)%Z -> ((infix_as (power x n) y) = (infix_as y
