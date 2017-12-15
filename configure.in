@@ -741,13 +741,13 @@ if test "$enable_frama_c" = yes ; then
         reason_frama_c=" (frama-c not found)"
    else
       AC_MSG_CHECKING(Frama-C version)
-      FRAMAC_VERSION=`$FRAMAC -version | sed -n -e 's|Version: *\(.*\)$|\1|p'`
+      FRAMAC_VERSION=`$FRAMAC -version | sed -n -e 's|\(Version: \)\?\(.*\)$|\2|p' `
       AC_MSG_RESULT($FRAMAC_VERSION)
       case $FRAMAC_VERSION in
-         Sodium-*) ;;
-         *) AC_MSG_WARN(Version Sodium required.)
+         Sulfur-*) ;;
+         *) AC_MSG_WARN(Version $FRAMAC_VERSION found but version Sulfur required.)
             enable_frama_c=no
-            reason_frama_c=" (version Sodium required)"
+            reason_frama_c=" (version Sulfur required)"
             ;;
       esac
       FRAMAC_SHARE=`$FRAMAC -print-path`
