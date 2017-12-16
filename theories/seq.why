@@ -131,7 +131,6 @@ theory Seq
 
 end
 
-(*
 (** {2 lemma library about algebraic interactions between
        empty/singleton/cons/snoc/++/[ .. ]} *)
 theory FreeMonoid
@@ -217,6 +216,7 @@ theory FreeMonoid
 
 end
 
+(*
 theory ToList
   use import int.Int
   use import Seq
@@ -318,7 +318,7 @@ theory Mem
 
   lemma mem_cons: forall x: 'a, s.
     length s > 0 ->
-    mem x s <-> x = s[0] \/ mem x s[1..]
+    mem x s <-> x = s[0] \/ mem x s[1 ..]
 
 end
 
@@ -430,16 +430,22 @@ theory Occ
   use int.NumOf as N
   use import Seq
 
-  function occ (x: 'a) (s: seq 'a) (l u: int) : int =
-    N.numof (fun i -> s[i] = x) l u
+  function occ (x: 'a) (s: seq 'a) : int =
+    N.numof (fun i -> s[i] = x) 0 (length s)
 
   (* TODO: lemmas for cons, snoc, etc. *)
 
   lemma append_num_occ:
-    forall x: 'a, s1 s2: seq 'a.
-    let s = s1 ++ s2 in
-      occ x s 0 (length s) =
-      occ x s1 0 (length s1) + occ x s2 0 (length s2)
+    forall s1 s2: seq 'a, x: 'a.
+    occ x (s1 ++ s2) = occ x s1 + occ x s2
+
+  lemma occ_exists:
+    forall x: 'a, s: seq 'a.
+    occ x s > 0 -> exists i: int. 0 <= i < length s /\ s[i] = x
+
+  lemma occ_pos:
+    forall s: seq 'a, i: int.
+    0 <= i < length s -> occ s[i] s > 0
 
 end
 
@@ -472,7 +478,7 @@ theory Permut
 
   predicate permut (s1 s2: seq 'a) =
     length s1 = length s2 /\
-    forall v: 'a. occ v s1 0 s1.length = occ v s2 0 s2.length
+    forall v: 'a. occ v s1 = occ v s2
 
   (** permut s1 s2 is true when sequence s1 is a permutation of
   sequence s2 *)
@@ -503,7 +509,7 @@ theory Permut
 
   lemma permut_refl: forall s: seq 'a, l u: int.
     0 <= l <= u <= length s ->
-    permut s s l u
+    permut_sub s s l u
 
   lemma permut_sym: forall s1 s2: seq 'a, l u: int.
     permut_sub s1 s2 l u -> permut_sub s2 s1 l u
