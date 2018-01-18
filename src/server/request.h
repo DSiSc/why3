@@ -1,7 +1,7 @@
 /**************************************************************************/
 /*                                                                        */
 /*  The Why3 Verification Platform   /   The Why3 Development Team        */
-/*  Copyright 2010-2018   --   Inria - CNRS - Paris-Sud University        */
+/*  Copyright 2010-2017   --   INRIA - CNRS - Paris-Sud University        */
 /*                                                                        */
 /*  This software is distributed under the terms of the GNU Lesser        */
 /*  General Public License version 2.1, with the special exception        */
@@ -14,8 +14,11 @@
 
 #include <stdbool.h>
 
+typedef enum { REQ_RUN, REQ_INTERRUPT } request_type;
+
 typedef struct {
   int key;
+  request_type req_type;
   char* id;
   int timeout;
   int memlimit;

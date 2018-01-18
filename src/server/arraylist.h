@@ -1,7 +1,7 @@
 /**************************************************************************/
 /*                                                                        */
 /*  The Why3 Verification Platform   /   The Why3 Development Team        */
-/*  Copyright 2010-2018   --   Inria - CNRS - Paris-Sud University        */
+/*  Copyright 2010-2017   --   INRIA - CNRS - Paris-Sud University        */
 /*                                                                        */
 /*  This software is distributed under the terms of the GNU Lesser        */
 /*  General Public License version 2.1, with the special exception        */
@@ -24,7 +24,7 @@ typedef struct {
   int capacity; // the capacity of the arrays key and data
 } t_list, *plist;
 // The idea is that each element in the list is a tuple (key, data), but it is
-// simpler to hahve two separate arrays for that
+// simpler to have two separate arrays for that
 
 // return a list of initial capacity <capacity>
 plist init_list(int capacity);
