@@ -146,15 +146,21 @@ AC_MSG_CHECKING(executable suffix)
 if uname -s | grep -q CYGWIN ; then
   EXE=.exe
   STRIP='echo "no strip "'
+  MYLN=cp
+  PATHKIND=windows
   AC_MSG_RESULT(.exe <Cygwin>)
 else
 if uname -s | grep -q MINGW ; then
   EXE=.exe
   STRIP=strip
+  MYLN=cp
+  PATHKIND=windows
   AC_MSG_RESULT(.exe <MinGW>)
 else
   EXE=
   STRIP=strip
+  MYLN=ln
+  PATHKIND=unixtoto
   AC_MSG_RESULT(<none>)
 fi
 fi
@@ -298,7 +304,7 @@ fi
 if test "$enable_local" = no; then
    LOCALDIR=''
 else
-   LOCALDIR="${PWD}"
+   LOCALDIR="$(ocaml test_cygwin.ml)"
 fi
 
 if test "$enable_local" = yes ; then
@@ -756,6 +762,8 @@ AC_SUBST(enable_verbose_make)
 
 AC_SUBST(EXE)
 AC_SUBST(STRIP)
+AC_SUBST(MYLN)
+AC_SUBST(PATHKIND)
 
 AC_SUBST(OCAMLC)
 AC_SUBST(OCAMLOPT)

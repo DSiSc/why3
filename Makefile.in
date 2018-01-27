@@ -55,6 +55,8 @@ COQDEP    = @COQDEP@
 COQCAMLP  = @COQCAMLP@
 COQCAMLPLIB = @COQCAMLPLIB@
 FRAMAC_LIBDIR = $(DESTDIR)@FRAMAC_LIBDIR@
+LN	  = @MYLN@
+PATHKIND  = @PATHKIND@
 
 ifeq (@enable_menhirLib@,yes)
 MENHIR	  = @MENHIR@ --table
@@ -486,7 +488,6 @@ TOOLSGENERATED = src/tools/why3wc.ml
 
 TOOLS_BIN = why3config why3execute why3extract why3prove \
 	    why3realize why3replay why3wc
-
 TOOLS_FILES = main $(TOOLS_BIN)
 
 TOOLSMODULES = $(addprefix src/tools/, $(TOOLS_FILES))
@@ -537,8 +538,9 @@ install_no_local::
 	$(INSTALL) bin/why3replay.@OCAMLBEST@  $(TOOLDIR)/why3replay$(EXE)
 	$(INSTALL) bin/why3wc.@OCAMLBEST@      $(TOOLDIR)/why3wc$(EXE)
 
-install_local:: bin/why3 $(addprefix bin/,$(TOOLS_BIN))
+install_local:: bin/why3$(EXE) $(addsuffix $(EXE), $(addprefix bin/,$(TOOLS_BIN)))
 
+ifeq ($(LN),ln)
 bin/%:	bin/%.@OCAMLBEST@
 	ln -sf $(notdir $<) $@
 
@@ -552,6 +554,21 @@ share/modules:
 
 share/theories:
 	ln -snf ../theories share/theories
+else
+bin/%$(EXE):	bin/%.@OCAMLBEST@
+	cp -f $< $@
+
+install_local:: share/drivers share/modules share/theories
+
+share/drivers:
+	cp -rf ../drivers share/drivers
+
+share/modules:
+	cp -rf ../modules share/modules
+
+share/theories:
+	cp -rf ../theories share/theories
+endif
 
 ifneq "$(MAKECMDGOALS:clean%=clean)" "clean"
 -include $(TOOLSDEP)
@@ -744,7 +761,7 @@ clean_old_install::
 install_no_local::
 	$(INSTALL) bin/why3ide.@OCAMLBEST@ $(TOOLDIR)/why3ide$(EXE)
 
-install_local:: bin/why3ide
+install_local:: bin/why3ide$(EXE)
 
 endif
 
@@ -790,7 +807,7 @@ clean_old_install::
 install_no_local::
 	$(INSTALL) bin/why3session.@OCAMLBEST@ $(TOOLDIR)/why3session$(EXE)
 
-install_local:: bin/why3session
+install_local:: bin/why3session$(EXE)
 
 
 ##############
@@ -1464,7 +1481,7 @@ clean_old_install::
 install_no_local::
 	$(INSTALL) bin/why3doc.@OCAMLBEST@ $(TOOLDIR)/why3doc$(EXE)
 
-install_local:: bin/why3doc
+install_local:: bin/why3doc$(EXE)
 
 #########
 # trywhy3

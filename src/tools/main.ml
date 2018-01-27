@@ -51,6 +51,8 @@ let command_path = match Config.localdir with
   | Some p -> Filename.concat p "bin"
   | None -> Filename.concat Config.libdir "commands"
 
+let command_path = Sysutil.cygpath command_path
+
 let extra_help fmt commands =
   fprintf fmt "@\nAvailable commands:@.";
   List.iter (fun (v,_) -> fprintf fmt "  %s@." v) commands
@@ -58,8 +60,9 @@ let extra_help fmt commands =
 let available_commands () =
   let commands = Sys.readdir command_path in
   Array.sort String.compare commands;
-  let re = Str.regexp "^why3\\([^.]+\\)\\([.].*\\)?" in
+  let re = Str.regexp "^why3\\([^.]+\\)\\([.].*\\)?[.]exe" in
   let commands = Array.fold_left (fun acc v ->
+      Printf.printf "cmds:%s\n%!" v;
     if Str.string_match re v 0 then
       let w = Str.matched_group 1 v in
       match acc with
@@ -90,7 +93,10 @@ let command sscmd =
     if i <> !Arg.current then args := Sys.argv.(i) :: !args;
   done;
   let scmd = "why3 " ^ sscmd in
-  Unix.execv cmd (Array.of_list (scmd :: List.rev !args))
+  let l = scmd :: List.rev !args in
+  let l = List.map (Printf.sprintf "%S") l in
+  Printf.printf "%s %s\n%!" cmd (String.concat "|" l);
+  Unix.execv cmd (Array.of_list l)
 
 let () = try
   let extra_help fmt () = extra_help fmt (available_commands ()) in

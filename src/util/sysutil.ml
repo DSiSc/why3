@@ -211,3 +211,16 @@ let uniquify file =
   done;
   let file = name ^ "_" ^ (string_of_int !i) ^ ext in
   file
+
+
+let cygpath file =
+  open_temp_file "cygpath" (fun tmp out ->
+      let fd = Unix.descr_of_out_channel out in
+      let pid = Unix.create_process "cygpath" [|"cygpath";"-w";file|] Unix.stdin fd fd in
+      let _,status = Unix.waitpid [] pid in
+      match status with
+      | Unix.WEXITED 0 ->
+        close_out out;
+        String.trim (file_contents tmp)
+      | _ -> (** error do nothing *) file
+    )

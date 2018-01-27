@@ -73,3 +73,6 @@ val uniquify : string -> string
 (** find filename that doesn't exists based on the given filename.
     Be careful the file can be taken after the return of this function.
 *)
+
+
+val cygpath: string -> string
