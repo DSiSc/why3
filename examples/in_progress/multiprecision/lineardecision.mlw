@@ -1513,62 +1513,6 @@ goal g'': forall r r' i c x x' y l: int.
   x' = x + power radix i * l ->
   r' + power radix (i+1) * c = x' + y
 
-(*tries to add power radix i and power radix (i+1), fails
-  -> cst propagation ? *)
-
-end
-
-module Test2
-
-use import int.Int
-use import LinearDecisionInt
-
-goal g: forall x y z: int.
-  x + y = 0 ->
-  y - z = 0 ->
-  x = 0
-
-end
-
-module Fmla
-
-use import map.Map
-use import int.Int
-
-type value
-constant dummy : value
-predicate foo value
-function add value value : value
-
-type term = Val int | Add term term
-type fmla = Forall fmla | Foo term
-
-function interp_term (t:term) (b:int->value) : value =
-  match t with
-  | Val n -> b n
-  | Add t1 t2 -> add (interp_term t1 b) (interp_term t2 b)
-  end
-
-function interp_fmla (f:fmla) (l:int) (b:int->value) : bool =
-  match f with
-  | Foo t -> foo (interp_term t b)
-  | Forall f -> forall v. interp_fmla f (l-1) b[l <- v]
-  end
-
-function interp (f:fmla) (b: int -> value) : bool =
-  interp_fmla f (-1) b
-
-let f (f:fmla) : bool
-  ensures { result -> forall b. interp f b }
-= false
-end
-
-module TestFmla
-
-use import Fmla
-
-goal g:
-     forall a: value.
-     ((forall x. forall y. foo (add x (add (add a dummy) y))) = True)
+(* Add examples here! *)
 
 end
