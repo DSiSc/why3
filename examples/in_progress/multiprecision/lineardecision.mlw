@@ -1504,6 +1504,7 @@ goal g': forall a b i j: int.
   (power radix i) * a = b ->
   i+1 = j ->
   (power radix j) * a = radix*b
+  (* subst j before reflection is needed *)
 
 goal g'': forall r r' i c x x' y l: int.
   0 <= i ->
@@ -1513,6 +1514,14 @@ goal g'': forall r r' i c x x' y l: int.
   x' = x + power radix i * l ->
   r' + power radix (i+1) * c = x' + y
 
-(* Add examples here! *)
+goal h: forall a b c d i: int.
+  0 <= i ->
+  a + (power radix i) * b = (power radix (i+2)) * c + 2 ->
+  b = radix * radix * c ->
+  -3 * d + 63 * a = 0 ->
+  d = 42
+(* Prove this yourself with "reflection_f mp_decision" *)
+
+(* Try your own examples here! *)
 
 end

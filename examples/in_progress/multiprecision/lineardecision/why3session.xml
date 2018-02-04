@@ -6,7 +6,7 @@
 <prover id="1" name="CVC4" version="1.4" timelimit="1" steplimit="0" memlimit="1000"/>
 <prover id="2" name="Z3" version="4.5.0" timelimit="1" steplimit="0" memlimit="1000"/>
 <prover id="3" name="Eprover" version="1.9.1-001" timelimit="10" steplimit="0" memlimit="2000"/>
-<file name="../lineardecision.mlw" proved="true">
+<file name="../lineardecision.mlw">
 <theory name="LinearEquationsCoeffs" proved="true" sum="488b407c1df82858497b5d843f9fa9de">
  <goal name="VC czero" expl="VC for czero" proved="true">
  <proof prover="2"><result status="valid" time="0.02"/></proof>
@@ -2770,7 +2770,7 @@
  <proof prover="2"><result status="valid" time="0.10"/></proof>
  </goal>
 </theory>
-<theory name="TestMP" proved="true" sum="772ba346049009c99e431140871e0a1c">
+<theory name="TestMP" sum="78be918031994ec1f0ba23b76c90db3b">
  <goal name="g" proved="true">
  <transf name="reflection_f" proved="true" arg1="mp_decision">
   <goal name="g.0" expl="reification check" proved="true">
@@ -2827,6 +2827,8 @@
   <proof prover="2"><result status="valid" time="0.02"/></proof>
   </goal>
  </transf>
+ </goal>
+ <goal name="h">
  </goal>
 </theory>
 </file>

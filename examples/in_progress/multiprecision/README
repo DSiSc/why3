@@ -2,7 +2,7 @@ The working directory contains two WhyML files :
  - mp2.mlw is our formalization of GMP algorithms
  - lineardecision.mlw contains our decision procedure for linear equation systems (module LinearEquationsDecision) and its specialization to GMP goals (module LinearDecisionIntMP), as well as a few example goals (module TestMP and others).
 
-You can open the Why3 IDE on either file with the following command:
+You can open the Why3 IDE on either file (expect 20+ seconds of loading time for mp2.mlw) with the following command:
     why3 ide -L . <FILENAME>
 
 All the large blocks of commented code in mp2.mlw (e.g., lines 1810-1853 and 4604-4668) correspond to user-supplied cut indications for assertions that are now proved by reflection.
@@ -10,15 +10,18 @@ All the large blocks of commented code in mp2.mlw (e.g., lines 1810-1853 and 460
 You may also consult the proof session of mp2.mlw with the command:
     firefox mp2/why3session.html
 
-The goals proved with reflection can be found by searching for "reflection" in the session.
+The goals proved using our decision procedure can be found by searching for "reflection" in the session.
 
 
-Trying reflection on your own examples
+*Trying reflection on your own*
 
-You may add your own examples to the TestMP module (at the end of lineardecision.mlw), and then try to prove them in the Why3 IDE by mimicking the proofs of the existing ones. The Why3 IDE has a builtin text editor, but you can also install your editor of choice with apt-get. The reflection procedure is called with the command "reflection_f mp_decision" in the Why3 IDE command line.
+The goal h from module TestMP has been left for you to prove. To do so, select it in the IDE and call the command "reflection_f mp_decision" in the IDE command line. This results in two subgoals. The first one is that the postcondition of the decision procedure mp_decision implies the goal, and the second one is the precondition of the decision procedure.
+You can now prove both of these subgoals with an automated prover such as Alt-Ergo. For each of the goals, you can do so by selecting it in the IDE and calling "altergo" from the command line.
+
+You may also add your own examples to the TestMP module (at the end of lineardecision.mlw), and then try to prove them in the Why3 IDE by mimicking the proofs of the existing ones. The Why3 IDE has a builtin text editor, but you can also install your editor of choice with apt-get. The reflection procedure is called with the command "reflection_f mp_decision" in the Why3 IDE command line.
 
 
-Why3 sources
+*Why3 sources*
 
 The directory ~/why3 contains the Why3 sources. Among other things, the reification procedure and the interpreter referenced in the paper can be found in the file ~/why3/src/transform/reification.ml
 
