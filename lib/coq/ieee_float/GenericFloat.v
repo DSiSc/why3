@@ -273,6 +273,11 @@ Definition roundToIntegral: mode -> t -> t.
 Defined.
 
 (* Why3 goal *)
+Definition rem: t -> t -> t.
+
+Defined.
+
+(* Why3 goal *)
 Definition min: t -> t -> t.
   exact (fun x y => match Bcompare _ _ x y with
            | Some Lt => x

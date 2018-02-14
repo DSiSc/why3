@@ -22,6 +22,7 @@ theory ieee_float.GenericFloat
    syntax function sqrt "(fp.sqrt %1 %2)"
 
    syntax function roundToIntegral "(fp.roundToIntegral %1 %2)"
+   syntax function rem  "(fp.rem %1 %2)"
 
    syntax function min "(fp.min %1 %2)"
    syntax function max "(fp.max %1 %2)"
