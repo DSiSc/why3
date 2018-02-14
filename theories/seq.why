@@ -33,15 +33,12 @@ theory Seq
     to_map s i
 
   (** equality is extensional *)
-  predicate (==) (s1 s2: seq 'a)
+  predicate (==) (s1 s2: seq 'a) =
+    length s1 = length s2 /\
+    (forall i: int. 0 <= i < length s1 -> s1[i] = s2[i])
 
   axiom extensionality:
     forall s1 s2: seq 'a. s1 == s2 -> s1 = s2
-
-  axiom eq_def:
-    forall s1 s2: seq 'a.
-      length s1 = length s2 /\
-      (forall i: int. 0 <= i < length s1 -> s1[i] = s2[i]) -> s1 == s2
 
   (** sequence comprehension *)
   function create (n: int) (f: int -> 'a) : seq 'a
