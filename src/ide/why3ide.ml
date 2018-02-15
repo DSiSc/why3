@@ -1472,13 +1472,9 @@ let on_selected_row r =
     let typ = get_node_type id in
     match typ with
     | NGoal ->
-      let detached = get_node_detached id in
-      if detached then
-        task_view#source_buffer#set_text ""
-      else
-        let b = gconfig.intro_premises in
+        let _b = gconfig.intro_premises in
         let c = gconfig.show_full_context in
-        send_request (Get_task(id,b,c,true))
+        send_request (Get_task(id,c,true))
     | NProofAttempt ->
        let (pa, _obs, _l) = Hint.find node_id_pa id in
        let output_text =
@@ -1504,17 +1500,13 @@ let on_selected_row r =
        edited_view#scroll_to_mark `INSERT;
        counterexample_view#source_buffer#set_text "(not yet available)";
        counterexample_view#scroll_to_mark `INSERT;
-       let detached = get_node_detached id in
-       if detached then
-         task_view#source_buffer#set_text ""
-       else
-         let b = gconfig.intro_premises in
-         let c = gconfig.show_full_context in
-         send_request (Get_task(id,b,c,true))
-    | _ ->
-       let b = gconfig.intro_premises in
+       let _b = gconfig.intro_premises in
        let c = gconfig.show_full_context in
-       send_request (Get_task(id,b,c,true))
+       send_request (Get_task(id,c,true))
+    | _ ->
+       let _b = gconfig.intro_premises in
+       let c = gconfig.show_full_context in
+       send_request (Get_task(id,c,true))
   with
     | Not_found -> task_view#source_buffer#set_text ""
 

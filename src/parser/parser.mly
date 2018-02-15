@@ -23,28 +23,43 @@
   let floc s e = Loc.extract (s,e)
 
   let model_label = Ident.create_label "model"
-  let model_projected = Ident.create_label "model_projected"
+(*  let model_projected = Ident.create_label "model_projected"*)
 
-  let is_model_label l = match l with
-    | Lstr lab -> Ident.lab_equal lab model_label ||
-                  Ident.lab_equal lab model_projected
+(*
+  let is_model_label l =
+    match l with
     | Lpos _ -> false
+    | Lstr lab ->
+      (lab = model_label) || (lab = model_projected)
 
-  let model_lab_present labels = List.exists is_model_label labels
+  let model_lab_present labels =
+    List.exists is_model_label labels
+*)
 
   let is_model_trace_label l = match l with
     | Lstr lab -> Strings.has_prefix "model_trace:" lab.Ident.lab_string
     | Lpos _ -> false
 
-  let model_trace_lab_present labels = List.exists is_model_trace_label labels
+  let model_trace_lab_present labels =
+    List.exists is_model_trace_label labels
 
-  let add_model_trace name labels =
-    if model_lab_present labels && not (model_trace_lab_present labels) then
-      (Lstr (Ident.create_label ("model_trace:" ^ name)))::labels
+  let add_model_trace id =
+    if model_trace_lab_present id.id_lab then
+      id
     else
-      labels
+      let l =
+        (Lstr (Ident.create_label ("model_trace:" ^ id.id_str)))
+        ::(Lstr model_label) :: id.id_lab in
+      { id with id_lab = l }
 
-  let add_lab id l = { id with id_lab = add_model_trace id.id_str l }
+  let add_lab id l =
+    { id with id_lab = l }
+
+  let add_model_labels (b : binder) =
+    match b with
+    | (loc, Some id, ghost, ty) ->
+      (loc, Some (add_model_trace id), ghost, ty)
+    | _ -> b
 
   let id_anonymous loc = { id_str = "_"; id_lab = []; id_loc = loc }
 
@@ -459,7 +474,7 @@ binder:
     { match $1 with
       | PTtyapp (Qident id, [])
       | PTparen (PTtyapp (Qident id, [])) ->
-             [floc $startpos $endpos, Some id, false, None]
+          [floc $startpos $endpos, Some id, false, None]
       | _ -> [floc $startpos $endpos, None, false, Some $1] }
 | LEFTPAR GHOST ty RIGHTPAR
     { match $3 with
@@ -579,7 +594,8 @@ single_term_:
 | MATCH term WITH match_cases(term) END
     { Tmatch ($2, $4) }
 | quant comma_list1(quant_vars) triggers DOT term
-    { Tquant ($1, List.concat $2, $3, $5) }
+    { let l = List.map add_model_labels (List.concat $2) in
+      Tquant ($1, l, $3, $5) }
 | FUN binders ARROW term
     { Tquant (Dterm.DTlambda, $2, [], $4) }
 | EPSILON
@@ -668,7 +684,7 @@ numeral:
 (* Program declarations *)
 
 prog_decl:
-| VAL ghost kind labels(lident_rich) mk_expr(val_defn) { Dlet ($4, $2, $3, $5) }
+| VAL ghost kind labels(lident_rich) mk_expr(val_defn) { Dlet (add_model_trace $4, $2, $3, $5) }
 | LET ghost kind labels(lident_rich) mk_expr(fun_defn) { Dlet ($4, $2, $3, $5) }
 | LET ghost kind labels(lident_rich) const_defn        { Dlet ($4, $2, $3, $5) }
 | LET REC with_list1(rec_defn)                         { Drec $3 }
@@ -698,7 +714,7 @@ fun_defn:
 | binders ret_opt spec EQUAL spec seq_expr
     { let id = mk_id return_id $startpos($4) $endpos($4) in
       let e = { $6 with expr_desc = Eoptexn (id, snd $2, $6) } in
-      Efun ($1, fst $2, snd $2, spec_union $3 $5, e) }
+      Efun (List.map add_model_labels $1, fst $2, snd $2, spec_union $3 $5, e) }
 
 val_defn:
 | params ret_opt spec
