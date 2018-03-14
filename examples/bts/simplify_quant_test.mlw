@@ -1,0 +1,167 @@
+
+
+module Test
+
+   use import int.Int
+
+   let a (c: int) : unit =
+   assert {c = 0 /\ forall temp___428 temp___429: int.
+    if temp___428 = 0 then
+      if temp___429 = 2 \/ temp___429 = 3 then
+        c = 1111
+      else
+        if temp___429 = 1 then
+          c = 2222
+        else
+          if temp___429 = 0 then
+            c = 3333
+          else
+            c = 4444
+    else
+      c = 5555};
+    ()
+
+end
+
+module Test2
+
+   use import int.Int
+
+   let b (c: int) : unit =
+   assert {c = 0 /\ forall temp___428 temp___429: int.
+    if temp___428 = 0 then
+      if temp___429 = 2 \/ temp___429 = 3 then
+        c = temp___429
+      else
+        if temp___429 = 1 then
+          c = 2222
+        else
+          if temp___429 = 0 then
+            c = 3333
+          else
+            c = 4444
+    else
+      c = 5555};
+    ()
+
+end
+
+
+module Test3
+
+  use import int.Int
+  
+  let b1 (c: int) : unit =
+   assert {forall temp___428 temp___429: int.
+    if temp___428 = 0 then
+      if temp___429 = 2 \/ temp___429 = 3 then
+        c = 1111
+      else
+        if temp___429 = 1 then
+          c = 2222
+        else
+          if temp___429 = 0 then
+            c = 3333
+          else
+            c = 4444
+    else
+      c = 5555};
+    ()
+  
+end
+
+
+module Test4
+
+  use import int.Int
+  
+  function unknown int int :int  
+  
+  let b2 (_ : unit) : unit =
+    assert {forall c d. c = 0 /\ forall a b.
+      if (a = 1) then
+        unknown a b = c
+      else
+        unknown a b = d}
+
+end
+
+
+module Test5
+
+  use import int.Int  
+  
+  function unknown int int :int  
+
+  let f (_ : unit) : unit = 
+  assert {forall c1 c2 c3 c4 c5. c1 = 0 /\ forall a b.
+    if a  = 2 then
+      unknown a b = c1
+    else 
+      if a = 1 then
+        if b = 5 then
+          unknown a b = c2
+        else
+          if b = 3 then
+            unknown a b = c3
+          else
+            unknown a b = c4
+      else
+        unknown a b = c5}
+      
+end
+
+module Test6
+
+  use import int.Int  
+  
+  function unknown int int :int  
+
+  let f (_ : unit) : unit = 
+  assert {forall c1 c2 c3 c4 c5. c1 = 0 /\ forall a b.
+    if a  = 2 \/ a = 12 then
+      unknown a b = c1
+    else
+      if a = 1 \/ a = 5 then
+        if b = 5 then
+          unknown a b = c2
+        else
+          if b = 3 \/ b = 83 then
+            unknown a b = c3
+          else
+            unknown a b = c4
+      else
+        unknown a b = c5}
+
+end
+
+(*module Test3D
+
+  use import int.Int  
+  
+  function unknown int int :int  
+
+  let f (_ : unit) : unit = 
+  assert {forall c1 c2 c3 c4 c5. c1 = 0 /\ forall a b.
+
+ axiom def_axiom :
+  (forall temp___279 #"arrays_multidim.adb" 108 0 0#  temp___280 #"arrays_multidim.adb" 108 0 0#  temp___281 #"arrays_multidim.adb" 108 0 0#  temp___282 #"arrays_multidim.adb" 108 0 0#  temp___283 #"arrays_multidim.adb" 108 0 0#  temp___284 #"arrays_multidim.adb" 108 0 0#  temp___285 #"arrays_multidim.adb" 108 0 0#  : int.
+   (let temp___278 = (temp___277 temp___279 temp___280 temp___281 temp___282 temp___283 temp___284 temp___285) in (
+    (forall temp___286 #"arrays_multidim.adb" 108 0 0#  temp___287 #"arrays_multidim.adb" 108 0 0#  temp___288 #"arrays_multidim.adb" 108 0 0#  : BV8.t.
+     (if ((temp___286 = ( 1 : BV8.t ))) then (
+      (if ((temp___287 = ( 2 : BV8.t ))) then (
+       (if ((temp___288 = ( 7 : BV8.t ))) then (
+        ((Array__BV8_BV8_BV8__Standard__natural.get temp___278 temp___286 temp___287 temp___288) = (Standard__natural__rep.of_rep temp___282))) else (
+        ((Array__BV8_BV8_BV8__Standard__natural.get temp___278 temp___286 temp___287 temp___288) = (Standard__natural__rep.of_rep temp___283))))) else if ((temp___287 = ( 3 : BV8.t ))) then (
+       (if (( (temp___288 = ( 3 : BV8.t )) \/ (temp___288 = ( 1 : BV8.t )) )) then (
+        ((Array__BV8_BV8_BV8__Standard__natural.get temp___278 temp___286 temp___287 temp___288) = (Standard__natural__rep.of_rep temp___280))) else if ((temp___288 = ( 5 : BV8.t ))) then (
+        ((Array__BV8_BV8_BV8__Standard__natural.get temp___278 temp___286 temp___287 temp___288) = (Standard__natural__rep.of_rep temp___279))) else (
+        ((Array__BV8_BV8_BV8__Standard__natural.get temp___278 temp___286 temp___287 temp___288) = (Standard__natural__rep.of_rep temp___281))))) else (
+       ((Array__BV8_BV8_BV8__Standard__natural.get temp___278 temp___286 temp___287 temp___288) = (Standard__natural__rep.of_rep temp___284))))) else (
+      ((Array__BV8_BV8_BV8__Standard__natural.get temp___278 temp___286 temp___287 temp___288) = (Standard__natural__rep.of_rep temp___285)))))))
+  )
+
+
+end
+*)
+
