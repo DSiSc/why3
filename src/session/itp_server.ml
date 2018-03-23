@@ -1122,12 +1122,12 @@ end
       Format.eprintf "Fatal anomaly in Itp_server.notify_change_proved@.";
       exit 1
 
-  let schedule_proof_attempt ~counterexmp nid (p: Whyconf.config_prover) limit =
+  let schedule_proof_attempt nid (p: Whyconf.config_prover) limit =
     let d = get_server_data () in
     let prover = p.Whyconf.prover in
     let callback = callback_update_tree_proof d.cont in
     let unproven_goals = unproven_goals_below_id d.cont (any_from_node_ID nid) in
-    List.iter (fun id -> C.schedule_proof_attempt d.cont id prover ~counterexmp
+    List.iter (fun id -> C.schedule_proof_attempt d.cont id prover
                 ~limit ~callback ~notification:(notify_change_proved d.cont))
       unproven_goals
 
@@ -1230,7 +1230,7 @@ end
 
   let debug_strat = Debug.register_flag "strategy_exec" ~desc:"Trace strategies execution"
 
-  let run_strategy_on_task ~counterexmp nid s =
+  let run_strategy_on_task nid s =
     let d = get_server_data () in
     let unproven_goals = unproven_goals_below_id d.cont (any_from_node_ID nid) in
     try
@@ -1242,7 +1242,7 @@ end
       let callback_pa = callback_update_tree_proof d.cont in
       let callback_tr tr args st = callback_update_tree_transform tr args st in
       List.iter (fun id ->
-                 C.run_strategy_on_goal d.cont id st ~counterexmp
+                 C.run_strategy_on_goal d.cont id st
                     ~callback_pa ~callback_tr ~callback ~notification:(notify_change_proved d.cont))
                 unproven_goals
     with
@@ -1380,7 +1380,6 @@ end
 
   let treat_request r =
     let d = get_server_data () in
-    let config = d.cont.controller_config in
     (* Check that the request does not refer to obsolete node_ids *)
     if not (request_is_valid r) then
       begin
@@ -1446,11 +1445,9 @@ end
         | Transform (s, _t, args) -> apply_transform nid s args
         | Query s                 -> P.notify (Message (Query_Info (nid, s)))
         | Prove (p, limit)        ->
-            let counterexmp = Whyconf.cntexample (Whyconf.get_main config) in
-            schedule_proof_attempt ~counterexmp nid p limit
+            schedule_proof_attempt nid p limit
         | Strategies st           ->
-            let counterexmp = Whyconf.cntexample (Whyconf.get_main config) in
-            run_strategy_on_task ~counterexmp nid st
+            run_strategy_on_task nid st
         | Edit p                  -> schedule_edition nid p
         | Bisect                  -> schedule_bisection nid
         | Replay valid_only       -> replay ~valid_only snid
