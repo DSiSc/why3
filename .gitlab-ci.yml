@@ -15,7 +15,7 @@ init:
 .init_template: &init_definition
   stage: init
   script:
-    - docker init -t bench-image-$COMPILER -f misc/Dockerfile.init .
+    - docker build -t bench-image-$COMPILER -f misc/Dockerfile.init --build-arg compiler=$COMPILER .
 
 init-4.03.0:
   variables:
