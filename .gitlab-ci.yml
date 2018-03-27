@@ -40,7 +40,7 @@ init-4.06.0:
 build:
   stage: build
   script:
-    - docker run -t --rm bench-image -f misc/build.sh
+    - docker run -t --rm bench-image misc/build.sh
 
 .build_template: &build_definition
   stage: build
