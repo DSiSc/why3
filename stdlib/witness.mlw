@@ -45,3 +45,12 @@ module Witness
     search 0
 
 end
+
+module Witness_non_constructive
+
+  val ghost function get_ghost (p: 'a -> bool) : 'a
+    requires { exists x. p x }
+    ensures { p result }
+
+
+end
