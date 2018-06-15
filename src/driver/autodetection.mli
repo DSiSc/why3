@@ -9,11 +9,22 @@
 (*                                                                  *)
 (********************************************************************)
 
+val debug: Debug.flag
+val info: Debug.flag
+
 (** Lists prover id strings from detection config *)
 val list_prover_ids : unit -> string list
 
 (** Adds a new prover executable *)
 val add_prover_binary : Whyconf.config -> string -> string -> Whyconf.config
 
+type autodetection_result
+
+(** Detect the provers *)
+val run_auto_detection : Whyconf.config -> autodetection_result
+
 (** Replace the provers by autodetected one *)
-val run_auto_detection : Whyconf.config -> Whyconf.config
+val generate_builtin_config : autodetection_result -> Whyconf.config -> Whyconf.config
+
+(** Replace the output of provers with the current one *)
+val generate_detected_config : autodetection_result -> Whyconf.detected_prover list
