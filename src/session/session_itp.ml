@@ -369,10 +369,21 @@ let fold_all_any_of_file s f acc file =
     List.fold_left (fold_all_any_of_theory s f) acc file.file_theories in
   f acc (AFile file)
 
+let search_file file s =
+  Hstr.find s.session_files file
+
+let search_theory th s =
+  let file = search_file th.theory_parent_name s in
+  List.find (fun x -> Ident.id_equal th.theory_name x.theory_name) file.file_theories
+
 let fold_all_any s f acc any =
   match any with
-  | AFile file -> fold_all_any_of_file s f acc file
-  | ATh th -> fold_all_any_of_theory s f acc th
+  | AFile file ->
+      let file = search_file file.file_name s in
+      fold_all_any_of_file s f acc file
+  | ATh th ->
+      let th = search_theory th s in
+      fold_all_any_of_theory s f acc th
   | APn pn -> fold_all_any_of_proofn s f acc pn
   | ATn tn -> fold_all_any_of_transn s f acc tn
   | APa _ -> f acc any
@@ -840,6 +851,16 @@ let mark_obsolete s (id: proofAttemptID) =
 
 exception RemoveError
 
+let update_theory (s: session) (th: theory) =
+  let file_name = th.theory_parent_name in
+  let sfile = Hstr.find s.session_files file_name in
+  Hstr.replace s.session_files file_name
+    {sfile with file_theories =
+     List.map
+       (fun x ->
+         if (Ident.id_equal x.theory_name th.theory_name) then th else x)
+       sfile.file_theories}
+
 let remove_subtree ~(notification:notifier) ~(removed:notifier) s (n: any) =
   let remove (n: any) =
     match n with
@@ -852,10 +873,11 @@ let remove_subtree ~(notification:notifier) ~(removed:notifier) s (n: any) =
        begin
          match node.proofn_parent with
          | Theory th ->
-            th.theory_goals <- List.filter ((<>) pn) th.theory_goals
+             th.theory_goals <- List.filter ((<>) pn) th.theory_goals;
+             update_theory s th
          | Trans tr ->
             let nt = get_transfNode s tr in
-            nt.transf_subtasks <- List.filter ((<>) pn) nt.transf_subtasks
+            nt.transf_subtasks <- List.filter ((<>) pn) nt.transf_subtasks;
        end
     | ATh th ->
        let f = theory_parent s th in
