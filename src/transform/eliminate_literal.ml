@@ -62,7 +62,7 @@ let elim le_int le_real neg_real type_kept kn
       let hi = ir.Number.ir_upper in
       let ty_decl = create_ty_decl ts in
       let ls_decl = create_param_decl to_int in
-      let pr = create_prsymbol (id_fresh (ts.ts_name.id_string ^ "'axiom")) in
+      let pr = create_prsymbol (id_fresh (name_concat_append ts.ts_name.id_string "'axiom")) in
       let v = create_vsymbol (id_fresh "i") (ty_app ts []) in
       let v_term = t_app to_int [t_var v] (Some ty_int) in
       let a_term = t_bigint_const lo in
@@ -89,7 +89,7 @@ let elim le_int le_real neg_real type_kept kn
       let isFinite_decl = create_param_decl is_finite in
       (* create defining axiom *)
       (* [forall v:t. is_finite v -> | to_real v | <= max] *)
-      let pr = create_prsymbol (id_fresh (ts.ts_name.id_string ^ "'axiom")) in
+      let pr = create_prsymbol (id_fresh (name_concat_append ts.ts_name.id_string "'axiom")) in
       let v = create_vsymbol (id_fresh "x") (ty_app ts []) in
       let v_term = t_app to_real [t_var v] (Some ty_real) in
       (* compute max *)

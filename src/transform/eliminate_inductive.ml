@@ -44,7 +44,7 @@ let inv acc (ps,al) =
     Simplify_formula.fmla_remove_quant ~keep_model_vars:false (t_implies hd dj)
   in
   let ax = t_forall_close vl [] hsdj in
-  let nm = id_derive (ps.ls_name.id_string ^ "_inversion") ps.ls_name in
+  let nm = id_derive (name_concat_append ps.ls_name.id_string "_inversion") ps.ls_name in
   create_prop_decl Paxiom (create_prsymbol nm) ax :: acc
 
 let elim d = match d.d_node with

@@ -275,7 +275,7 @@ let ident h id =
   let x =
     try Ident.Mid.find id !h
     with Not_found ->
-      let s = id.Ident.id_string in
+      let s = Ident.name_to_string id.Ident.id_string in
       h := Ident.Mid.add id s !h; s
   in
   push x

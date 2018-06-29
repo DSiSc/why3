@@ -336,7 +336,8 @@ let get_pvs env pvs =
     try
       Mvs.find pvs.pv_vs env.vsenv
   with Not_found ->
-    eprintf "program variable %s not found in env@."
+    eprintf "program variable %a not found in env@."
+      Ident.print_name
       pvs.pv_vs.vs_name.Ident.id_string;
     assert false
   in
@@ -403,8 +404,8 @@ let print_logic_result fmt r =
     | Normal v ->
       fprintf fmt "@[%a@]" print_value v
     | Excep(x,v) ->
-      fprintf fmt "@[exception %s(@[%a@])@]"
-        x.xs_name.Ident.id_string print_value v
+      fprintf fmt "@[exception %a(@[%a@])@]"
+        Ident.print_name x.xs_name.Ident.id_string print_value v
     | Irred e ->
       fprintf fmt "@[Cannot execute expression@ @[%a@]@]"
         print_expr e
@@ -435,16 +436,16 @@ let rec find_constr_or_proj dl rs =
     if List.mem rs d.Pdecl.itd_constructors then
       begin
         Debug.dprintf debug
-          "@[<hov 2>[interp] found constructor:@ %s@]@."
-          rs.rs_name.Ident.id_string;
+          "@[<hov 2>[interp] found constructor:@ %a@]@."
+          Ident.print_name rs.rs_name.Ident.id_string;
         Constructor d
       end
     else
       if List.mem rs d.Pdecl.itd_fields then
         begin
           Debug.dprintf debug
-            "@[<hov 2>[interp] found projection:@ %s@]@."
-            rs.rs_name.Ident.id_string;
+            "@[<hov 2>[interp] found projection:@ %a@]@."
+            Ident.print_name rs.rs_name.Ident.id_string;
           Projection d
         end
       else
@@ -483,8 +484,8 @@ let rec eval_expr env (e : expr) : result =
       try
         let v = get_pvs env pvs in
         Debug.dprintf debug
-          "[interp] reading var %s from env -> %a@."
-          pvs.pv_vs.vs_name.Ident.id_string
+          "[interp] reading var %a from env -> %a@."
+          Ident.print_name pvs.pv_vs.vs_name.Ident.id_string
           print_value v;
         Normal v
       with Not_found -> assert false (* Irred e ? *)
@@ -693,23 +694,23 @@ and exec_call env rs args ity_result =
           let pvsl = d.c_cty.cty_args in
           let env' = multibind_pvs pvsl args' env in
           Debug.dprintf debug
-            "@[Evaluating function body of %s@]@."
-            rs.rs_name.Ident.id_string;
+            "@[Evaluating function body of %a@]@."
+            Ident.print_name rs.rs_name.Ident.id_string;
           let r = eval_expr env' body
           in
           Debug.dprintf debug
-            "@[Return from function %s@ result@ %a@]@."
-            rs.rs_name.Ident.id_string print_logic_result r;
+            "@[Return from function %a@ result@ %a@]@."
+            Ident.print_name rs.rs_name.Ident.id_string print_logic_result r;
           r
       end
     | Builtin f ->
       Debug.dprintf debug
-        "@[Evaluating builtin function %s@]@."
-        rs.rs_name.Ident.id_string;
+        "@[Evaluating builtin function %a@]@."
+        Ident.print_name rs.rs_name.Ident.id_string;
       let r = Normal (f rs (* env ity_result *) args') in
       Debug.dprintf debug
-        "@[Return from builtin function %s result %a@]@."
-        rs.rs_name.Ident.id_string
+        "@[Return from builtin function %a result %a@]@."
+        Ident.print_name rs.rs_name.Ident.id_string
         print_logic_result r;
       r
     | Constructor _d ->
@@ -733,8 +734,8 @@ and exec_call env rs args ity_result =
         aux cstr.rs_cty.cty_args args
       | _ -> assert false
   with Not_found ->
-    eprintf "[interp] cannot find definition of routine %s@."
-      rs.rs_name.Ident.id_string;
+    eprintf "[interp] cannot find definition of routine %a@."
+      Ident.print_name rs.rs_name.Ident.id_string;
     raise CannotCompute
 
 
@@ -810,5 +811,6 @@ let eval_global_symbol env m fmt rs =
       end
     | _ -> assert false
   with Not_found ->
-    eprintf "Symbol '%s' has no definition.@." rs.rs_name.Ident.id_string;
+    eprintf "Symbol '%a' has no definition.@."
+      Ident.print_name rs.rs_name.Ident.id_string;
     exit 1

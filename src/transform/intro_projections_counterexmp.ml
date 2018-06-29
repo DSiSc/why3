@@ -91,8 +91,8 @@ let introduce_constant ls t_rhs proj_name =
     let const_attr = Sattr.add model_attr ls.ls_name.id_attrs in
     let const_attr = append_to_model_element_name ~attrs:const_attr ~to_append:proj_name in
     let const_loc = Opt.get ls.ls_name.id_loc in
-    let const_name = ls.ls_name.id_string^"_proj_constant_"^proj_name in
-    let axiom_name = ls.ls_name.id_string^"_proj_axiom_"^proj_name in
+    let const_name = name_concat_append ls.ls_name.id_string ("_proj_constant_"^proj_name) in
+    let axiom_name = name_concat_append ls.ls_name.id_string ("_proj_axiom_"^proj_name) in
     let id_new = Ident.id_user ~attrs:const_attr const_name const_loc in
     intro_const_equal_to_term ~term:t_rhs ~id_new:id_new ~axiom_name:axiom_name
   else
@@ -117,7 +117,7 @@ let rec projections_for_term ls term proj_name applied_projs env map_projs =
      Parameter applied_proj_f is a set of projection functions already applied
      to the term *)
   match (Opt.get term.t_ty).ty_node with
-  | Tyapp (ts, [_t_from; _t_to]) when ts.ts_name.id_string = "map" -> begin
+  | Tyapp (ts, [_t_from; _t_to]) when name_to_string ts.ts_name.id_string = "map" -> begin
       let pfs = get_list_projs term map_projs in
       match pfs with
       | [] ->

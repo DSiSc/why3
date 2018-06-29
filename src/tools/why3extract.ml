@@ -125,12 +125,12 @@ let opt_driver =
 
 let get_cout_old ?fname fg m = match opt_output with
   | None ->
-    let tname = m.mod_theory.Theory.th_name.Ident.id_string in
+    let tname = Ident.name_to_string m.mod_theory.Theory.th_name.Ident.id_string in
     Debug.dprintf Pdriver.debug "extract module %s to standard output@." tname;
     stdout, None
   | Some f ->
     let file = Filename.concat f (fg ?fname m) in
-    let tname = m.mod_theory.Theory.th_name.Ident.id_string in
+    let tname = Ident.name_to_string m.mod_theory.Theory.th_name.Ident.id_string in
     Debug.dprintf Pdriver.debug "extract module %s to file %s@." tname file;
     let old = if Sys.file_exists file then begin
       let backup = file ^ ".bak" in

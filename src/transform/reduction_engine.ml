@@ -762,7 +762,9 @@ and reduce_func_app ~orig _ty rem_st t1 t2 rem_cont =
                 t_attr_copy lhs lhs2 , fc2
               | [] , { t_node = Tvar fc1 } when vs_equal fc1 fc ->
                 let fcn = fc.vs_name in
-                let fc2 = Ident.id_derive fcn.Ident.id_string fcn in
+                let fc2 =
+                  Ident.id_derive (Ident.name_to_string fcn.Ident.id_string) fcn
+                in
                 let fc2 = create_vsymbol fc2 (t_type lhs) in
                 t_attr_copy lhs (t_var fc2) , fc2
               | _ -> raise Undetermined

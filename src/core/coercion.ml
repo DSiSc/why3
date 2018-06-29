@@ -134,22 +134,25 @@ let print_kind fmt crc =
     | _  -> assert false in
   let rec print_kind fmt = function
     | CRCleaf ls -> let s1, s2 = ty_str_of ls in
-        Format.fprintf fmt "%s: %s -> %s" ls.ls_name.id_string s1 s2
+      Format.fprintf fmt "%a: %a -> %a"
+        print_name ls.ls_name.id_string
+        print_name s1
+        print_name s2
     | CRCcomp (k1, k2) ->
         Format.fprintf fmt "%a@\n%a" print_kind k1 print_kind k2
   in print_kind fmt crc
 
 let already_a_coercion fmt crc =
-  Format.fprintf fmt "There is already a coercion from type %s to type %s:@\n%a"
-    crc.crc_src_ts.ts_name.id_string
-    crc.crc_tar_ts.ts_name.id_string
+  Format.fprintf fmt "There is already a coercion from type %a to type %a:@\n%a"
+    print_name crc.crc_src_ts.ts_name.id_string
+    print_name crc.crc_tar_ts.ts_name.id_string
     print_kind crc.crc_kind
 
 let () = Exn_printer.register
     begin fun fmt exn -> match exn with
       | NotACoercion ls ->
-          Format.fprintf fmt "Function %s cannot be used as a coercion"
-            ls.ls_name.id_string
+          Format.fprintf fmt "Function %a cannot be used as a coercion"
+            print_name ls.ls_name.id_string
       | CoercionCycle crc ->
           Format.fprintf fmt "This coercion introduces a cycle;@ ";
           already_a_coercion fmt crc

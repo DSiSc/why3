@@ -101,7 +101,7 @@ let create_rec_record_decl s fdl =
   let exn = Invalid_argument "Pdecl.create_rec_record_decl" in
   if not (its_recursive s) then raise exn;
   let id = s.its_ts.ts_name in
-  let cid = id_fresh ?loc:id.id_loc ("mk " ^ id.id_string) in
+  let cid = id_fresh ?loc:id.id_loc (name_concat_prepend "mk " id.id_string) in
   List.iter (check_field (Stv.of_list s.its_ts.ts_args)) fdl;
   let cs = create_constructor ~constr:1 cid s fdl in
   let pjl = List.map (create_projection s) fdl in
@@ -341,16 +341,16 @@ let create_type_decl dl =
     | _, _, Alias _ ->
         mk_decl (PDtype [itd]) [create_ty_decl ts]
     | _, _, Range ir ->
-        let pj_id = id_derive (nm ^ "'int") id in
+        let pj_id = id_derive (name_concat_append nm "'int") id in
         let pj_ls = create_fsymbol pj_id [ty_app ts []] ty_int in
         let pj_decl = create_param_decl pj_ls in
         (* create max attribute *)
-        let max_id = id_derive (nm ^ "'maxInt") id in
+        let max_id = id_derive (name_concat_append nm "'maxInt") id in
         let max_ls = create_fsymbol max_id [] ty_int  in
         let max_defn = t_const Number.(const_of_big_int ir.ir_upper) ty_int in
         let max_decl = create_logic_decl [make_ls_defn max_ls [] max_defn] in
         (* create min attribute *)
-        let min_id = id_derive (nm ^ "'minInt") id in
+        let min_id = id_derive (name_concat_append nm "'minInt") id in
         let min_ls = create_fsymbol min_id [] ty_int  in
         let min_defn = t_const Number.(const_of_big_int ir.ir_lower) ty_int in
         let min_decl = create_logic_decl [make_ls_defn min_ls [] min_defn] in
@@ -358,20 +358,20 @@ let create_type_decl dl =
         let meta = Theory.(meta_range, [MAts ts; MAls pj_ls]) in
         mk_decl_meta [meta] (PDtype [itd]) pure
     | _, _, Float ff ->
-        let pj_id = id_derive (nm ^ "'real") id in
+        let pj_id = id_derive (name_concat_append nm "'real") id in
         let pj_ls = create_fsymbol pj_id [ty_app ts []] ty_real in
         let pj_decl = create_param_decl pj_ls in
         (* create finiteness predicate *)
-        let iF_id = id_derive (nm ^ "'isFinite") id in
+        let iF_id = id_derive (name_concat_append nm "'isFinite") id in
         let iF_ls = create_psymbol iF_id [ty_app ts []] in
         let iF_decl = create_param_decl iF_ls in
         (* create exponent digits attribute *)
-        let eb_id = id_derive (nm ^ "'eb") id in
+        let eb_id = id_derive (name_concat_append nm "'eb") id in
         let eb_ls = create_fsymbol eb_id [] ty_int in
         let eb_defn = t_nat_const ff.Number.fp_exponent_digits in
         let eb_decl = create_logic_decl [make_ls_defn eb_ls [] eb_defn] in
         (* create significand digits attribute *)
-        let sb_id = id_derive (nm ^ "'sb") id in
+        let sb_id = id_derive (name_concat_append nm "'sb") id in
         let sb_ls = create_fsymbol sb_id [] ty_int  in
         let sb_defn = t_nat_const ff.Number.fp_significand_digits in
         let sb_decl = create_logic_decl [make_ls_defn sb_ls [] sb_defn] in
@@ -380,7 +380,7 @@ let create_type_decl dl =
         mk_decl_meta [meta] (PDtype [itd]) pure
     | fl, _, NoDef when itd.itd_invariant <> [] ->
         let inv = axiom_of_invariant itd in
-        let pr = create_prsymbol (id_derive (nm ^ "'invariant") id) in
+        let pr = create_prsymbol (id_derive (name_concat_append nm "'invariant") id) in
         let ax = create_prop_decl Paxiom pr inv in
         let add_fd s dl = create_param_decl (ls_of_rs s) :: dl in
         let pure = create_ty_decl ts :: List.fold_right add_fd fl [ax] in
@@ -490,7 +490,7 @@ let create_let_decl ld =
         let vl = List.map (fun v -> v.pv_vs) cty.cty_args in
         let hd = t_app ls (List.map t_var vl) ls.ls_value in
         let f = t_and_simp_l (conv_post hd cty.cty_post) in
-        let nm = id.id_string ^ "_spec" in
+        let nm = name_concat_append id.id_string "_spec" in
         let axms = cty_axiom (id_derive ~attrs nm id) cty f axms in
         let c = if Mrs.is_empty sm then c else c_rs_subst sm c in
         begin match c.c_node with
@@ -507,13 +507,13 @@ let create_let_decl ld =
             | Some f when cty.cty_pre = [] ->
                 abst, (ls, vl, f) :: defn, axms
             | Some f ->
-                let f = t_insert hd f and nm = id.id_string ^ "_def" in
+                let f = t_insert hd f and nm = name_concat_append id.id_string "_def" in
                 let axms = cty_axiom (id_derive ~attrs nm id) cty f axms in
                 create_param_decl ls :: abst, defn, axms
             | None when cty.cty_post = [] ->
                 let axms = match post_of_expr hd e with
                   | Some f ->
-                      let nm = id.id_string ^ "_def" in
+                      let nm = name_concat_append id.id_string "_def" in
                       cty_axiom (id_derive ~attrs nm id) cty f axms
                   | None -> axms in
                 create_param_decl ls :: abst, defn, axms
@@ -547,7 +547,7 @@ let create_let_decl ld =
     if is_trusted_rec then fail_trusted_rec ls;
     let abst = List.map (fun (s,_) -> create_param_decl s) dl in
     let mk_ax ({ls_name = id} as s, vl, t) =
-      let nm = id.id_string ^ "_def" in
+      let nm = name_concat_append id.id_string "_def" in
       let pr = create_prsymbol (id_derive ~attrs nm id) in
       let hd = t_app s (List.map t_var vl) t.t_ty in
       let ax = t_forall_close vl [] (t_insert hd t) in
@@ -672,7 +672,8 @@ let print_its_defn fst fmt itd =
         (if s.its_mutable && s.its_mfields = [] then " mutable" else "")
         (Pp.print_list Pp.semi print_field) fl
     | NoDef, fl, [{rs_name = {id_string = n}}]
-      when n = "mk " ^ s.its_ts.ts_name.id_string -> fprintf fmt " =%s { %a }"
+      when name_to_string n = "mk " ^ (name_to_string s.its_ts.ts_name.id_string)
+      -> fprintf fmt " =%s { %a }"
         (if s.its_mutable && s.its_mfields = [] then " mutable" else "")
         (Pp.print_list Pp.semi print_field) fl
     | NoDef, fl, cl ->

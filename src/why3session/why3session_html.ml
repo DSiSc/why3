@@ -180,7 +180,7 @@ let rec num_lines s acc tr =
     fprintf fmt "<td style=\"background-color:#%a\" colspan=\"%d\">"
       (color_of_status ~dark:false) (pn_proved s g)
       (max_depth - depth + 1);
-    fprintf fmt "%a</td>" Pp.html_string (get_proof_name s g).Ident.id_string;
+    fprintf fmt "%a</td>" Pp.html_string (Ident.name_to_string (get_proof_name s g).Ident.id_string);
     print_results fmt s provers (get_proof_attempt_ids s g);
     fprintf fmt "</tr>@\n";
     List.iter
@@ -199,7 +199,7 @@ let rec num_lines s acc tr =
       try
         let (l,t,_) = Theory.restore_path (theory_name th) in
         String.concat "." ([fn]@l@[t])
-      with Not_found -> fn ^ "." ^ (theory_name th).Ident.id_string
+      with Not_found -> fn ^ "." ^ (Ident.name_to_string (theory_name th).Ident.id_string)
     in
     fprintf fmt "<h2><span style=\"color:#%a\">Theory \"%s\": "
       (color_of_status ~dark:true) (th_proved s th)
@@ -260,7 +260,7 @@ struct
 
   and print_goal s fmt g =
     fprintf fmt "<li>%a : <ul>%a%a</ul></li>"
-      Pp.html_string (get_proof_name s g).Ident.id_string
+      Pp.html_string (Ident.name_to_string (get_proof_name s g).Ident.id_string)
       (Pp.print_iter2 Hprover.iter Pp.newline Pp.nothing
          Pp.nothing (print_proof_attempt s))
       (get_proof_attempt_ids s g)
@@ -268,8 +268,8 @@ struct
       (get_transformations s g)
 
   let print_theory s fmt th =
-    fprintf fmt "<li>%s%a</li>"
-      (theory_name th).Ident.id_string
+    fprintf fmt "<li>%a%a</li>"
+      Ident.print_name (theory_name th).Ident.id_string
       (print_ul (print_goal s)) (theory_goals th)
 
   let print_file s fmt f =

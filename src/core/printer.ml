@@ -230,7 +230,7 @@ let get_type_arguments t = match t.t_node with
       let m = oty_match Mtv.empty ls.ls_value t.t_ty in
       let m = List.fold_left2
         (fun m ty t -> oty_match m (Some ty) t.t_ty) m ls.ls_args tl in
-      let name tv = Mstr.add tv.tv_name.id_string in
+      let name tv = Mstr.add (name_to_string tv.tv_name.id_string) in
       let m = Mtv.fold name m Mstr.empty in
       Array.of_list (Mstr.values m)
   | _ ->

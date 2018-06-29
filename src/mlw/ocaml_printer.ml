@@ -197,11 +197,11 @@ module Print = struct
                   (print_lident info) ts
 
   let print_vsty_opt info fmt id ty =
-    fprintf fmt "?%s:(%a:@ %a)" id.id_string (print_lident info) id
+    fprintf fmt "?%a:(%a:@ %a)" print_name id.id_string (print_lident info) id
       (print_ty ~paren:false info) ty
 
   let print_vsty_named info fmt id ty =
-    fprintf fmt "~%s:(%a:@ %a)" id.id_string (print_lident info) id
+    fprintf fmt "~%a:(%a:@ %a)" print_name id.id_string (print_lident info) id
       (print_ty ~paren:false info) ty
 
   let print_vsty info fmt (id, ty, _) =
@@ -306,10 +306,10 @@ module Print = struct
           begin match expr.e_node with
             | Eapp (rs, _)
               when query_syntax info.info_syn rs.rs_name = Some "None" -> ()
-            | _ -> fprintf fmt "?%s:%a" (pv_name pv).id_string
+            | _ -> fprintf fmt "?%a:%a" print_name (pv_name pv).id_string
                      (print_expr ~paren:true info) expr end
         else if is_named ~attrs:(pv_name pv).id_attrs then
-          fprintf fmt "~%s:%a" (pv_name pv).id_string
+          fprintf fmt "~%a:%a" print_name (pv_name pv).id_string
             (print_expr ~paren:true info) expr
         else fprintf fmt "%a" (print_expr ~paren:true info) expr;
         if exprl <> [] then fprintf fmt "@ ";
@@ -696,7 +696,7 @@ let print_decl =
 let ng suffix ?fname m =
   let mod_name = m.mod_theory.th_name.id_string in
   let path     = m.mod_theory.th_path in
-  (module_name ?fname path mod_name) ^ suffix
+  (module_name ?fname path (name_to_string mod_name)) ^ suffix
 
 let file_gen = ng ".ml"
 let mli_gen = ng ".mli"

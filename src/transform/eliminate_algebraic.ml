@@ -191,7 +191,7 @@ and rewriteF kn state av sign f = match f.t_node with
 let add_selector (state,task) ts ty csl =
   if state.no_sel then state, task else
   (* declare the selector function *)
-  let mt_id = id_derive ("match_" ^ ts.ts_name.id_string) ts.ts_name in
+  let mt_id = id_derive (name_concat_prepend "match_" ts.ts_name.id_string) ts.ts_name in
   let mt_ty = ty_var (create_tvsymbol (id_fresh "a")) in
   let mt_al = ty :: List.rev_map (fun _ -> mt_ty) csl in
   let mt_ls = create_fsymbol mt_id mt_al mt_ty in
@@ -202,7 +202,7 @@ let add_selector (state,task) ts ty csl =
   let mt_vl = List.rev_map mt_vs csl in
   let mt_tl = List.rev_map t_var mt_vl in
   let mt_add tsk (cs,_) t =
-    let id = mt_ls.ls_name.id_string ^ "_" ^ cs.ls_name.id_string in
+    let id = middle_insertion mt_ls.ls_name.id_string "_" cs.ls_name.id_string in
     let pr = create_prsymbol (id_derive id cs.ls_name) in
     let vl = List.rev_map (create_vsymbol (id_fresh "u")) cs.ls_args in
     let hd = fs_app cs (List.rev_map t_var vl) (Opt.get cs.ls_value) in
@@ -220,14 +220,14 @@ let add_selector acc ts ty = function
 
 let add_indexer (state,task) ts ty csl =
   (* declare the indexer function *)
-  let mt_id = id_derive ("index_" ^ ts.ts_name.id_string) ts.ts_name in
+  let mt_id = id_derive (name_concat_prepend "index_" ts.ts_name.id_string) ts.ts_name in
   let mt_ls = create_fsymbol mt_id [ty] ty_int in
   let task  = add_param_decl task mt_ls in
   (* define the indexer function *)
   let index = ref (-1) in
   let mt_add tsk (cs,_) =
     incr index;
-    let id = mt_ls.ls_name.id_string ^ "_" ^ cs.ls_name.id_string in
+    let id = middle_insertion mt_ls.ls_name.id_string "_" cs.ls_name.id_string in
     let pr = create_prsymbol (id_derive id cs.ls_name) in
     let vl = List.rev_map (create_vsymbol (id_fresh "u")) cs.ls_args in
     let hd = fs_app cs (List.rev_map t_var vl) (Opt.get cs.ls_value) in
@@ -240,7 +240,7 @@ let add_indexer (state,task) ts ty csl =
 
 let add_discriminator (state,task) ts ty csl =
   let d_add (c1,_) task (c2,_) =
-    let id = c1.ls_name.id_string ^ "_" ^ c2.ls_name.id_string in
+    let id = middle_insertion c1.ls_name.id_string "_" c2.ls_name.id_string in
     let pr = create_prsymbol (id_derive id ts.ts_name) in
     let ul = List.rev_map (create_vsymbol (id_fresh "u")) c1.ls_args in
     let vl = List.rev_map (create_vsymbol (id_fresh "v")) c2.ls_args in
@@ -274,7 +274,7 @@ let meta_proj =
 let add_projections (state,task) _ts _ty csl =
   (* declare and define the projection functions *)
   let pj_add (m,tsk) (cs,pl) =
-    let id = cs.ls_name.id_string ^ "_proj_" in
+    let id = name_concat_append cs.ls_name.id_string "_proj_" in
     let vl = List.rev_map (create_vsymbol (id_fresh "u")) cs.ls_args in
     let tl = List.rev_map t_var vl in
     let hd = fs_app cs tl (Opt.get cs.ls_value) in
@@ -288,7 +288,7 @@ let add_projections (state,task) _ts _ty csl =
             create_lsymbol id [Opt.get cs.ls_value] t.t_ty
       in
       let tsk = add_param_decl tsk ls in
-      let id = id_derive (ls.ls_name.id_string ^ "_def") ls.ls_name in
+      let id = id_derive (name_concat_append ls.ls_name.id_string "_def") ls.ls_name in
       let pr = create_prsymbol id in
       let hh = t_app ls [hd] t.t_ty in
       let ax = t_forall_close (List.rev vl) [] (t_equ hh t) in
@@ -306,7 +306,7 @@ let add_projections (state,task) _ts _ty csl =
 let add_inversion (state,task) ts ty csl =
   if state.keep_t || state.no_inv then state, task else
   (* add the inversion axiom *)
-  let ax_id = ts.ts_name.id_string ^ "_inversion" in
+  let ax_id = name_concat_append ts.ts_name.id_string "_inversion" in
   let ax_pr = create_prsymbol (id_derive ax_id ts.ts_name) in
   let ax_vs = create_vsymbol (id_fresh "u") ty in
   let ax_hd = t_var ax_vs in

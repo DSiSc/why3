@@ -488,7 +488,7 @@ let build_vars_map renv prev =
                 (fun vy ty_vars (subst, prev) ->
                   Debug.dprintf debug_reification "creating var map %a@."
                     Pretty.print_vs vy;
-                  let ly = create_fsymbol (Ident.id_fresh vy.vs_name.id_string)
+                  let ly = create_fsymbol (Ident.id_fresh (name_to_string vy.vs_name.id_string))
                              [] ty_vars in
                   let y = t_app ly [] (Some ty_vars) in
                   let d = create_param_decl ly in
@@ -651,7 +651,7 @@ let reflection_by_function do_trans s env = Trans.store (fun task ->
              (fun id th acc ->
                try
                  let pm = Pmodule.restore_module th in
-                 Mstr.add id.id_string pm acc
+                 Mstr.add (name_to_string id.id_string) pm acc
                with Not_found -> acc)
              ths Mstr.empty in
   Debug.dprintf debug_refl "module map built@.";
@@ -684,7 +684,7 @@ let reflection_by_function do_trans s env = Trans.store (fun task ->
           let res =
             try term_of_value (Mlinterp.interp env mm rs vars)
             with Raised (xs,_,cs) ->
-              Format.eprintf "Raised %s %a@." (xs.xs_name.id_string)
+              Format.eprintf "Raised %a %a@." print_name (xs.xs_name.id_string)
                 (Pp.print_list Pp.semi Expr.print_rs) cs;
               raise (ReductionFail renv) in
           Debug.dprintf debug_refl "res %a@." Pretty.print_term res;

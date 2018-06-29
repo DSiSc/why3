@@ -281,12 +281,12 @@ let store_path, store_module, restore_path =
   let store_path {muc_theory = uc} path id =
     (* this symbol already belongs to some theory *)
     if Wid.mem id_to_path id then () else
-    let prefix = List.rev (id.id_string :: path @ uc.uc_prefix) in
-    Wid.set id_to_path id (uc.uc_path, uc.uc_name.id_string, prefix) in
+    let prefix = List.rev (name_to_string id.id_string :: path @ uc.uc_prefix) in
+    Wid.set id_to_path id (uc.uc_path, name_to_string uc.uc_name.id_string, prefix) in
   let store_module {mod_theory = {th_name = id} as th} =
     (* this symbol is already a module *)
     if Wid.mem id_to_path id then () else
-    Wid.set id_to_path id (th.th_path, id.id_string, []) in
+    Wid.set id_to_path id (th.th_path, name_to_string id.id_string, []) in
   let restore_path id = Wid.find id_to_path id in
   store_path, store_module, restore_path
 
@@ -325,8 +325,8 @@ let add_symbol add id v uc =
   store_path uc [] id;
   match uc.muc_import, uc.muc_export with
   | i0 :: sti, e0 :: ste -> { uc with
-      muc_import = add false id.id_string v i0 :: sti;
-      muc_export = add true  id.id_string v e0 :: ste }
+      muc_import = add false (name_to_string id.id_string) v i0 :: sti;
+      muc_export = add true  (name_to_string id.id_string) v e0 :: ste }
   | _ -> assert false
 
 let add_pdecl_no_logic uc d =
@@ -750,7 +750,7 @@ let clone_ppat cl sm pp mask =
         PPapp (restore_rs (cl_find_ls cl s), List.map conv_pat pl) in
   let pre = conv_pat pp.pp_pat in
   let vm, pp' = create_prog_pattern pre (clone_ity cl pp.pp_ity) mask in
-  let save v sm = sm_save_vs sm v (Mstr.find v.vs_name.id_string vm) in
+  let save v sm = sm_save_vs sm v (Mstr.find (name_to_string v.vs_name.id_string) vm) in
   Svs.fold save pp.pp_pat.pat_vars sm, pp'
 
 let rec clone_expr cl sm e = e_attr_copy e (match e.e_node with
@@ -857,11 +857,11 @@ let clone_type_record cl s d s' d' =
   let id = s.its_ts.ts_name in
   let fields' = Hstr.create 16 in
   let add_field' rs' = let pj' = fd_of_rs rs' in
-    Hstr.add fields' pj'.pv_vs.vs_name.id_string rs' in
+    Hstr.add fields' (name_to_string pj'.pv_vs.vs_name.id_string) rs' in
   List.iter add_field' d'.itd_fields;
   (* check if fields from former type are also declared in the new type *)
   let match_pj rs = let pj = fd_of_rs rs in
-    let pj_str = pj.pv_vs.vs_name.id_string in
+    let pj_str = name_to_string pj.pv_vs.vs_name.id_string in
     let pj_ity = clone_ity cl pj.pv_ity in
     let pj_ght = pj.pv_ghost in
     let rs' = try Hstr.find fields' pj_str with Not_found ->
@@ -997,8 +997,8 @@ let clone_type_decl inst cl tdl kn =
 
 let add_vc uc (its, f) =
   let {id_string = nm; id_loc = loc} = its.its_ts.ts_name in
-  let attrs = Sattr.singleton (Ident.create_attribute ("expl:VC for " ^ nm)) in
-  let pr = create_prsymbol (id_fresh ~attrs ?loc ("VC " ^ nm)) in
+  let attrs = Sattr.singleton (Ident.create_attribute (name_concat_prepend "expl:VC for " nm)) in
+  let pr = create_prsymbol (id_fresh ~attrs ?loc (name_concat_prepend "VC " nm)) in
   let d = create_pure_decl (create_prop_decl Pgoal pr f) in
   add_pdecl ~warn:false ~vc:false uc d
 
@@ -1175,11 +1175,11 @@ end)
 
 let mlw_language_builtin =
   let builtin s =
-    if s = unit_module.mod_theory.th_name.id_string then unit_module else
-    if s = builtin_theory.th_name.id_string then builtin_module else
-    if s = highord_theory.th_name.id_string then highord_module else
-    if s = bool_theory.th_name.id_string then bool_module else
-    match tuple_theory_name s with
+    if s = name_to_string unit_module.mod_theory.th_name.id_string then unit_module else
+    if s = name_to_string builtin_theory.th_name.id_string then builtin_module else
+    if s = name_to_string highord_theory.th_name.id_string then highord_module else
+    if s = name_to_string bool_theory.th_name.id_string then bool_module else
+    match tuple_theory_name (to_string_name s) with
     | Some n -> tuple_module n
     | None -> raise Not_found in
   Hpath.memo 7 (function
@@ -1204,7 +1204,7 @@ let print_mname fmt {mod_theory = th} =
   List.iter (fun s ->
     Format.pp_print_string fmt s;
     Format.pp_print_char fmt '.') th.th_path;
-  Format.pp_print_string fmt th.th_name.id_string
+  Format.pp_print_string fmt (name_to_string th.th_name.id_string)
 
 let rec print_unit fmt = function
   | Udecl d -> Pdecl.print_pdecl fmt d
@@ -1214,15 +1214,15 @@ let rec print_unit fmt = function
   | Umeta (m,al) -> Format.fprintf fmt "@[<hov 2>meta %s %a@]"
       m.meta_name (Pp.print_list Pp.comma Pretty.print_meta_arg) al
   | Uscope (s,[Uuse m]) -> Format.fprintf fmt "use %a%s" print_mname m
-      (if s = m.mod_theory.th_name.id_string then "" else " as " ^ s)
+      (if s = name_to_string m.mod_theory.th_name.id_string then "" else " as " ^ s)
   | Uscope (s,[Uclone mi]) -> Format.fprintf fmt "clone %a%s with ..."
       print_mname mi.mi_mod
-      (if s = mi.mi_mod.mod_theory.th_name.id_string then "" else " as " ^ s)
+      (if s = name_to_string mi.mi_mod.mod_theory.th_name.id_string then "" else " as " ^ s)
   | Uscope (s,ul) -> Format.fprintf fmt "@[<hov 2>scope %s@\n%a@]@\nend"
       s (Pp.print_list Pp.newline2 print_unit) ul
 
 let print_module fmt m = Format.fprintf fmt
-  "@[<hov 2>module %s@\n%a@]@\nend" m.mod_theory.th_name.id_string
+  "@[<hov 2>module %a@\n%a@]@\nend" print_name m.mod_theory.th_name.id_string
   (Pp.print_list Pp.newline2 print_unit) m.mod_units
 
 let get_rs_name nm =

@@ -556,9 +556,9 @@ module Print = struct
                  lf in
        fprintf fmt "%s" s
     | Dinclude (id, Sys) ->
-       fprintf fmt "#include <%s.h>@;"  (sanitizer id.id_string)
+       fprintf fmt "#include <%s.h>@;"  (sanitizer (name_to_string id.id_string))
     | Dinclude (id, Proj) ->
-       fprintf fmt "#include \"%s.h\"@;" (sanitizer id.id_string)
+       fprintf fmt "#include \"%s.h\"@;" (sanitizer (name_to_string id.id_string))
     | Dtypedef (ty,id) ->
        let s = sprintf "@[<hov>typedef@ %a@;%a;@]"
 	         (print_ty ~paren:false) ty print_ident id in
@@ -715,7 +715,7 @@ module MLToC = struct
        let fields = fields 0 lt in
        let s = match query_syntax info.syntax rs.rs_name with
          | Some s -> s
-         | None -> rs.rs_name.id_string in
+         | None -> name_to_string rs.rs_name.id_string in
        let name = Pp.sprintf "__%s_result" s in
        (name, fields)
     | _ -> assert false
@@ -867,8 +867,8 @@ module MLToC = struct
           | Mltree.Econst ic ->
             let n = Number.compute_int_constant ic in
             let ce = C.(Econst (Cint (BigInt.to_string n))) in
-	    Debug.dprintf debug_c_extraction "propagate constant %s for var %s@."
-			  (BigInt.to_string n) (pv_name pv).id_string;
+	    Debug.dprintf debug_c_extraction "propagate constant %s for var %a@."
+			  (BigInt.to_string n) print_name (pv_name pv).id_string;
             C.propagate_in_block (pv_name pv) ce (expr info env e)
           | Eapp (rs,_) when Mid.mem rs.rs_name info.converter ->
             begin match expr info {env with computes_return_value = false} le
@@ -882,8 +882,8 @@ module MLToC = struct
             match expr info {env with computes_return_value = false} le with
             | [], C.Sexpr((C.Esyntax(_,_,_,_,b) as se))
                 when b (* converter *) ->
-              Debug.dprintf debug_c_extraction "propagate converter for var %s@."
-                (pv_name pv).id_string;
+              Debug.dprintf debug_c_extraction "propagate converter for var %a@."
+                print_name (pv_name pv).id_string;
               C.propagate_in_block (pv_name pv) se (expr info env e)
             | d,s ->
               let initblock = d, C.assignify (Evar (pv_name pv)) s in
@@ -1111,7 +1111,7 @@ module MLToC = struct
 	   let s = C.elim_empty_blocks s in
 	   sdecls@[C.Dfun (rs.rs_name, (rtype,params), (d,s))]
       | Dtype [{its_name=id; its_def=idef}] ->
-         Debug.dprintf debug_c_extraction "PDtype %s@." id.id_string;
+         Debug.dprintf debug_c_extraction "PDtype %a@." print_name id.id_string;
          begin
            match idef with
            | Some (Dalias _ty) -> [] (*[C.Dtypedef (ty_of_mlty info ty, id)] *)
@@ -1122,7 +1122,7 @@ module MLToC = struct
               | None ->
                  raise (Unsupported
                           ("type declaration without syntax or alias: "
-                           ^id.id_string))
+                           ^ name_to_string id.id_string))
               end
          end
 
@@ -1135,7 +1135,7 @@ module MLToC = struct
     let decide_print id = query_syntax info.syntax id = None in
     match Mltree.get_decl_name d with
     | [id] when decide_print id ->
-       Debug.dprintf debug_c_extraction "print %s@." id.id_string;
+       Debug.dprintf debug_c_extraction "print %a@." print_name id.id_string;
        translate_decl info d
     | [_] | [] -> []
     | l -> Debug.dprintf debug_c_extraction "%d defs: %a@."
@@ -1149,7 +1149,7 @@ end
 
 let name_gen suffix ?fname m =
   let n = m.Pmodule.mod_theory.Theory.th_name.Ident.id_string in
-  let n = Print.sanitizer n in
+  let n = Print.sanitizer (name_to_string n) in
   let r = match fname with
     | None -> n ^ suffix
     | Some f -> f ^ "__" ^ n ^ suffix in

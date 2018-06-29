@@ -111,7 +111,7 @@ let ls_desc info ls =
   let vl = List.map (create_vsymbol (id_fresh "x")) ls.ls_args in
   let t = t_app ls (List.map t_var vl) ls.ls_value in
   let f = t_forall_close vl [] (t_equ (t_app fs_sort [t] t.t_ty) t) in
-  let pr = create_prsymbol (id_fresh (ls.ls_name.id_string ^ "_sort")) in
+  let pr = create_prsymbol (id_fresh (name_concat_append ls.ls_name.id_string "_sort")) in
   [create_prop_decl Paxiom pr (t_type_close (expl_term info true) f)]
 
 let decl info d = match d.d_node with

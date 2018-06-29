@@ -176,7 +176,7 @@ let rec goal_latex_stat s fmt prov depth depth_max subgoal g =
       end;
     if (depth <= 1) then
       fprintf fmt "\\explanation{%s} "
-              (protect (get_proof_name s g).Ident.id_string)
+              (protect (Ident.name_to_string (get_proof_name s g).Ident.id_string))
     else
       fprintf fmt " " ;
     let proofs = get_proof_attempt_ids s g in
@@ -230,14 +230,14 @@ let rec goal_latex2_stat s fmt prov depth depth_max subgoal g =
   if Hprover.length proofs > 0 then
     begin
       style_2_row fmt depth prov subgoal
-                  (protect (get_proof_name s g).Ident.id_string);
+                  (protect (Ident.name_to_string (get_proof_name s g).Ident.id_string));
       print_result_prov s proofs prov fmt
     end
  else
     if (*depth = 0*) true then
       begin
         style_2_row fmt depth prov subgoal
-                    (protect (get_proof_name s g).Ident.id_string);
+                    (protect (Ident.name_to_string (get_proof_name s g).Ident.id_string));
 	fprintf fmt "& \\multicolumn{%d}{|c|}{}\\\\ @."
           (List.length prov)
       end;
@@ -321,7 +321,7 @@ let theory_latex_stat n s table dir t =
     provers [] in
   let provers = List.sort Whyconf.Prover.compare provers in
   let depth = theory_depth s t in
-  let name = (theory_name t).Ident.id_string in
+  let name = Ident.name_to_string (theory_name t).Ident.id_string in
   let ch = open_out (Filename.concat dir(name^".tex")) in
   let fmt = formatter_of_out_channel ch in
     if table = "tabular" then
@@ -341,7 +341,7 @@ let standalone_goal_latex_stat n s _table dir g =
     provers [] in
   let provers = List.sort Whyconf.Prover.compare provers in
   let depth = goal_depth s g in
-  let name = (get_proof_name s g).Ident.id_string in
+  let name = Ident.name_to_string (get_proof_name s g).Ident.id_string in
   let ch = open_out (Filename.concat dir (name^".tex")) in
   let fmt = formatter_of_out_channel ch in
   latex_tabular_goal n s fmt depth provers g;
@@ -394,7 +394,7 @@ let element_latex_stat_theory s th n table dir e =
       try
         let goals =
           List.map (fun g ->
-                    (get_proof_name s g).Ident.id_string,g)
+                    Ident.name_to_string (get_proof_name s g).Ident.id_string,g)
             (theory_goals th)
         in
         let g = List.assoc g goals in
@@ -408,7 +408,7 @@ let element_latex_stat_file f n s table dir e =
     | th :: r ->
       try
         let ths =
-          List.map (fun th -> (theory_name th).Ident.id_string,th)
+          List.map (fun th -> Ident.name_to_string (theory_name th).Ident.id_string,th)
             (file_theories f)
         in
         let th = List.assoc th ths in

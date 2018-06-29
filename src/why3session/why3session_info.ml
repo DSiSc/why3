@@ -163,7 +163,7 @@ let rec stats_of_goal ~root prefix_name stats ses goal =
   in
   List.iter (update_perf_stats stats) proof_list;
   List.iter (stats_of_transf prefix_name stats ses) (get_transformations ses goal);
-  let goal_name = prefix_name ^ (get_proof_name ses goal).Ident.id_string in
+  let goal_name = Ident.middle_insertion prefix_name "" (get_proof_name ses goal).Ident.id_string in
   if not (pn_proved ses goal) then
     stats.no_proof <- Sstr.add goal_name stats.no_proof
   else
@@ -182,14 +182,14 @@ let rec stats_of_goal ~root prefix_name stats ses goal =
     end
 
 and stats_of_transf prefix_name stats ses transf =
-  let prefix_name = prefix_name ^ (get_transf_string ses transf) ^ " / " in
-  List.iter (stats_of_goal ~root:false prefix_name stats ses) (get_sub_tasks ses transf)
+  let prefix_name = Ident.name_to_string prefix_name ^ (get_transf_string ses transf) ^ " / " in
+  List.iter (stats_of_goal ~root:false (Ident.to_string_name prefix_name) stats ses) (get_sub_tasks ses transf)
 
 let stats_of_theory file stats ses theory =
   let goals = theory_goals theory in
-  let prefix_name = file_name file ^ " / " ^ (theory_name theory).Ident.id_string
+  let prefix_name = file_name file ^ " / " ^ Ident.name_to_string (theory_name theory).Ident.id_string
     ^  " / " in
-  List.iter (stats_of_goal ~root:true prefix_name stats ses) goals
+  List.iter (stats_of_goal ~root:true (Ident.to_string_name prefix_name) stats ses) goals
 
 let stats_of_file stats ses _ file =
   let theories = file_theories file in
@@ -245,7 +245,7 @@ let print_res ~time fmt (p,t) =
 
 let rec print_goal_stats ~time depth ses (g,l) =
   for _i=1 to depth do printf "  " done;
-  printf "+-- goal %s" (get_proof_name ses g).Ident.id_string;
+  printf "+-- goal %a" Ident.print_name (get_proof_name ses g).Ident.id_string;
   match l with
     | No l ->
       printf "@\n";
@@ -273,7 +273,7 @@ let stats2_of_theory ~nb_proofs ses th =
     [] (theory_goals th)
 
 let print_theory_stats ~time ses (th,r) =
-  printf "  +-- theory %s@\n" (theory_name th).Ident.id_string;
+  printf "  +-- theory %a@\n" Ident.print_name (theory_name th).Ident.id_string;
   List.iter (print_goal_stats ~time 2 ses) r
 
 let stats2_of_file ~nb_proofs ses file =

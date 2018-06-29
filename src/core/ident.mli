@@ -47,8 +47,28 @@ val kind_of_fix: string -> [ `None
 
 (** {2 Identifiers} *)
 
+type string_name
+
+val print_name: Format.formatter -> string_name -> unit
+
+val to_string_name: string -> string_name
+
+val name_to_string: string_name -> string
+
+val name_concat_prepend: string -> string_name -> string
+
+val name_concat_append: string_name -> string -> string
+
+val middle_insertion: string_name -> string -> string_name -> string
+
+val check_used: string_name -> bool
+
+val is_record_name: string_name -> bool
+
+val tuple_theory_name : string_name -> int option
+
 type ident = private {
-  id_string : string;               (** non-unique name *)
+  id_string : string_name;          (** non-unique name *)
   id_attrs  : Sattr.t;              (** identifier attributes *)
   id_loc    : Loc.position option;  (** optional location *)
   id_tag    : Weakhtbl.tag;         (** unique magical tag *)

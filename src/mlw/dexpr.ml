@@ -1017,8 +1017,8 @@ let find_old pvm (ovm,old) v =
      If v is local, ov and pv must be equal to v.
      If they are not equal, then v is defined under the label,
      so we return v and do not register an "oldie" for it. *)
-  let ov = Mstr.find_opt n ovm in
-  let pv = Mstr.find_opt n pvm in
+  let ov = Mstr.find_opt (name_to_string n) ovm in
+  let pv = Mstr.find_opt (name_to_string n) pvm in
   if not (Opt.equal pv_equal ov pv) then v
   else match Hpv.find_opt old v with
     | Some (_,o) -> o
@@ -1068,13 +1068,13 @@ let get_oldies old =
 let add_rsymbol ({rsm = rsm; pvm = pvm} as env) rs =
   let n = rs.rs_name.id_string in
   let pvm = match rs.rs_logic with
-    | RLpv pv -> Mstr.add n pv pvm
+    | RLpv pv -> Mstr.add (name_to_string n) pv pvm
     | _ -> pvm in
-  { env with rsm = Mstr.add n rs rsm; pvm = pvm }
+  { env with rsm = Mstr.add (name_to_string n) rs rsm; pvm = pvm }
 
 let add_pvsymbol ({pvm = pvm} as env) pv =
   let n = pv.pv_vs.vs_name.id_string in
-  { env with pvm = Mstr.add n pv pvm }
+  { env with pvm = Mstr.add (name_to_string n) pv pvm }
 
 let add_pv_map ({pvm = pvm} as env) vm =
   { env with pvm = Mstr.set_union vm pvm }
@@ -1082,7 +1082,7 @@ let add_pv_map ({pvm = pvm} as env) vm =
 let add_binders env pvl = List.fold_left add_pvsymbol env pvl
 
 let add_xsymbol ({xsm = xsm} as env) xs =
-  { env with xsm = Mstr.add xs.xs_name.id_string xs xsm }
+  { env with xsm = Mstr.add (name_to_string xs.xs_name.id_string) xs xsm }
 
 (** Abstract values *)
 
@@ -1108,8 +1108,8 @@ let check_used_pv e pv =
       Debug.test_noflag Dterm.debug_ignore_unused_var then
     begin
       let s = pv.pv_vs.vs_name.id_string in
-      if (s = "" || s.[0] <> '_') && not (Spv.mem pv e.e_effect.eff_reads) then
-        Warning.emit ?loc:pv.pv_vs.vs_name.id_loc "unused variable %s" s
+      if check_used s && not (Spv.mem pv e.e_effect.eff_reads) then
+        Warning.emit ?loc:pv.pv_vs.vs_name.id_loc "unused variable %a" print_name s
     end
 
 let e_let_check e ld = match ld with
@@ -1233,7 +1233,7 @@ and try_cexp uloc env ({de_dvty = argl,res} as de0) lpl =
            variables "'xi", but since we only do it for a better error
            message, we do not care all that much *)
         let tvm = ty_v_fold (fun m ({tv_name = id} as v) ->
-          if id.id_string = "xi" then m else (* freeze v *)
+          if name_to_string id.id_string = "xi" then m else (* freeze v *)
           let ts = create_tysymbol (id_clone id) [] NoDef in
           Mtv.add v (ty_app ts []) m) Mtv.empty ty in
         let occur_check v ty = not (ty_v_any (tv_equal v) ty) in
@@ -1511,9 +1511,9 @@ and rec_defn uloc ({inr = inr} as env0) {fds = dfdl} =
     let {rs_name = {id_string = nm; id_loc = loc}; rs_cty = c} = rs in
     let lam, dsp, dvl = lambda uloc env c.cty_args mask dsp dvl de in
     if c_ghost lam && not (rs_ghost rs) then Loc.errorm ?loc
-      "Function %s must be explicitly marked ghost" nm;
+      "Function %a must be explicitly marked ghost" print_name nm;
     if mask_spill lam.c_cty.cty_mask c.cty_mask then Loc.errorm ?loc
-      "Function %s returns unexpected ghost results" nm;
+      "Function %a returns unexpected ghost results" print_name nm;
     (rs, lam, dvl, kind)::fdl, dsp::dspl in
   (* check for unexpected aliases in case of trouble *)
   let fdl, dspl = try List.fold_right step2 fdl ([],[]) with

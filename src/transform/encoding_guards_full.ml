@@ -46,7 +46,7 @@ module Lib = struct
 (* function symbol selecting ty_type from ty_type^n *)
 let ls_selects_of_ts = Wts.memoize 63 (fun ts ->
   let create_select _ =
-    let preid = id_fresh ("select_"^ts.ts_name.id_string) in
+    let preid = id_fresh (name_concat_prepend "select_" ts.ts_name.id_string) in
     create_fsymbol preid [ty_type] ty_type in
   List.rev_map create_select ts.ts_args)
 

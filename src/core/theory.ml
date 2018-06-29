@@ -411,14 +411,16 @@ let store_path, store_theory, restore_path =
   let store_path uc path id =
     (* this symbol already belongs to some theory *)
     if Wid.mem id_to_path id then () else
-    let prefix = List.rev (id.id_string :: path @ uc.uc_prefix) in
-    Wid.set id_to_path id (uc.uc_path, uc.uc_name.id_string, prefix)
+    let prefix =
+      List.rev (name_to_string id.id_string :: path @ uc.uc_prefix)
+    in
+    Wid.set id_to_path id (uc.uc_path, name_to_string uc.uc_name.id_string, prefix)
   in
   let store_theory th =
     let id = th.th_name in
     (* this symbol is already a theory *)
     if Wid.mem id_to_path id then () else
-    Wid.set id_to_path id (th.th_path, id.id_string, []) in
+    Wid.set id_to_path id (th.th_path, name_to_string id.id_string, []) in
   let restore_path id = Wid.find id_to_path id in
   store_path, store_theory, restore_path
 
@@ -431,15 +433,15 @@ let add_symbol add id v uc =
   store_path uc [] id;
   match uc.uc_import, uc.uc_export with
   | i0 :: sti, e0 :: ste -> { uc with
-      uc_import = add false id.id_string v i0 :: sti;
-      uc_export = add true  id.id_string v e0 :: ste }
+      uc_import = add false (name_to_string id.id_string) v i0 :: sti;
+      uc_export = add true  (name_to_string id.id_string) v e0 :: ste }
   | _ -> assert false
 
 let add_symbol_ts uc ts = add_symbol add_ts ts.ts_name ts uc
 
 let add_symbol_ls uc ({ls_name = id} as ls) =
   let {id_string = nm; id_loc = loc} = id in
-  if (nm = "infix =" || nm = "infix <>") &&
+  if (name_to_string nm = "infix =" || name_to_string nm = "infix <>") &&
       uc.uc_path <> ["why3";"BuiltIn"] then
     Loc.errorm ?loc "Logical equality cannot be redefined";
   add_symbol add_ls id ls uc
@@ -448,7 +450,7 @@ let add_symbol_pr uc pr = add_symbol add_pr pr.pr_name pr uc
 
 let create_decl d = mk_tdecl (Decl d)
 
-let print_id fmt id = Format.fprintf fmt "%s" id.id_string
+let print_id fmt id = Format.fprintf fmt "%a" print_name id.id_string
 
 let warn_dubious_axiom uc k p syms =
   match k with
@@ -463,8 +465,8 @@ let warn_dubious_axiom uc k p syms =
           | _ -> ())
         syms;
       Warning.emit ?loc:p.id_loc
-        "@[axiom %s does not contain any local abstract symbol@ \
-          (contains: @[%a@])@]" p.id_string
+        "@[axiom %a does not contain any local abstract symbol@ \
+          (contains: @[%a@])@]" print_name p.id_string
         (Pp.print_list Pp.comma print_id) (Sid.elements syms)
     with Exit -> ()
 
@@ -777,10 +779,10 @@ let warn_clone_not_abstract loc th =
         end
       | _ -> ()
     ) th.th_decls;
-    Warning.emit ~loc "cloned theory %a.%s does not contain \
+    Warning.emit ~loc "cloned theory %a.%a does not contain \
         any abstract symbol; it should be used instead"
       (Pp.print_list (Pp.constant_string ".") Pp.string) th.th_path
-      th.th_name.id_string
+      print_name th.th_name.id_string
   with Exit -> ()
 
 let clone_theory cl add_td acc th inst =
@@ -928,17 +930,6 @@ let tuple_theory = Hint.memo 17 (fun n ->
   let uc = add_data_decl uc [ts, [fs,pl]] in
   close_theory uc)
 
-let tuple_theory_name s =
-  let l = String.length s in
-  if l < 6 then None else
-  let p = String.sub s 0 5 in
-  if p <> "Tuple" then None else
-  let q = String.sub s 5 (l - 5) in
-  let i = try int_of_string q with _ -> 0 in
-  (* we only accept the decimal notation *)
-  if q <> string_of_int i then None else
-  Some i
-
 let add_decl_with_tuples uc d =
   let ids = Mid.set_diff d.d_syms uc.uc_known in
   let add id s = match is_ts_tuple_id id with
@@ -961,11 +952,13 @@ let print_meta_arg_type fmt = function
 let () = Exn_printer.register
   begin fun fmt exn -> match exn with
   | NonLocal id ->
-      Format.fprintf fmt "Non-local symbol: %s" id.id_string
+      Format.fprintf fmt "Non-local symbol: %a" print_name id.id_string
   | CannotInstantiate id ->
-      Format.fprintf fmt "Cannot instantiate a defined symbol %s" id.id_string
+      Format.fprintf fmt "Cannot instantiate a defined symbol %a"
+        print_name id.id_string
   | BadInstance id ->
-      Format.fprintf fmt "Illegal instantiation for symbol %s" id.id_string
+      Format.fprintf fmt "Illegal instantiation for symbol %a"
+        print_name id.id_string
   | CloseTheory ->
       Format.fprintf fmt "Cannot close theory: some namespaces are still open"
   | NoOpenedNamespace ->
@@ -986,10 +979,10 @@ let () = Exn_printer.register
         is applied to %a"
         m.meta_name print_meta_arg_type t1 print_meta_arg_type t2
   | RangeConflict ts ->
-      Format.fprintf fmt "Conflicting definitions for range type %s"
-        ts.ts_name.id_string
+      Format.fprintf fmt "Conflicting definitions for range type %a"
+        print_name ts.ts_name.id_string
   | FloatConflict ts ->
-      Format.fprintf fmt "Conflicting definitions for float type %s"
-        ts.ts_name.id_string
+      Format.fprintf fmt "Conflicting definitions for float type %a"
+        print_name ts.ts_name.id_string
   | _ -> raise exn
   end

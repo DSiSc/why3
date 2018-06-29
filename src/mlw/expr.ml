@@ -1124,7 +1124,7 @@ let let_rec fdl =
     then invalid_arg "Expr.let_rec";
     (* prepare the extra "decrease" precondition *)
     let decr_tl = List.map fst varl in
-    let decr_id = id_fresh ("DECR " ^ s.rs_name.id_string) in
+    let decr_id = id_fresh (name_concat_prepend "DECR " s.rs_name.id_string) in
     let decr_ps = create_psymbol decr_id (List.map t_type decr_tl) in
     let pre = ps_app decr_ps decr_tl :: c.cty_pre in
     (* create the clean rsymbol *)
@@ -1173,7 +1173,7 @@ let forget_let_defn = function
   | LDrec rdl -> List.iter (fun fd -> forget_rs fd.rec_sym) rdl
 
 let extract_op {id_string = s} =
-  match Ident.kind_of_fix s with
+  match Ident.kind_of_fix (name_to_string s) with
   | `None | `Mixfix _ -> None
   | `Prefix s | `Infix s -> Some s
 
@@ -1181,12 +1181,19 @@ let tight_op s =
   s <> "" && (let c = String.get s 0 in c = '!' || c = '?')
 
 let print_rs fmt ({rs_name = {id_string = nm}} as s) =
-  if nm = Ident.mixfix "[]" then pp_print_string fmt "([])" else
-  if nm = Ident.mixfix "[]<-" then pp_print_string fmt "([]<-)" else
-  if nm = Ident.mixfix "[<-]" then pp_print_string fmt "([<-])" else
-  if nm = Ident.mixfix "[..]" then pp_print_string fmt "([..])" else
-  if nm = Ident.mixfix "[_..]" then pp_print_string fmt "([_..])" else
-  if nm = Ident.mixfix "[.._]" then pp_print_string fmt "([.._])" else
+  if name_to_string nm = Ident.mixfix "[]" then
+    pp_print_string fmt "([])"
+  else if name_to_string nm = Ident.mixfix "[]<-" then
+    pp_print_string fmt "([]<-)"
+  else if name_to_string nm = Ident.mixfix "[<-]" then
+    pp_print_string fmt "([<-])"
+  else if name_to_string nm = Ident.mixfix "[..]" then
+    pp_print_string fmt "([..])"
+  else if name_to_string nm = Ident.mixfix "[_..]" then
+    pp_print_string fmt "([_..])"
+  else if name_to_string nm = Ident.mixfix "[.._]" then
+    pp_print_string fmt "([.._])"
+  else
   match extract_op s.rs_name, s.rs_logic with
   | Some x, _ ->
       fprintf fmt "(%s%s%s)"
@@ -1252,25 +1259,25 @@ let print_capp pri ({rs_name = id} as s) fmt vl =
       print_rs fmt s
   | Some o, [t1] when tight_op o ->
       fprintf fmt (protect_on (pri > 7) "%s%a") o print_pv t1
-  | Some o, [t1] when String.get id.id_string 0 = 'p' ->
+  | Some o, [t1] when String.get (name_to_string id.id_string) 0 = 'p' ->
       fprintf fmt (protect_on (pri > 4) "%s %a") o print_pv t1
   | Some o, [t1;t2] ->
       fprintf fmt (protect_on (pri > 4) "@[<hov 1>%a %s@ %a@]")
         print_pv t1 o print_pv t2
-  | _, [t1;t2] when id.id_string = "mixfix []" ->
+  | _, [t1;t2] when name_to_string id.id_string = "mixfix []" ->
       fprintf fmt (protect_on (pri > 6) "%a[%a]") print_pv t1 print_pv t2
-  | _, [t1;t2;t3] when id.id_string = "mixfix [<-]" ->
+  | _, [t1;t2;t3] when name_to_string id.id_string = "mixfix [<-]" ->
       fprintf fmt (protect_on (pri > 6) "%a[%a <- %a]")
         print_pv t1 print_pv t2 print_pv t3
-  | _, [t1;t2;t3] when id.id_string = "mixfix []<-" ->
+  | _, [t1;t2;t3] when name_to_string id.id_string = "mixfix []<-" ->
       fprintf fmt (protect_on (pri > 0) "%a[%a] <- %a")
         print_pv t1 print_pv t2 print_pv t3
-  | _, [t1;t2;t3] when id.id_string = "mixfix [..]" ->
+  | _, [t1;t2;t3] when name_to_string id.id_string = "mixfix [..]" ->
       fprintf fmt (protect_on (pri > 6) "%a[%a..%a]")
         print_pv t1 print_pv t2 print_pv t3
-  | _, [t1;t2] when id.id_string = "mixfix [_..]" ->
+  | _, [t1;t2] when name_to_string id.id_string = "mixfix [_..]" ->
       fprintf fmt (protect_on (pri > 6) "%a[%a..]") print_pv t1 print_pv t2
-  | _, [t1;t2] when id.id_string = "mixfix [.._]" ->
+  | _, [t1;t2] when name_to_string id.id_string = "mixfix [.._]" ->
       fprintf fmt (protect_on (pri > 6) "%a[..%a]") print_pv t1 print_pv t2
   | _, tl ->
       fprintf fmt (protect_on (pri > 5) "@[<hov 1>%a@ %a@]")
@@ -1279,14 +1286,14 @@ let print_capp pri ({rs_name = id} as s) fmt vl =
 let print_cpur pri ({ls_name = id} as s) fmt vl =
   let op = match extract_op id, vl with
     | Some o, [_] when tight_op o -> Some o
-    | Some o, [_] when String.get id.id_string 0 = 'p' -> Some (o ^ "_")
+    | Some o, [_] when String.get (name_to_string id.id_string) 0 = 'p' -> Some (o ^ "_")
     | Some o, [_;_] -> Some o
-    | _, [_;_] when id.id_string = "mixfix []" -> Some "[]"
-    | _, [_;_;_] when id.id_string = "mixfix [<-]" -> Some "[<-]"
-    | _, [_;_;_] when id.id_string = "mixfix []<-" -> Some "[]<-"
-    | _, [_;_;_] when id.id_string = "mixfix [..]" -> Some "[..]"
-    | _, [_;_] when id.id_string = "mixfix [_..]" -> Some "[_..]"
-    | _, [_;_] when id.id_string = "mixfix [.._]" -> Some "[.._]"
+    | _, [_;_] when name_to_string id.id_string = "mixfix []" -> Some "[]"
+    | _, [_;_;_] when name_to_string id.id_string = "mixfix [<-]" -> Some "[<-]"
+    | _, [_;_;_] when name_to_string id.id_string = "mixfix []<-" -> Some "[]<-"
+    | _, [_;_;_] when name_to_string id.id_string = "mixfix [..]" -> Some "[..]"
+    | _, [_;_] when name_to_string id.id_string = "mixfix [_..]" -> Some "[_..]"
+    | _, [_;_] when name_to_string id.id_string = "mixfix [.._]" -> Some "[.._]"
     | _ -> None in
   match op, vl with
   | None, [] ->
@@ -1356,7 +1363,7 @@ and print_enode pri fmt e = match e.e_node with
   | Econst c -> Number.print_constant fmt c
   | Eexec (c,_) -> print_cexp true pri fmt c
   | Elet (LDvar (v,e1), e2)
-    when v.pv_vs.vs_name.id_string = "_" && ity_equal v.pv_ity ity_unit ->
+    when name_to_string v.pv_vs.vs_name.id_string = "_" && ity_equal v.pv_ity ity_unit ->
       fprintf fmt (protect_on (pri > 0) "%a;@\n%a")
         print_expr e1 print_expr e2
   | Elet (ld, e) ->

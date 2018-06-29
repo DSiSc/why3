@@ -473,7 +473,7 @@ let print_decl =
 let fg_cml ?fname m =
   let mod_name = m.mod_theory.th_name.id_string in
   let path     = m.mod_theory.th_path in
-  (module_name ?fname path mod_name) ^ ".cml"
+  (module_name ?fname path (name_to_string mod_name)) ^ ".cml"
 
 open Pdriver
 
@@ -490,7 +490,7 @@ let () = Pdriver.register_printer "cakeml" cml_printer
 let fg_sml ?fname m =
   let mod_name = m.mod_theory.th_name.id_string in
   let path     = m.mod_theory.th_path in
-  (module_name ?fname path mod_name) ^ ".sml"
+  (module_name ?fname path (name_to_string mod_name)) ^ ".sml"
 
 let sml_printer =
   { desc = "printer for SML code";

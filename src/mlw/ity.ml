@@ -1653,7 +1653,7 @@ let print_spec args pre post xpost oldies eff fmt ity =
   let print_write fmt (reg,fds) =
     let pfx = find_prefix reg in
     let print_fld fmt {pv_vs = {vs_name = id}} =
-      fprintf fmt "(%a).%s" (print_pfx reg) pfx id.id_string in
+      fprintf fmt "(%a).%a" (print_pfx reg) pfx print_name id.id_string in
     if Spv.is_empty fds then print_pfx reg fmt pfx else
       Pp.print_list Pp.comma print_fld fmt (Spv.elements fds) in
   let print_region fmt reg = print_pfx reg fmt (find_prefix reg) in
@@ -1742,11 +1742,11 @@ let () = Exn_printer.register (fun fmt e -> match e with
   | AssignSnapshot t -> fprintf fmt
       "This assignment modifies a value of the immutable type %a" print_ity t
   | WriteImmutable (r, v) -> fprintf fmt
-      "In the type symbol %a, the field %s is immutable"
-        print_its r.reg_its v.pv_vs.vs_name.id_string
+      "In the type symbol %a, the field %a is immutable"
+        print_its r.reg_its print_name v.pv_vs.vs_name.id_string
   | DuplicateField (_r, v) -> fprintf fmt
-      "In this assignment, the field %s is modified twice"
-        v.pv_vs.vs_name.id_string
+      "In this assignment, the field %a is modified twice"
+        print_name v.pv_vs.vs_name.id_string
   | GhostDivergence -> fprintf fmt
       "This ghost expression may not terminate"
   | IllegalSnapshot t -> fprintf fmt

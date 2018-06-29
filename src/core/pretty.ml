@@ -156,6 +156,7 @@ let print_ts fmt ts =
   fprintf fmt "%s" (id_unique tprinter ts.ts_name)
 
 let print_ls fmt ({ls_name = {id_string = nm}} as ls) =
+  let nm = name_to_string nm in
   if nm = "mixfix []" then pp_print_string fmt "([])" else
   if nm = "mixfix [<-]" then pp_print_string fmt "([<-])" else
   if nm = "mixfix [..]" then pp_print_string fmt "([..])" else
@@ -285,19 +286,19 @@ and print_app pri ls fmt tl =
   | Some s, [t1;t2] ->
       fprintf fmt (protect_on (pri > 5) "@[%a@ %s %a@]")
         (print_lterm 6) t1 s (print_lterm 6) t2
-  | _, [t1;t2] when ls.ls_name.id_string = "mixfix []" ->
+  | _, [t1;t2] when name_to_string ls.ls_name.id_string = "mixfix []" ->
       fprintf fmt (protect_on (pri > 7) "@[%a@,[%a]@]")
         (print_lterm 7) t1 print_term t2
-  | _, [t1;t2;t3] when ls.ls_name.id_string = "mixfix [<-]" ->
+  | _, [t1;t2;t3] when name_to_string ls.ls_name.id_string = "mixfix [<-]" ->
       fprintf fmt (protect_on (pri > 7) "@[%a@,[%a <-@ %a]@]")
         (print_lterm 7) t1 (print_lterm 6) t2 (print_lterm 6) t3
-  | _, [t1;t2;t3] when ls.ls_name.id_string = "mixfix [..]" ->
+  | _, [t1;t2;t3] when name_to_string ls.ls_name.id_string = "mixfix [..]" ->
       fprintf fmt (protect_on (pri > 7) "%a[%a..%a]")
         (print_lterm 7) t1 (print_lterm 6) t2 (print_lterm 6) t3
-  | _, [t1;t2] when ls.ls_name.id_string = "mixfix [_..]" ->
+  | _, [t1;t2] when name_to_string ls.ls_name.id_string = "mixfix [_..]" ->
       fprintf fmt (protect_on (pri > 7) "%a[%a..]")
         (print_lterm 7) t1 print_term t2
-  | _, [t1;t2] when ls.ls_name.id_string = "mixfix [.._]" ->
+  | _, [t1;t2] when name_to_string ls.ls_name.id_string = "mixfix [.._]" ->
       fprintf fmt (protect_on (pri > 7) "%a[..%a]")
         (print_lterm 7) t1 print_term t2
   | _, tl ->
@@ -753,7 +754,7 @@ let () = Exn_printer.register
   | Decl.UnboundVar vs ->
       fprintf fmt "Unbound variable: %a" print_vsty vs
   | Decl.ClashIdent id ->
-      fprintf fmt "Ident %s is defined twice" id.id_string
+      fprintf fmt "Ident %a is defined twice" print_name id.id_string
   | Decl.EmptyDecl ->
       fprintf fmt "Empty declaration"
   | Decl.EmptyAlgDecl ts ->
@@ -761,12 +762,12 @@ let () = Exn_printer.register
   | Decl.EmptyIndDecl ls ->
       fprintf fmt "Inductive predicate %a has no constructors" print_ls ls
   | Decl.KnownIdent id ->
-      fprintf fmt "Ident %s is already declared" id.id_string
+      fprintf fmt "Ident %a is already declared" print_name id.id_string
   | Decl.UnknownIdent id ->
-      fprintf fmt "Ident %s is not yet declared" id.id_string
+      fprintf fmt "Ident %a is not yet declared" print_name id.id_string
   | Decl.RedeclaredIdent id ->
-      fprintf fmt "Ident %s is already declared, with a different declaration"
-        id.id_string
+      fprintf fmt "Ident %a is already declared, with a different declaration"
+        print_name id.id_string
   | Decl.NoTerminationProof ls ->
       fprintf fmt "Cannot prove the termination of %a" print_ls ls
   | _ -> raise exn

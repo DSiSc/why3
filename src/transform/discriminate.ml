@@ -205,7 +205,7 @@ let map metas_rewrite_pr env d =
           | Some ld ->
               create_logic_decl [ld] :: defns, axioms
           | None ->
-              let nm = ls.ls_name.id_string ^ "_inst" in
+              let nm = name_concat_append ls.ls_name.id_string "_inst" in
               let pr = create_prsymbol (id_derive nm ls.ls_name) in
               defns, create_prop_decl Paxiom pr f :: axioms
       in

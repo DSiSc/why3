@@ -137,13 +137,13 @@ let file_statistics ses _ f (files,n,m) =
 
 let print_statistics ses files =
   let print_goal g =
-    printf "         +--goal %s not proved@."
-           (S.get_proof_name ses g).Ident.id_string
+    printf "         +--goal %a not proved@."
+         Ident.print_name (S.get_proof_name ses g).Ident.id_string
   in
   let print_theory (th,goals,n,m) =
     if n<m then begin
-      printf "      +--theory %s: %d/%d@."
-        (S.theory_name th).Ident.id_string n m;
+      printf "      +--theory %a: %d/%d@."
+        Ident.print_name (S.theory_name th).Ident.id_string n m;
       List.iter print_goal (List.rev goals)
     end
   in
@@ -158,7 +158,7 @@ let print_statistics ses files =
 
 let print_report ses (id,p,l,r) =
   let g = S.get_proof_name ses id in
-  printf "   goal '%s', prover '%a': " g.Ident.id_string Whyconf.print_prover p;
+  printf "   goal '%a', prover '%a': " Ident.print_name g.Ident.id_string Whyconf.print_prover p;
   match !opt_smoke with
   | SD_None ->
      begin

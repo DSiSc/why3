@@ -43,7 +43,7 @@ let clone_pv loc {pv_vs = {vs_name = id; vs_ty = ty}} =
      in the new variable for SP, because we do not want
      to require a model for it and rely on "model_vc_*"
      attributes to produce new, correctly located, variables *)
-  let id = id_fresh ~attrs:id.id_attrs ?loc id.id_string in
+  let id = id_fresh ~attrs:id.id_attrs ?loc (name_to_string id.id_string) in
   create_vsymbol id ty
 
 let pv_is_unit v = ity_equal v.pv_ity ity_unit
@@ -1482,8 +1482,8 @@ let vc_rec env vc_wp rdl =
 let mk_vc_decl kn id f =
   let {id_string = nm; id_attrs = attrs; id_loc = loc} = id in
   let attrs = if attrs_has_expl attrs then attrs else
-    Sattr.add (Ident.create_attribute ("expl:VC for " ^ nm)) attrs in
-  let pr = create_prsymbol (id_fresh ~attrs ?loc ("VC " ^ nm)) in
+    Sattr.add (Ident.create_attribute (name_concat_prepend "expl:VC for " nm)) attrs in
+  let pr = create_prsymbol (id_fresh ~attrs ?loc (name_concat_prepend "VC " nm)) in
   let f = wp_forall (Mvs.keys (t_freevars Mvs.empty f)) f in
   let f = Typeinv.inject kn f in
   let f = if Debug.test_flag debug_no_eval then f else

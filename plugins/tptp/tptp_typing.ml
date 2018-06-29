@@ -105,7 +105,7 @@ let make_denv env =
   }
 
 let add_theory env impl th =
-  let s = "$th$" ^ th.th_name.id_string in
+  let s = "$th$" ^ name_to_string th.th_name.id_string in
   if not (Mstr.mem s env) then Hstr.replace impl s (Suse th)
 
 let defined_ty ~loc denv env impl dw tyl =
@@ -549,7 +549,7 @@ let typedecl denv env impl loc s (tvl,(el,e)) =
     in
     let tvl = List.map ntv tvl in
     let add e v =
-      let s = v.tv_name.id_string in
+      let s = name_to_string v.tv_name.id_string in
       Mstr.add_new (DuplicateVar s) s (STVar v) e
     in
     let env = List.fold_left add env tvl in
@@ -576,7 +576,7 @@ let typedecl denv env impl loc s (tvl,(el,e)) =
 let flush_impl ~strict env uc impl =
   let update_th _ e uc = match e with
     | Suse th ->
-        let uc = open_scope uc th.th_name.id_string in
+        let uc = open_scope uc (name_to_string th.th_name.id_string) in
         let uc = use_export uc th in
         close_scope uc ~import:false
     | _ -> uc
@@ -599,7 +599,7 @@ let flush_impl ~strict env uc impl =
           | _ -> f in
         let f = Mstr.fold add env t_true in
         let uc = if t_equal f t_true then uc else
-          let id = ls.ls_name.id_string ^ "_def" in
+          let id = name_concat_append ls.ls_name.id_string "_def" in
           let pr = create_prsymbol (id_fresh id) in
           add_prop_decl uc Paxiom pr f in
         Mstr.add s e env, uc

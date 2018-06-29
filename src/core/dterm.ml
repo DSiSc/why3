@@ -566,7 +566,7 @@ let check_used_var t vs =
   if not (Sattr.mem attr_w_unused_var_no vs.vs_name.id_attrs) &&
       Debug.test_noflag debug_ignore_unused_var then
     begin
-      let s = vs.vs_name.id_string in
+      let s = name_to_string vs.vs_name.id_string in
       if (s = "" || s.[0] <> '_') && t_v_occurs vs t = 0 then
         Warning.emit ?loc:vs.vs_name.id_loc "unused variable %s" s
     end

@@ -201,7 +201,7 @@ let rec print_term info defs fmt t =
         | Some s -> syntax_arguments s term fmt tl
         | None ->
             unsupportedTerm t
-              ("gappa: function '" ^ ls.ls_name.id_string ^ "' is not supported")
+              ("gappa: function '" ^ name_to_string ls.ls_name.id_string ^ "' is not supported")
       end
   | Tlet _ -> unsupportedTerm t
       "gappa: you must eliminate let in term"
@@ -273,7 +273,7 @@ let rec print_fmla info defs fmt f =
         | Some s -> syntax_arguments s term fmt tl
         | None ->
             unsupportedTerm f
-              ("gappa: predicate '" ^ ls.ls_name.id_string ^ "' is not supported")
+              ("gappa: predicate '" ^ name_to_string ls.ls_name.id_string ^ "' is not supported")
       end
   | Tquant (_q, _fq) ->
       unsupportedTerm f

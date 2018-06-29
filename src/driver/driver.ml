@@ -212,7 +212,10 @@ let load_driver_absolute = let driver_tag = ref (-1) in fun env file extra_files
   let add_theory { thr_name = (loc,q); thr_rules = trl } =
     let f,id = Lists.chop_last q in
     let th = Loc.try3 ~loc Env.read_theory env f id in
-    let th_uc = Theory.create_theory (Ident.id_fresh ~loc ("driver export for "^th.th_name.id_string)) in
+    let th_uc = Theory.create_theory
+        (Ident.id_fresh ~loc ("driver export for "^
+                              name_to_string th.th_name.id_string))
+    in
     qualid := q;
     let th_uc' = List.fold_left (add_local th) th_uc trl in
     if th_uc != th_uc' then
@@ -269,10 +272,12 @@ let get_filename drv input_file theory_name goal_name =
   Str.global_substitute filename_regexp replace file
 
 let file_of_task drv input_file theory_name task =
-  get_filename drv input_file theory_name (task_goal task).pr_name.id_string
+  get_filename drv input_file theory_name
+    (name_to_string (task_goal task).pr_name.id_string)
 
 let file_of_theory drv input_file th =
-  get_filename drv input_file th.th_name.Ident.id_string "null"
+  get_filename drv input_file
+    (name_to_string th.th_name.Ident.id_string) "null"
 
 let call_on_buffer ~command ~limit ~gen_new_file ?inplace ~filename
     ~printer_mapping drv buffer =
@@ -379,7 +384,7 @@ let file_name_of_task ?old ?inplace ?interactive drv task =
           | Some loc -> let fn,_,_,_ = Loc.get loc in Filename.basename fn
           | None -> "" in
         let fn = try Filename.chop_extension fn with Invalid_argument _ -> fn in
-        true, get_filename drv fn "T" pr.pr_name.id_string
+        true, get_filename drv fn "T" (name_to_string pr.pr_name.id_string)
     | _ ->
         (* Example: cvc4 without ?save_to argument
            No file were provided. We have to generate a new one.
@@ -389,7 +394,7 @@ let file_name_of_task ?old ?inplace ?interactive drv task =
           | Some loc -> let fn,_,_,_ = Loc.get loc in Filename.basename fn
           | None -> "" in
         let fn = try Filename.chop_extension fn with Invalid_argument _ -> fn in
-        true, get_filename drv fn "T" pr.pr_name.id_string
+        true, get_filename drv fn "T" (name_to_string pr.pr_name.id_string)
 
 let prove_task_prepared ~command ~limit ?old ?inplace ?interactive drv task =
   let buf = Buffer.create 1024 in

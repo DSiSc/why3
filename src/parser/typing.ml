@@ -1072,7 +1072,8 @@ let add_types muc tdl =
             (* empty records are automatically private, otherwise they are
                just unit types that can be neither constructed nor refined *)
             let priv = d.td_vis <> Public || fl = [] and mut = d.td_mut in
-            let add_fd m (_, v) = Mstr.add v.pv_vs.vs_name.id_string v m in
+            let add_fd m (_, v) =
+              Mstr.add (name_to_string v.pv_vs.vs_name.id_string) v m in
             let gvars = List.fold_left add_fd Mstr.empty fl in
             let type_inv f = type_fmla_pure muc gvars Dterm.denv_empty f in
             let inv = List.map type_inv d.td_inv in
@@ -1090,7 +1091,7 @@ let add_types muc tdl =
             let wit = if d.td_wit = [] then [] else
               List.map (fun (_,v) -> try Mpv.find v wit with
                 | _ -> Loc.errorm ?loc:v.pv_vs.vs_name.Ident.id_loc
-                  "Missing field %s" v.pv_vs.vs_name.id_string) fl in
+                  "Missing field %a" print_name v.pv_vs.vs_name.id_string) fl in
             let itd = create_plain_record_decl ~priv ~mut id args fl inv wit in
             Hstr.add hts x itd.itd_its; Hstr.add htd x itd
         end
@@ -1237,9 +1238,9 @@ let type_inst ({muc_theory = tuc} as muc) ({mod_theory = t} as m) s =
         let ts1 = find_tysymbol_ns t.th_export p in
         let ts2 = find_itysymbol muc q in
         if Mts.mem ts1 s.mi_ty then Loc.error ~loc:(qloc p)
-          (ClashSymbol ts1.ts_name.id_string);
+          (ClashSymbol (name_to_string ts1.ts_name.id_string));
         { s with mi_ts = Loc.try4 ~loc:(qloc p) Mts.add_new
-            (ClashSymbol ts1.ts_name.id_string) ts1 ts2 s.mi_ts }
+            (ClashSymbol (name_to_string ts1.ts_name.id_string)) ts1 ts2 s.mi_ts }
     | CStsym (p,tvl,pty) ->
         let ts1 = find_tysymbol_ns t.th_export p in
         let tvl = List.map (fun id -> tv_of_string id.id_str) tvl in
@@ -1252,35 +1253,35 @@ let type_inst ({muc_theory = tuc} as muc) ({mod_theory = t} as m) s =
         | Ityapp (ts2, tyl, _) | Ityreg { reg_its = ts2; reg_args = tyl }
           when Lists.equal check tvl tyl ->
             if Mts.mem ts1 s.mi_ty then Loc.error ~loc:(qloc p)
-              (ClashSymbol ts1.ts_name.id_string);
+              (ClashSymbol (name_to_string ts1.ts_name.id_string));
             { s with mi_ts = Loc.try4 ~loc:(qloc p) Mts.add_new
-                (ClashSymbol ts1.ts_name.id_string) ts1 ts2 s.mi_ts }
+                (ClashSymbol (name_to_string ts1.ts_name.id_string)) ts1 ts2 s.mi_ts }
         | _ ->
             if Mts.mem ts1 s.mi_ts then Loc.error ~loc:(qloc p)
-              (ClashSymbol ts1.ts_name.id_string);
+              (ClashSymbol (name_to_string ts1.ts_name.id_string));
             { s with mi_ty = Loc.try4 ~loc:(qloc p) Mts.add_new
-                (ClashSymbol ts1.ts_name.id_string) ts1 ty2 s.mi_ty }
+                (ClashSymbol (name_to_string ts1.ts_name.id_string)) ts1 ty2 s.mi_ty }
         end
     | CSfsym (p,q) ->
         let ls1 = find_fsymbol_ns t.th_export p in
         let ls2 = find_fsymbol tuc q in
         { s with mi_ls = Loc.try4 ~loc:(qloc p) Mls.add_new
-            (ClashSymbol ls1.ls_name.id_string) ls1 ls2 s.mi_ls }
+            (ClashSymbol (name_to_string ls1.ls_name.id_string)) ls1 ls2 s.mi_ls }
     | CSpsym (p,q) ->
         let ls1 = find_psymbol_ns t.th_export p in
         let ls2 = find_psymbol tuc q in
         { s with mi_ls = Loc.try4 ~loc:(qloc p) Mls.add_new
-            (ClashSymbol ls1.ls_name.id_string) ls1 ls2 s.mi_ls }
+            (ClashSymbol (name_to_string ls1.ls_name.id_string)) ls1 ls2 s.mi_ls }
     | CSvsym (p,q) ->
         let rs1 = find_prog_symbol_ns m.mod_export p in
         let rs2 = find_prog_symbol muc q in
         begin match rs1, rs2 with
         | RS rs1, RS rs2 ->
             { s with mi_rs = Loc.try4 ~loc:(qloc p) Mrs.add_new
-                (ClashSymbol rs1.rs_name.id_string) rs1 rs2 s.mi_rs }
+                (ClashSymbol (name_to_string rs1.rs_name.id_string)) rs1 rs2 s.mi_rs }
         | PV pv1, PV pv2 ->
             { s with mi_pv = Loc.try4 ~loc:(qloc p) Mvs.add_new
-                (ClashSymbol pv1.pv_vs.vs_name.id_string) pv1.pv_vs pv2 s.mi_pv }
+                (ClashSymbol (name_to_string pv1.pv_vs.vs_name.id_string)) pv1.pv_vs pv2 s.mi_pv }
         | PV _, RS _ ->
             Loc.errorm ~loc:(qloc q) "program constant expected"
         | RS _, PV _ ->
@@ -1292,19 +1293,19 @@ let type_inst ({muc_theory = tuc} as muc) ({mod_theory = t} as m) s =
         let xs1 = find_xsymbol_ns m.mod_export p in
         let xs2 = find_xsymbol muc q in
         { s with mi_xs = Loc.try4 ~loc:(qloc p) Mxs.add_new
-            (ClashSymbol xs1.xs_name.id_string) xs1 xs2 s.mi_xs }
+            (ClashSymbol (name_to_string xs1.xs_name.id_string)) xs1 xs2 s.mi_xs }
     | CSaxiom p ->
         let pr = find_prop_ns t.th_export p in
         { s with mi_pk = Loc.try4 ~loc:(qloc p) Mpr.add_new
-            (ClashSymbol pr.pr_name.id_string) pr Paxiom s.mi_pk }
+            (ClashSymbol (name_to_string pr.pr_name.id_string)) pr Paxiom s.mi_pk }
     | CSlemma p ->
         let pr = find_prop_ns t.th_export p in
         { s with mi_pk = Loc.try4 ~loc:(qloc p) Mpr.add_new
-            (ClashSymbol pr.pr_name.id_string) pr Plemma s.mi_pk }
+            (ClashSymbol (name_to_string pr.pr_name.id_string)) pr Plemma s.mi_pk }
     | CSgoal p ->
         let pr = find_prop_ns t.th_export p in
         { s with mi_pk = Loc.try4 ~loc:(qloc p) Mpr.add_new
-            (ClashSymbol pr.pr_name.id_string) pr Pgoal s.mi_pk }
+            (ClashSymbol (name_to_string pr.pr_name.id_string)) pr Pgoal s.mi_pk }
     | CSprop k ->
         (* TODO: check for multiple settings *)
         { s with mi_df = k }
@@ -1389,7 +1390,7 @@ let close_module loc =
     let m = Loc.try1 ~loc close_module (Opt.get slice.muc) in
     if Debug.test_flag Glob.flag then
       Glob.def ~kind:"theory" m.mod_theory.th_name;
-    slice.file <- Mstr.add m.mod_theory.th_name.id_string m slice.file;
+    slice.file <- Mstr.add (name_to_string m.mod_theory.th_name.id_string) m slice.file;
   end;
   slice.muc <- None
 

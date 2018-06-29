@@ -245,7 +245,7 @@ let vs_tyscheme km x =
     let s = match ty.ty_node with
       | Tyapp (ts, _) -> ts.ts_name.id_string
       | Tyvar tv -> tv.tv_name.id_string
-    in if s = "" then "x" else String.make 1 s.[0]
+    in if name_to_string s = "" then "x" else String.make 1 (name_to_string s).[0]
   in
   let ty_vs ty =
     let ty = ty_inst sigma ty in

@@ -70,7 +70,7 @@ let canonicalize x f =
 let get_canonical ls =
   let ty = Opt.get_def Ty.ty_bool ls.ls_value in
   let ty = List.fold_right Ty.ty_func ls.ls_args ty in
-  let nm = ls.ls_name.id_string ^ "_closure" in
+  let nm = name_concat_append ls.ls_name.id_string "_closure" in
   let cs = create_fsymbol (id_derive nm ls.ls_name) [] ty in
   let mk_vs ty = create_vsymbol (id_fresh "y") ty in
   let vl = List.map mk_vs ls.ls_args in
@@ -79,7 +79,7 @@ let get_canonical ls =
   let e = t_app ls tl ls.ls_value in
   let f = if ls.ls_value = None
     then t_iff (t_equ t t_bool_true) e else t_equ t e in
-  let nm = ls.ls_name.id_string ^ "_closure_def" in
+  let nm = name_concat_append ls.ls_name.id_string "_closure_def" in
   let pr = create_prsymbol (id_derive nm ls.ls_name) in
   let ax = create_prop_decl Paxiom pr (t_forall_close vl [] f) in
   create_param_decl cs, ax, cs
@@ -164,7 +164,7 @@ let rec lift_f el acc t0 =
             let ls = create_fsymbol (id_clone vs.vs_name) tyl vs.vs_ty in
             let t = fs_app ls (List.map t_var vl) vs.vs_ty in
             let f = t_forall_close_merge vl (t_subst_single vs t f) in
-            let id = id_derive (vs.vs_name.id_string ^ "_def") vs.vs_name in
+            let id = id_derive (name_concat_append vs.vs_name.id_string "_def") vs.vs_name in
             let ax = create_prop_decl Paxiom (create_prsymbol id) f in
             (create_param_decl ls :: abst, ax :: axml), t
       in
@@ -180,7 +180,7 @@ let lift_l el (acc,dl) (ls,ld) =
       let (abst,axml), f = lift_f el acc f in
       let t = t_app ls (List.map t_var vl) t.t_ty in
       let f = t_forall_close_merge vl (t_subst_single vs t f) in
-      let id = id_derive (ls.ls_name.id_string ^ "_def") ls.ls_name in
+      let id = id_derive (name_concat_append ls.ls_name.id_string "_def") ls.ls_name in
       let ax = create_prop_decl Paxiom (create_prsymbol id) f in
       (create_param_decl ls :: abst, ax :: axml), dl
   | _ ->

@@ -514,8 +514,8 @@ let print_info_model info =
 
 (* TODO factor out print_prop ? *)
 let print_prop info fmt pr f =
-  fprintf fmt "@[<hov 2>;; %s@\n(assert@ %a)@]@\n@\n"
-    pr.pr_name.id_string (* FIXME? collisions *)
+  fprintf fmt "@[<hov 2>;; %a@\n(assert@ %a)@]@\n@\n"
+    print_name pr.pr_name.id_string (* FIXME? collisions *)
     (print_fmla info) f
 
 let add_check_sat info fmt =
@@ -616,7 +616,7 @@ let print_constructor_decl info fmt (ls,args) =
         List.rev field_names)
   in
 
-  if Strings.has_prefix "mk " ls.ls_name.id_string then
+  if is_record_name ls.ls_name.id_string then
     begin
       info.list_records <- Mstr.add (sprintf "%a" (print_ident info) ls.ls_name) field_names info.list_records;
     end

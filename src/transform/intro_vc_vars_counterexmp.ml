@@ -129,8 +129,8 @@ let rec do_intro info vc_loc vc_map vc_var t =
               model_trace_for_postcondition ~attrs:ls.id_attrs
             else
               ls.id_attrs in
-            let const_name = ls.id_string^"_vc_constant" in
-            let axiom_name = ls.id_string^"_vc_axiom" in
+            let const_name = name_concat_append ls.id_string "_vc_constant" in
+            let axiom_name = name_concat_append ls.id_string "_vc_axiom" in
             (* Create a new id here to check the couple name, location. *)
             let id_new = Ident.id_user ~attrs:const_attr const_name loc in
             (* The following check is used to avoid duplication of

@@ -206,8 +206,8 @@ let print_decl info fmt d = match d.d_node with
       "smtv1: inductive definitions are not supported"
   | Dprop (Paxiom, pr, _) when Mid.mem pr.pr_name info.info_syn -> ()
   | Dprop (Paxiom, pr, f) ->
-      fprintf fmt "@[<hov 2>;; %s@\n:assumption@ %a@]@\n@\n"
-        pr.pr_name.id_string (print_fmla info) f
+      fprintf fmt "@[<hov 2>;; %a@\n:assumption@ %a@]@\n@\n"
+        print_name pr.pr_name.id_string (print_fmla info) f
   | Dprop (Pgoal, pr, f) ->
       fprintf fmt "@[:formula@\n";
       fprintf fmt "@[;; %a@]@\n" print_ident pr.pr_name;

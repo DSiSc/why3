@@ -269,15 +269,15 @@ module Translate = struct
         else let e1 = ML.e_ignore e1.e_ity (expr info svar MaskGhost e1) in
           ML.e_seq e1 (expr info svar mask e2) (ML.I e.e_ity) mask eff attrs
     | Elet (LDvar (pv, e1), e2) ->
-        Debug.dprintf debug_compile "compiling local definition of %s@."
-          (pv_name pv).id_string;
+        Debug.dprintf debug_compile "compiling local definition of %a@."
+          print_name (pv_name pv).id_string;
         let ld = ML.var_defn pv (expr info svar MaskVisible e1) in
         ML.e_let ld (expr info svar mask e2) (ML.I e.e_ity) mask eff attrs
     | Elet (LDsym (rs, _), ein) when rs_ghost rs ->
         expr info svar mask ein
     | Elet (LDsym (rs, {c_node = Cfun ef; c_cty = cty}), ein) ->
-        Debug.dprintf debug_compile "compiling local function definition %s@."
-          rs.rs_name.id_string;
+        Debug.dprintf debug_compile "compiling local function definition %a@."
+          print_name rs.rs_name.id_string;
         let args = params cty.cty_args in
         let res = mlty_of_ity cty.cty_mask cty.cty_result in
         let ld = ML.sym_defn rs res args (expr info svar cty.cty_mask ef) in
@@ -293,8 +293,8 @@ module Translate = struct
         ML.e_let ld ein (ML.I e.e_ity) mask eff attrs
     | Elet (LDsym (rsf, {c_node = Capp (rs_app, pvl); c_cty = cty}), ein) ->
         (* partial application *) (* FIXME -> zero arguments functions *)
-        Debug.dprintf debug_compile "compiling partial application of %s@."
-          rsf.rs_name.id_string;
+        Debug.dprintf debug_compile "compiling partial application of %a@."
+          print_name rsf.rs_name.id_string;
         let cmk = cty.cty_mask in
         let ceff = cty.cty_effect in
         let pvl = app pvl rs_app.rs_cty.cty_args (fun x -> x) in
@@ -340,8 +340,8 @@ module Translate = struct
         (* partial application of constructors *)
         mk_eta_expansion rs pvl cty
     | Eexec ({c_node = Capp (rs, pvl); c_cty = cty}, _) ->
-        Debug.dprintf debug_compile "compiling total application of %s@."
-          rs.rs_name.id_string;
+        Debug.dprintf debug_compile "compiling total application of %a@."
+          print_name rs.rs_name.id_string;
         Debug.dprintf debug_compile "cty_args: %d@." (List.length cty.cty_args);
         let add_unit = function [] -> [ML.e_unit] | args -> args in
         let id_f = fun x -> x in

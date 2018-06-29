@@ -57,7 +57,7 @@ let iprinter = fresh_printer ()
 
 let forget_ids () = forget_all iprinter
 
-let string_of_id id = isanitize id.id_string
+let string_of_id id = isanitize (name_to_string id.id_string)
 
 (* type variables *)
 
@@ -91,7 +91,7 @@ let print_id fmt id = string fmt (id_unique iprinter id)
 let print_altname_path info fmt id =
   attribs "altname" html_string
     (print_option (attrib "path" string))
-    fmt (id.id_string, Mid.find_opt id info.theories)
+    fmt (name_to_string id.id_string, Mid.find_opt id info.theories)
 
 let print_id_attr info fmt id =
   attribs "name" print_id (print_altname_path info)

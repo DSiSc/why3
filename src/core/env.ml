@@ -239,7 +239,7 @@ let base_language_builtin =
     | None -> raise Not_found
   in
   Hpath.memo 7 (function
-    | [s] -> Mstr.singleton s (builtin s)
+    | [s] -> Mstr.singleton s (builtin (to_string_name s))
     | _   -> raise Not_found)
 
 let () = add_builtin base_language base_language_builtin

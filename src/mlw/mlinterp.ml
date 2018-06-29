@@ -127,11 +127,11 @@ let get_decl env mm rs =
   let open Pdecl in
   Debug.dprintf debug_interp "get_decl@.";
   let id = rs.rs_name in
-  Debug.dprintf debug_interp "looking for rs %s@." id.id_string;
+  Debug.dprintf debug_interp "looking for rs %a@." print_name id.id_string;
   if is_rs_tuple rs then raise Tuple;
   let pm = find_module_id env mm id in
-  Debug.dprintf debug_interp "pmodule %s@."
-                              (pm.Pmodule.mod_theory.Theory.th_name.id_string);
+  Debug.dprintf debug_interp "pmodule %a@."
+    print_name (pm.Pmodule.mod_theory.Theory.th_name.id_string);
   let tm = translate_module pm in
   let pd = Mid.find id tm.mod_from.from_km in
   match pd.pd_node with
@@ -568,7 +568,8 @@ let add_vs vs = add_id vs.vs_name
 let add_pv pv = add_vs pv.pv_vs
 
 let add_fundecl rs decl info =
-  Debug.dprintf debug_interp "adding decl for %s@." rs.rs_name.id_string;
+  Debug.dprintf debug_interp "adding decl for %a@."
+    print_name rs.rs_name.id_string;
   { info with funs = Mrs.add rs decl info.funs }
 
 exception NoMatch
@@ -619,8 +620,8 @@ let rec interp_expr info (e:Mltree.expr) : value =
             (fun info e (id, _ty, ig) ->
               assert (not ig);
               let v = interp_expr info e in
-              Debug.dprintf debug_interp "arg %s : %a@."
-                id.id_string print_value v;
+              Debug.dprintf debug_interp "arg %a : %a@."
+                print_name id.id_string print_value v;
               add_id id v info)
             info le vl in
         if rs_equal rs info.cur_rs
@@ -769,7 +770,7 @@ let rec interp_expr info (e:Mltree.expr) : value =
                   info rdl in
      interp_expr info e
   | Eraise (xs, oe)  ->
-     Debug.dprintf debug_interp "Eraise %s@." xs.xs_name.id_string;
+     Debug.dprintf debug_interp "Eraise %a@." print_name xs.xs_name.id_string;
      let ov = match oe with
        | None -> None
        | Some e -> Some (interp_expr info e) in

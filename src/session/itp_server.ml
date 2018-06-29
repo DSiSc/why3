@@ -197,7 +197,7 @@ let bypass_pretty s id =
   | Decl.UnboundVar vs ->
       fprintf fmt "Unbound variable:\n%a" (print_vsty s id) vs
   | Decl.ClashIdent id ->
-      fprintf fmt "Ident %s is defined twice" id.Ident.id_string
+      fprintf fmt "Ident %a is defined twice" Ident.print_name id.Ident.id_string
   | Decl.EmptyDecl ->
       fprintf fmt "Empty declaration"
   | Decl.EmptyAlgDecl ts ->
@@ -205,12 +205,12 @@ let bypass_pretty s id =
   | Decl.EmptyIndDecl ls ->
       fprintf fmt "Inductive predicate %a has no constructors" (print_ls s id) ls
   | Decl.KnownIdent id ->
-      fprintf fmt "Ident %s is already declared" id.Ident.id_string
+      fprintf fmt "Ident %a is already declared" Ident.print_name id.Ident.id_string
   | Decl.UnknownIdent id ->
-      fprintf fmt "Ident %s is not yet declared" id.Ident.id_string
+      fprintf fmt "Ident %a is not yet declared" Ident.print_name id.Ident.id_string
   | Decl.RedeclaredIdent id ->
-      fprintf fmt "Ident %s is already declared, with a different declaration"
-        id.Ident.id_string
+      fprintf fmt "Ident %a is already declared, with a different declaration"
+        Ident.print_name id.Ident.id_string
   | Decl.NoTerminationProof ls ->
       fprintf fmt "Cannot prove the termination of %a" (print_ls s id) ls
   | _ -> Format.fprintf fmt "Uncaught: %a" Exn_printer.exn_printer exn
@@ -620,7 +620,7 @@ end
     let d = get_server_data () in
     match node with
     | AFile file -> file_name file
-    | ATh th -> (theory_name th).Ident.id_string
+    | ATh th -> Ident.name_to_string (theory_name th).Ident.id_string
     | ATn tn ->
        let name = get_transf_name d.cont.controller_session tn in
        let args = get_transf_args d.cont.controller_session tn in
@@ -629,7 +629,8 @@ end
          String.sub full 0 40 ^ " ..."
        else full
     | APn pn ->
-       let name = (get_proof_name d.cont.controller_session pn).Ident.id_string in
+       let name =
+         Ident.name_to_string (get_proof_name d.cont.controller_session pn).Ident.id_string in
        (* Reduce the name of the goal to the minimum, by taking the
           part after the last dot: "0" instead of "WP_Parameter.0" for
           example.  *)
@@ -858,7 +859,9 @@ end
         let s = "Goal is detached and cannot be printed" in
         P.notify (Task (nid, s, []))
       | ATh t ->
-          P.notify (Task (nid, "Detached theory " ^ (theory_name t).Ident.id_string, []))
+          P.notify (Task (nid, "Detached theory " ^
+                          (Ident.name_to_string (theory_name t).Ident.id_string),
+                          []))
       | APa pid ->
           let pa = get_proof_attempt_node  d.cont.controller_session pid in
           let name = Pp.string_of Whyconf.print_prover pa.prover in
@@ -877,7 +880,8 @@ end
           let s, list_loc = task_of_id d id show_full_context loc in
           P.notify (Task (nid, s, list_loc))
       | ATh t ->
-          P.notify (Task (nid, "Theory " ^ (theory_name t).Ident.id_string, []))
+          P.notify (Task (nid, "Theory " ^
+                          (Ident.name_to_string (theory_name t).Ident.id_string), []))
       | APa pid ->
           let print_attrs = Debug.test_flag debug_attrs in
           let pa = get_proof_attempt_node  d.cont.controller_session pid in

@@ -222,7 +222,7 @@ let memlimit = match !opt_memlimit with
   | Some i -> i
 
 let print_th_namespace fmt th =
-  Pretty.print_namespace fmt th.th_name.Ident.id_string th
+  Pretty.print_namespace fmt (Ident.name_to_string th.th_name.Ident.id_string) th
 
 let fname_printer = ref (Ident.create_ident_printer [])
 
@@ -230,7 +230,7 @@ let output_task drv fname _tname th task dir =
   let fname = Filename.basename fname in
   let fname =
     try Filename.chop_extension fname with _ -> fname in
-  let tname = th.th_name.Ident.id_string in
+  let tname = Ident.name_to_string th.th_name.Ident.id_string in
   let dest = Driver.file_of_task drv fname tname task in
   (* Uniquify the filename before the extension if it exists*)
   let i = try String.rindex dest '.' with _ -> String.length dest in
@@ -252,8 +252,8 @@ let do_task drv fname tname (th : Theory.theory) (task : Task.task) =
         let call =
           Driver.prove_task ~command ~limit drv task in
         let res = Call_provers.wait_on_call call in
-        printf "%s %s %s: %a@." fname tname
-          (task_goal task).Decl.pr_name.Ident.id_string
+        printf "%s %s %a: %a@." fname tname
+          Ident.print_name (task_goal task).Decl.pr_name.Ident.id_string
           Call_provers.print_prover_result res;
         if res.Call_provers.pr_answer <> Call_provers.Valid then unproved := true
     | None, None ->

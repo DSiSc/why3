@@ -169,7 +169,7 @@ let rec print_term info fmt t =
       | None -> print_ident fmt id
     end
   | Tapp ( { ls_name = id } ,[t] )
-      when try String.sub id.id_string 0 6 = "index_" with Invalid_argument _
+      when try String.sub (name_to_string id.id_string) 0 6 = "index_" with Invalid_argument _
         -> false ->
             fprintf fmt "%a" term t
   | Tapp (ls, tl) ->
@@ -306,7 +306,8 @@ exception AlreadyDefined
 (* TODO *)
 let is_number = function
   | Tyapp (ts, _) ->
-      ts.ts_name.id_string = "int" || ts.ts_name.id_string = "real"
+      name_to_string ts.ts_name.id_string = "int" ||
+      name_to_string ts.ts_name.id_string = "real"
   | _ -> false
 
 
@@ -367,7 +368,7 @@ type filter_goal =
 let filter_goal pr f =
   match f.t_node with
     | Tapp(ps,[]) ->
-        Goal_bad ("symbol " ^ ps.ls_name.Ident.id_string ^ " unknown")
+        Goal_bad ("symbol " ^ name_to_string ps.ls_name.Ident.id_string ^ " unknown")
         (* todo: filter more goals *)
     | _ ->
         Goal_good(pr,f)
@@ -479,7 +480,7 @@ let print_hyp info fmt (pr,f) =
 
 let is_integer = function
   | Tyapp (ts, _) ->
-      ts.ts_name.id_string = "int"
+      name_to_string ts.ts_name.id_string = "int"
   | _ -> false
 
 let print_dom _info fmt lsymbol =

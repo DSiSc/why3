@@ -193,7 +193,7 @@ let search ~search_both s tables =
        Pp.sprintf
          "No declaration contain all the %d identifiers @[%a@]"
          (List.length ids)
-         (Pp.print_list Pp.space (fun fmt id -> Pp.string fmt id.Ident.id_string))
+         (Pp.print_list Pp.space (fun fmt id -> Pp.string fmt (Ident.name_to_string id.Ident.id_string)))
          ids
     else let l = Decl.Sdecl.elements l in
          let pr = tables.Trans.printer in

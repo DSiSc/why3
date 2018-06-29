@@ -173,7 +173,7 @@ module PSession = struct
        List.fold_right (fun th -> n (Theory th)) (file_theories f) []
     | Theory th ->
        let id = theory_name th in
-       let name = id.Ident.id_string in
+       let name = Ident.name_to_string id.Ident.id_string in
        let name = if th_proved s th then name^"!" else name^"?" in
        name,
        List.fold_right
@@ -182,7 +182,7 @@ module PSession = struct
          []
     | Goal id ->
        let gid = get_proof_name s id in
-       let name = gid.Ident.id_string in
+       let name = Ident.name_to_string gid.Ident.id_string in
        let name = if pn_proved s id then name^"!" else name^"?" in
        let pas = get_proof_attempts s id in
        let trs = get_transformations s id in
@@ -557,7 +557,7 @@ let create_file_rel_path c pr pn =
   let task = Session_itp.get_task session pn in
   let session_dir = Session_itp.get_dir session in
   let th = get_encapsulating_theory session (APn pn) in
-  let th_name = (Session_itp.theory_name th).Ident.id_string in
+  let th_name = Ident.name_to_string (Session_itp.theory_name th).Ident.id_string in
   let f = get_encapsulating_file session (ATh th) in
   let fn = Filename.chop_extension (Filename.basename (file_name f)) in
   let file = Driver.file_of_task driver fn th_name task in
@@ -660,8 +660,8 @@ let schedule_edition c id pr ~callback ~notification =
     end;
     callback panid s
   in
-  Debug.dprintf debug_sched "[Editing] goal %s with command '%s' on file %s@."
-                (Session_itp.get_proof_name session id).Ident.id_string
+  Debug.dprintf debug_sched "[Editing] goal %a with command '%s' on file %s@."
+                Ident.print_name (Session_itp.get_proof_name session id).Ident.id_string
                 editor file;
   let call = Call_provers.call_editor ~command:editor file in
   callback panid Running;

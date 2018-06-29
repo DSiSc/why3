@@ -67,8 +67,59 @@ let kind_of_fix s =
 
 (** Identifiers *)
 
+type string_name = string
+
+let print_name fmt n = Format.fprintf fmt "%s" n
+
+let to_string_name n = n
+
+let name_to_string n = n
+
+let tuple_theory_name s =
+  let l = String.length s in
+  if l < 6 then None else
+  let p = String.sub s 0 5 in
+  if p <> "Tuple" then None else
+  let q = String.sub s 5 (l - 5) in
+  let i = try int_of_string q with _ -> 0 in
+  (* we only accept the decimal notation *)
+  if q <> string_of_int i then None else
+  Some i
+
+(* TODO this does not look very good... *)
+let name_concat_prepend (s: string) (name: string_name) =
+  match name with
+  | _ when Strings.has_prefix "infix " name ->
+      s ^ Strings.remove_prefix "infix " name
+  | _ when Strings.has_prefix "mixfix " name ->
+      s ^ Strings.remove_prefix "mixfix " name
+  | _ when Strings.has_prefix "prefix " name ->
+      s ^ Strings.remove_prefix "prefix " name
+  | _ ->
+      s ^ name
+
+let name_concat_append (name: string_name) (s: string) =
+  match name with
+  | _ when Strings.has_prefix "infix " name ->
+      (Strings.remove_prefix "infix " name) ^ s
+  | _ when Strings.has_prefix "mixfix " name ->
+      (Strings.remove_prefix "mixfix " name) ^ s
+  | _ when Strings.has_prefix "prefix " name ->
+      (Strings.remove_prefix "prefix " name) ^ s
+  | _ ->
+      name ^ s
+
+let middle_insertion (name1: string_name) (ins: string) (name2: string_name) =
+  name1 ^ ins ^ name2
+
+let check_used (var: string_name) : bool =
+  var = "" || var.[0] <> '_'
+
+let is_record_name (s: string_name) =
+  Strings.has_prefix "mk " s
+
 type ident = {
-  id_string : string;               (* non-unique name *)
+  id_string : string_name;          (* non-unique name *)
   id_attrs  : Sattr.t;              (* identifier attributes *)
   id_loc    : Loc.position option;  (* optional location *)
   id_tag    : Weakhtbl.tag;         (* unique magical tag *)

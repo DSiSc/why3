@@ -141,7 +141,7 @@ let generalize hd (pl, task) = match hd.Task.task_decl.Theory.td_node with
       let expl = get_expls f in
       let get_vs {ls_name = id; ls_value = oty} =
         let attrs = Sattr.remove intro_attr id.id_attrs in
-        let id = id_fresh ~attrs ?loc:id.id_loc id.id_string in
+        let id = id_fresh ~attrs ?loc:id.id_loc (name_to_string id.id_string) in
         create_vsymbol id (Opt.get oty) in
       let set_vs vs ls f =
         t_replace (t_app ls [] ls.ls_value) (t_var vs) f in
