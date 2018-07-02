@@ -1,4 +1,5 @@
 stages:
+  - nightly
   - build
   - test
   - deploy
@@ -88,7 +89,7 @@ full:
     - misc/ci-docker.sh misc/ci-local.sh bench ide doc
 
 nightly-bench:
-  stage: test
+  stage: nightly
   variables:
     COMPILER: system
     DEBIAN_VERSION: testing
