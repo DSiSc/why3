@@ -2,11 +2,20 @@ ARG debian_version=stable
 FROM ocaml/ocaml:debian-$debian_version
 
 # install dependencies
-RUN apt-get update -y && apt-get upgrade -y --with-new-pkgs --auto-remove && dpkg -l
-RUN apt-get update -y && apt-get upgrade -y --with-new-pkgs --auto-remove && apt-get install --no-install-recommends -y wget libgmp-dev gtk+-2.0 libgtksourceview2.0-dev gnome-themes-standard libcanberra-gtk-module opam xvfb
+RUN apt-get update -y && apt-get upgrade -y --with-new-pkgs --auto-remove
+RUN apt-get update -y && apt-get upgrade -y --with-new-pkgs --auto-remove && apt-get install --no-install-recommends -y wget libgmp-dev gtk+-2.0 libgtksourceview2.0-dev gnome-themes-standard libcanberra-gtk-module opam xvfb unzip
 ARG debian_packages
 RUN apt-get update -y && apt-get upgrade -y --with-new-pkgs --auto-remove && apt-get install --no-install-recommends -y $debian_packages
 RUN apt-get clean
+
+# install provers
+## CVC4
+RUN wget http://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-1.5-x86_64-linux-opt
+RUN cp cvc4-1.5-x86_64-linux-opt /usr/local/bin/cvc4-1.5
+## Z3
+RUN wget https://github.com/Z3Prover/z3/releases/download/z3-4.6.0/z3-4.6.0-x64-debian-8.10.zip
+RUN unzip z3-4.6.0-x64-debian-8.10.zip
+RUN cp z3-4.6.0-x64-debian-8.10/bin/z3 /usr/local/bin/z3-4.6.0
 
 # create user
 RUN sudo adduser --disabled-password --gecos '' why3
