@@ -37,7 +37,9 @@ do
             make doc
             ;;
         nightly-bench)
-            misc/nightly-bench.sh
+            bin/why3config --detect-provers
+            bench/ce-bench
+            examples/regtests.sh
             ;;
     esac
     shift
