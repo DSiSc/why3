@@ -2,10 +2,10 @@ ARG debian_version=stable
 FROM ocaml/ocaml:debian-$debian_version
 
 # install dependencies
+RUN apt-get update -y && apt-get upgrade -y --with-new-pkgs --auto-remove && dpkg -l
+RUN apt-get update -y && apt-get upgrade -y --with-new-pkgs --auto-remove && apt-get install --no-install-recommends -y wget libgmp-dev gtk+-2.0 libgtksourceview2.0-dev gnome-themes-standard libcanberra-gtk-module opam xvfb
 ARG debian_packages
-RUN apt-get update -y && apt-get upgrade -y --with-new-pkgs && dpkg -l
-RUN apt-get update -y && apt-get upgrade -y --with-new-pkgs && apt-get install -y wget libgmp-dev gtk+-2.0 libgtksourceview2.0-dev gnome-themes-standard libcanberra-gtk-module opam xvfb
-RUN apt-get update -y && apt-get upgrade -y --with-new-pkgs && apt-get install -y $debian_packages
+RUN apt-get update -y && apt-get upgrade -y --with-new-pkgs --auto-remove && apt-get install --no-install-recommends -y $debian_packages
 RUN apt-get clean
 
 # create user

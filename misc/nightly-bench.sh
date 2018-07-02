@@ -14,15 +14,17 @@ esac
 GITBRANCH=`git rev-parse --abbrev-ref HEAD`
 REPORTDIR=$PWD/../why3-reports-$GITBRANCH
 
-if ! test -e "$REPORTDIR"; then
-    echo "directory '$REPORTDIR' for reports does not exist, aborting."
-    exit 2
-fi
-
 OUT=$REPORTDIR/nightly-bench.out
 PREVIOUS=$REPORTDIR/nightly-bench.previous
 DIFF=$REPORTDIR/nightly-bench.diff
 REPORT=$REPORTDIR/nightly-bench.report
+
+if ! test -e "$REPORTDIR"; then
+    echo "directory '$REPORTDIR' for reports does not exist, creating."
+    mkdir "$REPORTDIR"
+    touch "$PREVIOUS"
+fi
+
 DATE=`date --utc +%Y-%m-%d`
 SUBJECT="Why3 [$GITBRANCH] bench : "
 
