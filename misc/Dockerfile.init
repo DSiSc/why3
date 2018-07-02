@@ -1,4 +1,5 @@
-FROM ocaml/ocaml:debian-stable
+ARG debian_version=stable
+FROM ocaml/ocaml:debian-$debian_version
 
 # install dependencies
 ARG debian_packages

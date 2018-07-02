@@ -34,6 +34,9 @@ do
         doc)
             make doc
             ;;
+        nightly-bench)
+            misc/nightly-bench.sh
+            ;;
     esac
     shift
 done

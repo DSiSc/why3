@@ -87,6 +87,16 @@ full:
   script:
     - misc/ci-docker.sh misc/ci-local.sh bench ide doc
 
+nightly-bench:
+  stage: test
+  variables:
+    COMPILER: system
+    DEBIAN_VERSION: testing
+    DEBIAN_PACKAGES: z3 cvc4
+  script:
+    - misc/ci-docker.sh misc/ci-local.sh nightly-bench
+  when: manual
+
 opam:
   stage: build
   variables:
