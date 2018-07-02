@@ -96,7 +96,6 @@ nightly-bench:
     DEBIAN_PACKAGES: z3 cvc4
   script:
     - misc/ci-docker.sh misc/ci-local.sh nightly-bench
-  when: manual
 
 opam:
   stage: build
