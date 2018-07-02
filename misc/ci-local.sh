@@ -19,7 +19,7 @@ set -e
 eval `opam config env`
 
 ls -l .
-ls -l install-sh
+wc -c install-sh || true
 ./configure --enable-local
 make
 
