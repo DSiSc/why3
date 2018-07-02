@@ -3,6 +3,7 @@ FROM ocaml/ocaml:debian-$debian_version
 
 # install dependencies
 ARG debian_packages
+RUN apt-get update -y && apt-get upgrade -y && dpkg -l
 RUN apt-get update -y && apt-get upgrade -y && apt-get install -y wget libgmp-dev gtk+-2.0 libgtksourceview2.0-dev gnome-themes-standard libcanberra-gtk-module opam xvfb
 RUN apt-get update -y && apt-get upgrade -y && apt-get install -y $debian_packages
 RUN apt-get clean
