@@ -175,6 +175,7 @@ open Whyconf
 
 let convert_policy u =
   match u with
+  | CPU_remove -> ["policy", String "remove"]
   | CPU_keep -> ["policy", String "keep"]
   | CPU_upgrade p ->
      ["policy", String "upgrade"] @ convert_prover "target_" p

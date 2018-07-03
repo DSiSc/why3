@@ -39,6 +39,7 @@ do
         nightly-bench)
             bin/why3config --detect-provers
             bench/ce-bench
+            cat misc/bench-few-provers-why3-conf >> why3.conf
             examples/regtests.sh
             ;;
     esac

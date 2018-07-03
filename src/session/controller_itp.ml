@@ -925,7 +925,8 @@ let find_prover notification c goal_id pr =
           Session_itp.change_prover notification c.controller_session goal_id pr new_pr;
           Some new_pr
         end
-   | Whyconf.CPU_duplicate _new_pr ->
+   | Whyconf.CPU_remove
+   | Whyconf.CPU_duplicate _ (* _new_pr *) ->
       assert false (* TODO *)
 (*
       (* does a proof using new_p already exists ? *)

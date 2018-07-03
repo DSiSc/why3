@@ -1,0 +1,84 @@
+[uninstalled_prover altergo_95_2]
+name = "Alt-Ergo"
+version = "0.95.2"
+alternative = ""
+policy = "upgrade"
+target_alternative = ""
+target_name = "Alt-Ergo"
+target_version = "2.2.0"
+
+[uninstalled_prover altergo_99_1]
+name = "Alt-Ergo"
+version = "0.99.1"
+alternative = ""
+policy = "upgrade"
+target_alternative = ""
+target_name = "Alt-Ergo"
+target_version = "2.2.0"
+
+[uninstalled_prover altergo_1_01]
+name = "Alt-Ergo"
+version = "0.1.01"
+alternative = ""
+policy = "upgrade"
+target_alternative = ""
+target_name = "Alt-Ergo"
+target_version = "2.2.0"
+
+[uninstalled_prover altergo_2_0_0]
+name = "Alt-Ergo"
+version = "2.0.0"
+alternative = ""
+policy = "upgrade"
+target_alternative = ""
+target_name = "Alt-Ergo"
+target_version = "2.2.0"
+
+[uninstalled_prover cvc3_2_2]
+name = "CVC3"
+version = "2.2"
+alternative = ""
+policy = "remove"
+
+[uninstalled_prover cvc3_2_4_1]
+name = "CVC3"
+version = "2.4.1"
+alternative = ""
+policy = "remove"
+
+[uninstalled_prover cvc4_1_2]
+name = "CVC4"
+version = "1.2"
+alternative = ""
+policy = "upgrade"
+target_alternative = ""
+target_name = "CVC4"
+target_version = "1.5"
+
+[uninstalled_prover cvc4_1_3]
+name = "CVC4"
+version = "1.3"
+alternative = ""
+policy = "upgrade"
+target_alternative = ""
+target_name = "CVC4"
+target_version = "1.5"
+
+[uninstalled_prover cvc4_1_4_nobv]
+name = "CVC4"
+version = "1.4"
+alternative = "(noBV)"
+policy = "upgrade"
+target_name = "CVC4"
+target_version = "1.5"
+target_alternative = "(noBV)"
+
+
+[uninstalled_prover cvc4_1_4]
+name = "CVC4"
+version = "1.4"
+alternative = ""
+policy = "upgrade"
+target_name = "CVC4"
+target_version = "1.5"
+target_alternative = ""

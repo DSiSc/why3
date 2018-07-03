@@ -86,45 +86,7 @@ perl -pi -e 's/running_provers_max = 2/running_provers_max = 4/' why3.conf
 COQVER=$(bin/why3 --list-provers | sed -n -e 's/  Coq (\?\([0-9.]\+\).*/\1/p')
 echo "Coq version detected: $COQVER" >> $REPORT
 if test "$COQVER" != "" ; then
-cat >> why3.conf <<EOF
-
-[uninstalled_prover coq85]
-alternative = ""
-name = "Coq"
-policy = "upgrade"
-target_alternative = ""
-target_name = "Coq"
-target_version = "$COQVER"
-version = "8.5"
-
-[uninstalled_prover coq86]
-alternative = ""
-name = "Coq"
-policy = "upgrade"
-target_alternative = ""
-target_name = "Coq"
-target_version = "$COQVER"
-version = "8.6"
-
-[uninstalled_prover coq861]
-alternative = ""
-name = "Coq"
-policy = "upgrade"
-target_alternative = ""
-target_name = "Coq"
-target_version = "$COQVER"
-version = "8.6.1"
-
-[uninstalled_prover coq872]
-alternative = ""
-name = "Coq"
-policy = "upgrade"
-target_alternative = ""
-target_name = "Coq"
-target_version = "$COQVER"
-version = "8.7.2"
-
-EOF
+sed bench-coq-why3-conf -e "s/@COQVER@/$COQVER/g"  >> why3.conf
 fi
 
 # run the bench
