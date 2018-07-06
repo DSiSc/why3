@@ -910,22 +910,22 @@ let copy_paste ~notification ~callback_pa ~callback_tr c from_any to_any =
 let debug_replay = Debug.register_flag "replay" ~desc:"Debug@ info@ for@ replay"
 
 let find_prover notification c goal_id pr =
-  if Hprover.mem c.controller_provers pr then Some pr else
+  if Hprover.mem c.controller_provers pr then `Found pr else
    match Whyconf.get_prover_upgrade_policy c.controller_config pr with
-   | exception Not_found -> None
-   | Whyconf.CPU_keep -> None
+   | exception Not_found -> `Keep
+   | Whyconf.CPU_keep -> `Keep
    | Whyconf.CPU_upgrade new_pr ->
       (* does a proof using new_pr already exists ? *)
       if Hprover.mem (get_proof_attempt_ids c.controller_session goal_id) new_pr
       then (* yes, then we do nothing *)
-        None
+        `Keep
       else
         begin
           (* we modify the prover in-place *)
           Session_itp.change_prover notification c.controller_session goal_id pr new_pr;
-          Some new_pr
+          `Found new_pr
         end
-   | Whyconf.CPU_remove
+   | Whyconf.CPU_remove -> `Remove
    | Whyconf.CPU_duplicate _ (* _new_pr *) ->
       assert false (* TODO *)
 (*
@@ -947,8 +947,9 @@ let replay_proof_attempt c pr limit (parid: proofNodeID) id ~callback ~notificat
   (* The replay can be done on a different machine so we need
      to check more things before giving the attempt to the scheduler *)
   match find_prover notification c parid pr with
-  | None -> callback id (Uninstalled pr)
-  | Some pr' ->
+  | `Keep -> callback id (Uninstalled pr)
+  | `Remove -> (* todo *) callback id (Uninstalled pr)
+  | `Found pr' ->
      try
        if pr' <> pr then callback id (UpgradeProver pr');
        let _ = get_task c.controller_session parid in

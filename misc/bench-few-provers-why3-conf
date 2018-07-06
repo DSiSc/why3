@@ -124,14 +124,14 @@ target_name = "Z3"
 target_version = "4.6.0"
 target_alternative = ""
 
-[uninstalled_prover Z34.4.1 (noBV)]
+[uninstalled_prover Z34.4.1_noBV]
 name = "Z3"
-version = "4.4.1 (noBV)"
-alternative = ""
+version = "4.4.1"
+alternative = "noBV"
 policy = "upgrade"
 target_name = "Z3"
 target_version = "4.6.0"
-target_alternative = ""
+target_alternative = "noBV"
 
 [uninstalled_prover Z34.4.1]
 name = "Z3"
