@@ -37,8 +37,6 @@ do
             make doc
             ;;
         nightly-bench)
-            ls -l /usr/local/bin/
-            file $(which cvc4-1.5)
             bin/why3config --detect-provers
             bench/ce-bench
             cat misc/bench-few-provers-why3-conf >> why3.conf
