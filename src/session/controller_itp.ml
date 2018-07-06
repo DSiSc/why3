@@ -31,6 +31,7 @@ type proof_attempt_status =
   | InternalFailure of exn (** external proof aborted by internal error *)
   | Uninstalled of Whyconf.prover (** prover is uninstalled *)
   | UpgradeProver of Whyconf.prover (** prover is upgraded *)
+  | Removed of Whyconf.prover (** prover as been removed or upgraded *)
 
 let print_status fmt st =
   match st with
@@ -47,6 +48,8 @@ let print_status fmt st =
       fprintf fmt "Prover %a is uninstalled" Whyconf.print_prover pr
   | UpgradeProver pr    ->
       fprintf fmt "Prover upgrade to %a" Whyconf.print_prover pr
+  | Removed pr    ->
+      fprintf fmt "Prover %a removed" Whyconf.print_prover pr
 
 type transformation_status =
   | TSscheduled | TSdone of transID | TSfailed of (proofNodeID * exn)
@@ -496,7 +499,7 @@ let schedule_proof_attempt c id pr ?save_to ~limit ~callback ~notification =
   let callback panid s =
     begin
       match s with
-      | UpgradeProver _ -> ()
+      | UpgradeProver _ | Removed _ -> ()
       | Scheduled ->
          Hpan.add c.controller_running_proof_attempts panid ();
          update_goal_node notification ses id
@@ -656,7 +659,7 @@ let schedule_edition c id pr ~callback ~notification =
       | Interrupted
       | InternalFailure _ ->
          update_goal_node notification session id
-      | Undone | Detached | Uninstalled _ | Scheduled -> assert false
+      | Undone | Detached | Uninstalled _ | Scheduled | Removed _ -> assert false
     end;
     callback panid s
   in
@@ -731,7 +734,7 @@ let run_strategy_on_goal
               callback (STSgoto (g,pc+1));
               let run_next () = exec_strategy (pc+1) strat g; false in
               S.idle ~prio:0 run_next
-           | Undone | Detached | Uninstalled _ ->
+           | Undone | Detached | Uninstalled _ | Removed _ ->
                          (* should not happen *)
                          assert false
          in
@@ -917,8 +920,8 @@ let find_prover notification c goal_id pr =
    | Whyconf.CPU_upgrade new_pr ->
       (* does a proof using new_pr already exists ? *)
       if Hprover.mem (get_proof_attempt_ids c.controller_session goal_id) new_pr
-      then (* yes, then we do nothing *)
-        `Keep
+      then (* yes, then we remove the attempt *)
+        `Remove
       else
         begin
           (* we modify the prover in-place *)
@@ -948,7 +951,9 @@ let replay_proof_attempt c pr limit (parid: proofNodeID) id ~callback ~notificat
      to check more things before giving the attempt to the scheduler *)
   match find_prover notification c parid pr with
   | `Keep -> callback id (Uninstalled pr)
-  | `Remove -> (* todo *) callback id (Uninstalled pr)
+  | `Remove ->
+      remove_proof_attempt c.controller_session parid pr;
+      callback id (Removed pr)
   | `Found pr' ->
      try
        if pr' <> pr then callback id (UpgradeProver pr');
@@ -1006,7 +1011,7 @@ let replay ~valid_only ~obsolete_only ?(use_steps=false) ?(filter=fun _ -> true)
 
   let craft_report s id pr limits pa =
     match s with
-    | UpgradeProver _ -> found_upgraded_prover := true
+    | UpgradeProver _ | Removed _ -> found_upgraded_prover := true
     | Scheduled | Running -> ()
     | Undone | Interrupted ->
        decr count;
@@ -1146,7 +1151,7 @@ let bisect_proof_attempt ~callback_tr ~callback_pa ~notification ~removed c pa_i
                   callback_pa paid st;
                   begin match st with
                   | UpgradeProver _ | Scheduled | Running -> ()
-                  | Detached | Uninstalled _ -> assert false
+                  | Detached | Uninstalled _ | Removed _ -> assert false
                   | Undone | Interrupted -> Debug.dprintf debug "Bisecting interrupted.@."
                   | InternalFailure exn ->
                      (* Perhaps the test can be considered false in this case? *)
@@ -1208,7 +1213,7 @@ later on. We do has if proof fails. *)
               callback_pa paid st;
               begin
               match st with
-              | UpgradeProver _ -> ()
+              | UpgradeProver _ | Removed _ -> ()
               | Scheduled ->
                  Debug.dprintf
                    debug "[Bisect] prover on subtask is scheduled@."
