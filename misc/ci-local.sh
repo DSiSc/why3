@@ -38,10 +38,8 @@ do
             ;;
         nightly-bench-reduced)
             bin/why3config --detect-provers
-            cat why3.conf
             bench/ce-bench
             cat misc/bench-few-provers-why3-conf >> why3.conf
-            cat why3.conf
             REGTESTS_MODE=REDUCED examples/regtests.sh
             ;;
     esac
