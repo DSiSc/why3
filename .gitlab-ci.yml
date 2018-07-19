@@ -95,7 +95,7 @@ nightly-bench:
     DEBIAN_PACKAGES: cvc3 spass
     OPAM_PACKAGES: alt-ergo.2.2.0 zenon.0.8.0 coq.8.7.1 coq-flocq.2.6.1
   script:
-    - misc/ci-docker.sh misc/ci-local.sh nightly-bench
+    - misc/ci-docker.sh misc/ci-local.sh nightly-bench-reduced
 
 opam:
   stage: build

@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -eu
 # regression tests for why3
 
 REPLAYOPT=""
@@ -39,12 +39,24 @@ export shapes=""
 
 
 run_dir () {
-    for f in `ls $1/*/why3session.xml`; do
+    if [ "$REGTESTS_MODE" = "REDUCED" ]; then
+        if [ -f $1/reduced_regtests.list ]; then
+            LIST=`cat $1/reduced_regtests.list`
+        else
+            LIST=
+        fi
+    else
+        LIST=`ls $1/*/why3session.xml`
+    fi
+    for f in $LIST; do
         d=`dirname $f`
         printf "Replaying $d ... "
-        ../bin/why3replay.opt -q $REPLAYOPT $2 $d 2> $TMPERR > $TMP
-        ret=$?
-        if test "$ret" != "0"  ; then
+        if ../bin/why3replay.opt -q $REPLAYOPT $2 $d 2> $TMPERR > $TMP ; then
+            printf "OK"
+            cat $TMP $TMPERR
+            success=`expr $success + 1`
+        else
+            ret=$?
             printf "FAILED (ret code=$ret):"
             out=`head -1 $TMP`
             if test -z "$out" ; then
@@ -54,10 +66,6 @@ run_dir () {
                cat $TMP
             fi
             res=1
-        else
-            printf "OK"
-            cat $TMP $TMPERR
-            success=`expr $success + 1`
         fi
         total=`expr $total + 1`
     done
@@ -67,7 +75,7 @@ run_dir () {
 
 echo "=== Programs already ported === MUST REPLAY AND ALL GOALS PROVED ==="
 echo ""
-run_dir .
+run_dir . ""
 run_dir double_wp "-L double_wp"
 run_dir avl "-L avl"
 run_dir foveoos11-cm
