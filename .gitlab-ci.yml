@@ -1,7 +1,7 @@
 stages:
-  - nightly
   - build
   - test
+  - nightly
   - deploy
 
 .build_template: &build_definition
@@ -84,7 +84,7 @@ full:
   stage: test
   variables:
     COMPILER: 4.04.0
-    DEBIAN_PACKAGES: hevea rubber texlive-latex-extra
+    DEBIAN_PACKAGES: hevea rubber texlive-latex-extra lmodern texlive-fonts-recommended
     OPAM_PACKAGES: coq-flocq.2.6.1 js_of_ocaml-ppx alt-ergo.2.0.0
   script:
     - misc/ci-docker.sh misc/ci-local.sh bench ide doc
