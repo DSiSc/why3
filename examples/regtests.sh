@@ -2,6 +2,7 @@
 # regression tests for why3
 
 REPLAYOPT=""
+REGTESTS_MODE=""
 
 while test $# != 0; do
 case "$1" in
@@ -13,6 +14,10 @@ case "$1" in
         ;;
   "--prover")
         REPLAYOPT="$REPLAYOPT --prover $2"
+        shift
+        ;;
+  "--reduced-mode")
+        REGTESTS_MODE="REDUCED"
         shift
         ;;
   *)
@@ -78,10 +83,10 @@ echo ""
 run_dir . ""
 run_dir double_wp "-L double_wp"
 run_dir avl "-L avl"
-run_dir foveoos11-cm
+run_dir foveoos11-cm ""
 run_dir vacid_0_binary_heaps "-L vacid_0_binary_heaps"
 run_dir verifythis_2016_matrix_multiplication "-L verifythis_2016_matrix_multiplication"
-run_dir WP_revisited
+run_dir WP_revisited ""
 run_dir prover "-L prover --debug ignore_unused_vars"
 run_dir multiprecision "-L multiprecision"
 echo ""

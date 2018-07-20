@@ -18,8 +18,6 @@
 set -e
 eval `opam config env`
 
-ls -l .
-wc -c install-sh || true
 ./configure --enable-local
 make
 
@@ -39,8 +37,9 @@ do
         nightly-bench-reduced)
             bin/why3config --detect-provers
             bench/ce-bench
+            sed -i why3.conf -e "s/running_provers_max = [0-9]*/running_provers_max = 1/"
             cat misc/bench-few-provers-why3-conf >> why3.conf
-            REGTESTS_MODE=REDUCED examples/regtests.sh
+            examples/regtests.sh --reduced-mode
             ;;
     esac
     shift
