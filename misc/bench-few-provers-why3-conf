@@ -68,7 +68,7 @@ alternative = ""
 policy = "upgrade"
 target_alternative = ""
 target_name = "CVC4"
-target_version = "1.5"
+target_version = "1.4"
 
 [uninstalled_prover cvc4_1_3]
 name = "CVC4"
@@ -77,25 +77,7 @@ alternative = ""
 policy = "upgrade"
 target_alternative = ""
 target_name = "CVC4"
-target_version = "1.5"
-
-[uninstalled_prover cvc4_1_4_nobv]
-name = "CVC4"
-version = "1.4"
-alternative = "noBV"
-policy = "upgrade"
-target_name = "CVC4"
-target_version = "1.5"
-target_alternative = "noBV"
-
-[uninstalled_prover cvc4_1_4]
-name = "CVC4"
-version = "1.4"
-alternative = ""
-policy = "upgrade"
-target_name = "CVC4"
-target_version = "1.5"
-target_alternative = ""
+target_version = "1.4"
 
 [uninstalled_prover Z33.2]
 name = "Z3"
