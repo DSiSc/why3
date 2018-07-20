@@ -18,7 +18,6 @@ case "$1" in
         ;;
   "--reduced-mode")
         REGTESTS_MODE="REDUCED"
-        shift
         ;;
   *)
         echo "$0: Unknown option '$1'"
@@ -46,7 +45,7 @@ export shapes=""
 run_dir () {
     if [ "$REGTESTS_MODE" = "REDUCED" ]; then
         if [ -f $1/reduced_regtests.list ]; then
-            LIST=`cat $1/reduced_regtests.list`
+            LIST=`sed $1/reduced_regtests.list -e "s&.*&$1/\0/why3session.xml&"`
         else
             LIST=
         fi

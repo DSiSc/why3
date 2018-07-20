@@ -1,4 +1,4 @@
-./counting_sort/why3session.xml
-./leftist_heap/why3session.xml
-./binary_sort/why3session.xml
-./mergesort_array/why3session.xml
+counting_sort
+leftist_heap
+binary_sort
+mergesort_array
